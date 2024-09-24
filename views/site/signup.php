@@ -25,7 +25,8 @@ $this->params['breadcrumbs'][] = $this->title;
         <?= $form->field($model, 'role')->dropDownList([
             User::ROLE_USER => 'User',
             User::ROLE_ADMIN => 'Admin',
-        ]) ?>
+            User::ROLE_DEVELOPER => 'Developer',
+        ], ['id' => 'role-dropdown']) ?>
 
         <div class="form-group">
             <?= Html::submitButton('Signup', ['class' => 'btn btn-primary', 'name' => 'signup-button']) ?>

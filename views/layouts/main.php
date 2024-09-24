@@ -31,7 +31,7 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
 <header id="header">
     <?php
     NavBar::begin([
-        'brandLabel' => Yii::$app->name,
+        // 'brandLabel' => Yii::$app->name,
         'brandUrl' => Yii::$app->homeUrl,
         'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
     ]);
@@ -43,21 +43,23 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
     if (Yii::$app->user->isGuest) {
         $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
     } else {
-        if (Yii::$app->user->identity->isDeveloper()) {
+        if (Yii::$app->user->identity->isAdmin()) {
+            $menuItems[] = ['label' => 'Admin', 'url' => ['/site/admin']];
+        } else {
             $menuItems[] = ['label' => 'Developer Dashboard', 'url' => ['/developer/view']];
         }
-        $menuItems[] = '<li class="nav-item">'
-            . Html::beginForm(['/site/logout'])
+        $menuItems[] = '<li>'
+            . Html::beginForm(['/site/logout'], 'post')
             . Html::submitButton(
-                'Logout (' . Html::encode(Yii::$app->user->identity->getUsername()) . ')',
-                ['class' => 'nav-link btn btn-link logout']
+                'Logout (' . Yii::$app->user->identity->username . ')',
+                ['class' => 'btn btn-link logout']
             )
             . Html::endForm()
             . '</li>';
     }
 
     echo Nav::widget([
-        'options' => ['class' => 'navbar-nav ml-auto'],
+        'options' => ['class' => 'navbar-nav'],
         'items' => $menuItems,
     ]);
 
@@ -71,14 +73,17 @@ $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii
             <?= Breadcrumbs::widget(['links' => $this->params['breadcrumbs']]) ?>
         <?php endif ?>
         <?= Alert::widget() ?>
+        <?php foreach (Yii::$app->session->getAllFlashes() as $key => $message): ?>
+            <div class="alert alert-<?= $key ?>"><?= $message ?></div>
+        <?php endforeach; ?>
         <?= $content ?>
     </div>
 </main>
 
 <footer id="footer" class="mt-auto py-3 bg-light">
     <div class="container">
-        <div class="row text-muted">
-            <div class="col-md-6 text-center text-md-start">&copy; My Company <?= date('Y') ?></div>
+        <div class="row ">
+            <div class="col-md-6 text-center text-md-start">&copy; Iansoft Technologies <?= date('Y') ?></div>
             <div class="col-md-6 text-center text-md-end"><?= Yii::powered() ?></div>
         </div>
     </div>

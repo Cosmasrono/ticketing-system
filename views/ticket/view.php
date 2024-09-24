@@ -24,6 +24,13 @@ $this->params['breadcrumbs'][] = $this->title;
                     },
                 ],
                 'created_at:datetime',
+                [
+                    'label' => 'Remaining Time',
+                    'value' => function ($model) {
+                        return '<span class="remaining-time" data-seconds="' . $model->getRemainingTimeInSeconds() . '"></span>';
+                    },
+                    'format' => 'raw',
+                ],
             ],
         ]); ?>
     <?php else: ?>
@@ -34,3 +41,26 @@ $this->params['breadcrumbs'][] = $this->title;
     <?php endif; ?>
     <?php Pjax::end(); ?>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function updateTimers() {
+        document.querySelectorAll('.remaining-time').forEach(function(element) {
+            let seconds = parseInt(element.getAttribute('data-seconds'));
+            if (seconds > 0) {
+                seconds--;
+                element.setAttribute('data-seconds', seconds);
+                let hours = Math.floor(seconds / 3600);
+                let minutes = Math.floor((seconds % 3600) / 60);
+                let secs = seconds % 60;
+                element.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            } else {
+                element.textContent = '00:00:00';
+            }
+        });
+    }
+
+    setInterval(updateTimers, 1000);
+    updateTimers(); // Initial call to set the timers immediately
+});
+</script>

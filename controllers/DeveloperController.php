@@ -6,6 +6,7 @@ use yii\web\Controller;
 use yii\filters\AccessControl;
 use yii\web\ForbiddenHttpException;
 use app\models\Ticket;
+use app\models\Developer;
 use Yii;
 use yii\data\ActiveDataProvider;
 
@@ -21,7 +22,8 @@ class DeveloperController extends Controller
                         'allow' => true,
                         'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->company_email == 'ptiongik@gmail.com';
+                            $user = Yii::$app->user->identity;
+                            return $user->role === 'developer' && Developer::findByCompanyEmail($user->company_email) !== null;
                         }
                     ],
                 ],
@@ -31,46 +33,48 @@ class DeveloperController extends Controller
 
     public function actionView()
     {
-        $developerId = 2;  // This is the correct assigned_to value
-        $developerName = 'dev1';
-
-        $query = Ticket::find()->where(['assigned_to' => $developerId]);
+        $user = Yii::$app->user->identity;
+        $developer = Developer::findByCompanyEmail($user->company_email);
+        
+        if (!$developer) {
+            throw new ForbiddenHttpException('Developer not found for the given email.');
+        }
 
         $dataProvider = new ActiveDataProvider([
-            'query' => $query,
+            'query' => $developer->getAssignedTickets(),
             'pagination' => [
                 'pageSize' => 20,
             ],
-            'sort' => [
-                'defaultOrder' => [
-                    'created_at' => SORT_DESC,
-                ]
-            ],
         ]);
-
-        $ticketCount = $query->count();
 
         return $this->render('view', [
             'dataProvider' => $dataProvider,
-            'developerName' => $developerName,
-            'developerId' => $developerId,
-            'ticketCount' => $ticketCount,
+            'developer' => $developer,
         ]);
     }
 
     public function actionCloseTicket($id)
     {
+        $user = Yii::$app->user->identity;
+        $developer = Developer::findByCompanyEmail($user->company_email);
+
+        if (!$developer) {
+            throw new ForbiddenHttpException('Developer not found for the given email.');
+        }
+
         $ticket = Ticket::findOne($id);
-        if ($ticket && $ticket->assigned_to == 2) {
+        if ($ticket && $ticket->assigned_to == $developer->id && $ticket->status !== 'closed') {
             $ticket->status = 'closed';
-            if ($ticket->save()) {
+            $ticket->closed_by = $developer->id;
+            if ($ticket->save(false, ['status', 'closed_by'])) {  // Only save these fields
                 Yii::$app->session->setFlash('success', 'Ticket closed successfully.');
             } else {
-                Yii::$app->session->setFlash('error', 'Failed to close ticket.');
+                Yii::$app->session->setFlash('error', 'Failed to close the ticket.');
             }
         } else {
-            Yii::$app->session->setFlash('error', 'Invalid ticket or not assigned to you.');
+            Yii::$app->session->setFlash('error', 'Ticket not found, already closed, or you are not authorized to close this ticket.');
         }
+
         return $this->redirect(['view']);
     }
 

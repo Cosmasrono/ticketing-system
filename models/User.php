@@ -5,12 +5,15 @@ namespace app\models;
 use Yii;
 use yii\db\ActiveRecord;
 use yii\web\IdentityInterface;
+use app\models\Admin;
 
 class User extends ActiveRecord implements IdentityInterface
 {
 
     const ROLE_USER = 'user';
     const ROLE_ADMIN = 'admin';
+    const ROLE_DEVELOPER = 'developer'; // Add this line
+
     /**
      * {@inheritdoc}
      */
@@ -30,7 +33,8 @@ class User extends ActiveRecord implements IdentityInterface
             [['company_email'], 'unique'],
             [['password_hash', 'auth_key'], 'string'],
             ['auth_key', 'string', 'max' => 32],
-            ['role', 'in', 'range' => [self::ROLE_USER, self::ROLE_ADMIN]],
+            ['role', 'safe'],
+        ['role', 'in', 'range' => [User::ROLE_USER, User::ROLE_ADMIN, User::ROLE_DEVELOPER]],
 
         ];
     }
@@ -155,7 +159,7 @@ class User extends ActiveRecord implements IdentityInterface
 
     public function isDeveloper()
     {
-        return Developer::find()->where(['email' => $this->company_email])->exists();
+        return $this->role === self::ROLE_DEVELOPER;
     }
 
     // Add this method if you don't have a username column
@@ -167,6 +171,21 @@ class User extends ActiveRecord implements IdentityInterface
     public function attributes()
     {
         return array_merge(parent::attributes(), ['company_email']);
+    }
+
+    public static function findByEmail($email)
+    {
+        return static::findOne(['company_email' => $email]);
+    }
+
+    public function getAssignedTickets()
+    {
+        return $this->hasMany(Ticket::class, ['assigned_to' => 'id']);
+    }
+
+    public function isAdmin()
+    {
+        return Admin::isAdminEmail($this->company_email);
     }
 
 }

@@ -59,21 +59,19 @@ class TicketController extends Controller
 
     public function actionView()
     {
-        $query = Ticket::find();
-        $companyEmail = Yii::$app->user->isGuest 
-            ? (Yii::$app->session->get('company_email') ?? Yii::$app->request->get('company_email'))
-            : Yii::$app->user->identity->company_email;
-    
-        echo "Debug: Company Email in Controller: " . $companyEmail . "<br>";
+        $user = Yii::$app->user->identity;
+        $companyEmail = $user->company_email;
 
-        $query->andWhere(['company_email' => $companyEmail]);
-    
-        $dataProvider = new ActiveDataProvider([
+        $query = Ticket::find()->where(['company_email' => $companyEmail]);
+        $dataProvider = new \yii\data\ActiveDataProvider([
             'query' => $query,
+            'pagination' => [
+                'pageSize' => 20,
+            ],
         ]);
-    
+
         $hasResults = $query->exists();
-    
+
         return $this->render('view', [
             'dataProvider' => $dataProvider,
             'hasResults' => $hasResults,
@@ -84,30 +82,9 @@ class TicketController extends Controller
     {
         $model = new Ticket();
     
-        if ($model->load(Yii::$app->request->post())) {
-            // Get the company email
-            $companyEmail = Yii::$app->user->isGuest 
-                ? Yii::$app->session->get('company_email')
-                : Yii::$app->user->identity->company_email;
-
-            // Set the company email for the new ticket
-            $model->company_email = $companyEmail;
-
-            if ($model->validate()) {
-                if ($model->save()) {
-                    // Ticket saved successfully, now update the company email in the database
-                    $this->updateCompanyEmail($companyEmail);
-
-                    Yii::$app->session->setFlash('success', 'Ticket created successfully.');
-                    return $this->redirect(['view', 'id' => $model->id]);
-                } else {
-                    Yii::error('Failed to save ticket: ' . print_r($model->errors, true), __METHOD__);
-                    Yii::$app->session->setFlash('error', 'Failed to save ticket. Please try again.');
-                }
-            } else {
-                Yii::error('Ticket validation failed: ' . print_r($model->errors, true), __METHOD__);
-                Yii::$app->session->setFlash('error', 'Invalid ticket data: ' . implode(', ', $model->getFirstErrors()));
-            }
+        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+            Yii::$app->session->setFlash('success', 'Ticket created successfully.');
+            return $this->redirect(['view', 'id' => $model->id]);
         }
     
         return $this->render('create', [
@@ -205,32 +182,22 @@ class TicketController extends Controller
     
     
 
-    public function actionCancel()
+    public function actionCancel($id)
     {
-        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-    
-        $ticketId = Yii::$app->request->post('id');
-        Yii::info("Cancel action called for ticket ID: $ticketId");
-        Yii::info("POST data: " . json_encode(Yii::$app->request->post()));
-    
-        $ticket = Ticket::findOne($ticketId);
-        if (!$ticket) {
-            Yii::error("Ticket not found: $ticketId");
-            return ['success' => false, 'message' => 'Ticket not found'];
-        }
-    
-        Yii::info("Ticket found. Current state: " . json_encode($ticket->attributes));
-    
-        // Set the status to canceled and developer_id to null
-        $ticket->status = 'canceled'; // Update status
-        $ticket->developer_id = null; // Set developer_id to null to indicate it's not assigned
-    
-        if ($ticket->save()) { // Save the changes
-            return ['success' => true, 'message' => 'Ticket cancelled successfully'];
+        $ticket = Ticket::findOne($id);
+
+        if ($ticket) {
+            $ticket->status = 'cancelled'; // Change status to 'cancelled'
+            if ($ticket->save(false, ['status'])) { // Only save the status field
+                Yii::$app->session->setFlash('success', 'Ticket cancelled successfully.');
+            } else {
+                Yii::$app->session->setFlash('error', 'Failed to cancel the ticket.');
+            }
         } else {
-            Yii::error("Failed to cancel ticket $ticketId. Errors: " . json_encode($ticket->errors));
-            return ['success' => false, 'message' => 'Failed to cancel ticket', 'errors' => $ticket->errors];
+            Yii::$app->session->setFlash('error', 'Ticket not found.');
         }
+
+        return $this->redirect(['view', 'id' => $ticket->id]);
     }
     
 

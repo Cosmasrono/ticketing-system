@@ -17,7 +17,7 @@ class Ticket extends ActiveRecord
 
     public static function tableName()
     {
-        return 'ticket';
+        return '{{%ticket}}';
     }
 
 
@@ -39,12 +39,11 @@ class Ticket extends ActiveRecord
     {
         return [
             [['title', 'description'], 'required'],
-            ['title', 'string', 'max' => 255],
-            ['description', 'string'],
-            ['status', 'string'],
-            [['assigned_to'], 'integer'],
-            ['status', 'in', 'range' => ['pending', 'approved','cancelled']],
-            ['company_email', 'email'],
+            [['assigned_to', 'closed_by'], 'integer'],
+            [['status', 'company_email'], 'string'],
+            [['title'], 'string', 'max' => 255],
+            [['description'], 'string'],
+            [['assigned_at'], 'datetime'],
         ];
     }
 
@@ -61,9 +60,8 @@ class Ticket extends ActiveRecord
             'title' => 'Title',
             'description' => 'Description',
             'status' => 'Status',
-            'company_email' => 'Company Email',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'closed_by' => 'Closed By',
+            'assigned_to' => 'Assigned To',
         ];
     }
  
@@ -75,7 +73,7 @@ class Ticket extends ActiveRecord
 
     public function getAssignedDeveloper()
     {
-        return $this->hasOne(User::className(), ['id' => 'assigned_to']);
+        return $this->hasOne(Developer::class, ['id' => 'assigned_to']);
     }
 
 
@@ -133,30 +131,61 @@ class Ticket extends ActiveRecord
 
 
     public function beforeSave($insert)
-{
-    if (!parent::beforeSave($insert)) {
+    {
+        if (parent::beforeSave($insert)) {
+            if ($this->isNewRecord) {
+                $this->status = 'pending'; // Set default status to 'pending'
+                $this->company_email = Yii::$app->user->identity->company_email; // Set company_email to the current user's company email
+            }
+            if ($this->assigned_to && !$this->assigned_at) {
+                $this->assigned_at = date('Y-m-d H:i:s'); // Set assigned_at to the current timestamp
+            }
+            return true;
+        }
         return false;
     }
 
-    Yii::info("beforeSave called for ticket {$this->id}. Current attributes: " . json_encode($this->attributes));
+    public function afterSave($insert, $changedAttributes)
+    {
+        parent::afterSave($insert, $changedAttributes);
 
-    // Your custom logic here
+        Yii::info("afterSave called for ticket {$this->id}. Changed attributes: " . json_encode($changedAttributes));
 
-    return true;
-}
+        // Your custom logic here
+    }
 
-public function afterSave($insert, $changedAttributes)
-{
-    parent::afterSave($insert, $changedAttributes);
+    public function getAssignedUser()
+    {
+        return $this->hasOne(User::class, ['id' => 'assigned_to']);
+    }
 
-    Yii::info("afterSave called for ticket {$this->id}. Changed attributes: " . json_encode($changedAttributes));
+    public function getClosedByUser()
+    {
+        return $this->hasOne(User::class, ['id' => 'closed_by']);
+    }
 
-    // Your custom logic here
-}
+    public function getRaisedByUser()
+    {
+        return $this->hasOne(User::class, ['id' => 'raised_by']); // Relation to the user who raised the ticket
+    }
 
-public function getAssignedUser()
-{
-    return $this->hasOne(User::class, ['id' => 'assigned_to']);
-}
+    public function getRemainingTimeInSeconds()
+    {
+        if ($this->assigned_at) {
+            $assignedTime = new \DateTime($this->assigned_at);
+            $currentTime = new \DateTime();
+            $interval = $assignedTime->diff($currentTime);
+            
+            $hoursPassed = $interval->h + ($interval->days * 24);
+            $minutesPassed = $interval->i;
+            $secondsPassed = $interval->s;
+            
+            $totalSecondsPassed = ($hoursPassed * 3600) + ($minutesPassed * 60) + $secondsPassed;
+            $totalSecondsRemaining = (48 * 3600) - $totalSecondsPassed;
+            
+            return $totalSecondsRemaining > 0 ? $totalSecondsRemaining : 0;
+        }
+        return null;
+    }
 
 }

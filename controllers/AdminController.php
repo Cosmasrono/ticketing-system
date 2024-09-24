@@ -51,6 +51,7 @@ class AdminController extends Controller
             'totalUsers' => $totalUsers,
             'totalDevelopers' => $totalDevelopers,
             'recentTickets' => $recentTickets,
+            'closedTickets' => $closedTickets,
         ]);
     }
 }

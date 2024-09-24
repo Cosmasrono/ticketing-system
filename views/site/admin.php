@@ -60,6 +60,15 @@ $this->params['breadcrumbs'][] = $this->title;
                 </div>
             </div>
         </div>
+        <!-- closed tickets -->
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+            <div class="card text-white bg-secondary h-100">
+                <div class="card-header">Closed Tickets</div>
+                <div class="card-body d-flex flex-column justify-content-center">
+                    <h5 class="card-title"><?= $ticketCounts['closed'] ?? 0 ?></h5>
+                </div>
+            </div>
+        </div>
         <!-- Total Tickets -->
         <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
             <div class="card text-white bg-secondary h-100">

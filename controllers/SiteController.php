@@ -16,6 +16,7 @@ use yii\data\ActiveDataProvider;
 use app\models\Developer;
 use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
+use app\models\Admin;
 
 class SiteController extends Controller
 {
@@ -27,12 +28,14 @@ class SiteController extends Controller
         return [
             'access' => [
                 'class' => AccessControl::class,
-                'only' => ['logout'],
+                'only' => ['admin'],
                 'rules' => [
                     [
-                        'actions' => ['logout'],
+                        'actions' => ['admin'],
                         'allow' => true,
-                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            return !Yii::$app->user->isGuest && Yii::$app->user->identity->isAdmin();
+                        }
                     ],
                 ],
             ],
@@ -130,28 +133,27 @@ class SiteController extends Controller
     public function actionSignup()
     {
         $model = new SignupForm();
-
-        if (Yii::$app->request->isPost) {
-            if ($model->load(Yii::$app->request->post())) {
-                try {
-                    // Check if email already exists
-                    if (User::findByCompanyEmail($model->company_email) !== null) {
-                        Yii::$app->session->setFlash('error', 'This company email address is already registered. Please log in.');
-                        return $this->redirect(['site/login']); // Redirect to login page
-                    }
-
-                    // Proceed with signup
-                    if ($user = $model->signup()) {
-                        Yii::$app->session->setFlash('success', 'Thank you for registration. Please check your inbox for verification email.');
-                        // ... rest of your code ...
-                    }
-                } catch (\Exception $e) {
-                    // Handle any exceptions
-                    Yii::$app->session->setFlash('error', 'An error occurred during signup: ' . $e->getMessage());
+        if ($model->load(Yii::$app->request->post())) {
+            Yii::info('Form data loaded: ' . json_encode($model->attributes), __METHOD__);
+            if ($model->validate()) {
+                Yii::info('Form data validated', __METHOD__);
+                if ($user = $model->signup()) {
+                    Yii::info('User signed up: ' . json_encode($user->attributes), __METHOD__);
+                    Yii::$app->session->setFlash('success', 'Signup successful! Please log in.');
+                    return $this->redirect(['site/login']);
+                } else {
+                    Yii::error('User signup failed: ' . json_encode($model->errors), __METHOD__);
+                    Yii::$app->session->setFlash('error', 'Signup failed. Please check your input and try again.');
                 }
+            } else {
+                Yii::error('Signup validation failed: ' . json_encode($model->errors), __METHOD__);
+                Yii::$app->session->setFlash('error', 'Signup validation failed. Please check your input and try again.');
             }
+        } else {
+            Yii::error('Signup form not loaded', __METHOD__);
+            Yii::$app->session->setFlash('error', 'Signup form not loaded. Please try again.');
         }
-
+        
         return $this->render('signup', [
             'model' => $model,
         ]);
@@ -189,16 +191,26 @@ class SiteController extends Controller
  
      public function actionLogin()
      {
+         Yii::info('Session ID: ' . Yii::$app->session->id);
+         Yii::info('CSRF Token: ' . Yii::$app->request->csrfToken);
+         
          if (!Yii::$app->user->isGuest) {
              return $this->goHome(); // Redirect to home if already logged in
          }
      
          $model = new LoginForm();
          if ($model->load(Yii::$app->request->post()) && $model->login()) {
-             Yii::info("User logged in: ID={Yii::$app->user->id}, Email={Yii::$app->user->identity->company_email}", 'login');
-             if (Yii::$app->user->identity->isDeveloper()) {
-                 Yii::info("User is a developer", 'login');
-                 return $this->redirect(['/developer/view']);
+             $user = Yii::$app->user->identity;
+             if ($user->isAdmin()) {
+                 return $this->redirect(['site/admin']);
+             } elseif ($user->isDeveloper()) {
+                 $developer = Developer::findByCompanyEmail($user->company_email);
+                 if ($developer) {
+                     return $this->redirect(['developer/view', 'id' => $developer->id]);
+                 } else {
+                     Yii::error('Developer not found for company email: ' . $user->company_email);
+                     throw new ForbiddenHttpException('Developer not found for the given email.');
+                 }
              }
              return $this->goBack();
          }
@@ -230,6 +242,7 @@ class SiteController extends Controller
             'cancelled' => Ticket::find()->where(['status' => 'cancelled'])->count(), // Add this line
             'assigned' => Ticket::find()->where(['not', ['assigned_to' => null]])->count(),
             'notAssigned' => Ticket::find()->where(['assigned_to' => null])->count(),
+            'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
         ];
 
         // Calculate total tickets
@@ -330,16 +343,21 @@ public function actionDeveloperDashboard()
     }
 
     $user = Yii::$app->user->identity;
-    $developer = Developer::findOne(['email' => $user->company_email]);
-    if (!$developer) {
-        throw new ForbiddenHttpException('You are not authorized to view this page.');
+    if ($user->isDeveloper()) {
+        $developer = Developer::findOne(['email' => $user->company_email]);
+        if ($developer) {
+            $assignedTickets = $developer->assignedTickets;
+            return $this->render('developer-dashboard', [
+                'developer' => $developer,
+                'assignedTickets' => $assignedTickets,
+            ]);
+        } else {
+            Yii::error('Developer not found for email: ' . $user->company_email, __METHOD__);
+        }
+    } else {
+        Yii::error('User is not a developer: ' . $user->company_email, __METHOD__);
     }
 
-    $assignedTickets = $developer->assignedTickets;
-
-    return $this->render('developer-dashboard', [
-        'developer' => $developer,
-        'assignedTickets' => $assignedTickets,
-    ]);
+    throw new ForbiddenHttpException('You are not authorized to view this page.');
 }
 }

@@ -9,7 +9,7 @@ class Admin extends ActiveRecord
 {
     public static function tableName()
     {
-        return '{{%admin}}';
+        return 'admin'; // or whatever your admin table is called
     }
 
     public function behaviors()

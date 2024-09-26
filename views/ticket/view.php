@@ -2,6 +2,7 @@
 use yii\helpers\Html;
 use yii\grid\GridView;
 use yii\widgets\Pjax;
+use yii\helpers\Url;
 
 $this->title = 'Company Tickets';
 $this->params['breadcrumbs'][] = $this->title;
@@ -25,11 +26,32 @@ $this->params['breadcrumbs'][] = $this->title;
                 ],
                 'created_at:datetime',
                 [
-                    'label' => 'Remaining Time',
+                    'label' => 'Time',
                     'value' => function ($model) {
-                        return '<span class="remaining-time" data-seconds="' . $model->getRemainingTimeInSeconds() . '"></span>';
+                        if ($model->status === 'Closed') {
+                            return '<span class="time-spent" data-ticket-id="' . $model->id . '">Loading...</span>';
+                        } else {
+                            return '<span class="remaining-time" data-seconds="' . $model->getRemainingTimeInSeconds() . '"></span>';
+                        }
                     },
                     'format' => 'raw',
+                ],
+                [
+                    'class' => 'yii\grid\ActionColumn',
+                    'template' => '{close}',
+                    'buttons' => [
+                        'close' => function ($url, $model, $key) {
+                            return Html::button('Close', [
+                                'class' => 'btn btn-danger btn-sm close-ticket',
+                                'data-ticket-id' => $model->id,
+                            ]);
+                        },
+                    ],
+                    'visibleButtons' => [
+                        'close' => function ($model) {
+                            return $model->status !== 'Closed';
+                        },
+                    ],
                 ],
             ],
         ]); ?>
@@ -60,7 +82,67 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    function loadTimeSpent() {
+        document.querySelectorAll('.time-spent').forEach(function(element) {
+            let ticketId = element.getAttribute('data-ticket-id');
+            fetch('<?= Url::to(['ticket/get-time-spent']) ?>?id=' + ticketId)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        element.textContent = data.timeSpent;
+                    } else {
+                        element.textContent = 'Error';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    element.textContent = 'Error';
+                });
+        });
+    }
+
     setInterval(updateTimers, 1000);
     updateTimers(); // Initial call to set the timers immediately
+    loadTimeSpent(); // Load time spent for closed tickets
+
+    // Add event listener for close buttons
+    document.querySelectorAll('.close-ticket').forEach(function(button) {
+        button.addEventListener('click', function() {
+            if (confirm('Are you sure you want to close this ticket?')) {
+                let ticketId = this.getAttribute('data-ticket-id');
+                fetch('<?= Url::to(['ticket/close']) ?>', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': '<?= Yii::$app->request->csrfToken ?>'
+                    },
+                    body: 'id=' + ticketId
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update the status in the grid
+                        let row = this.closest('tr');
+                        let statusCell = row.querySelector('td:nth-child(3)');
+                        statusCell.textContent = 'Closed';
+                        // Update the time cell
+                        let timeCell = row.querySelector('.remaining-time');
+                        timeCell.className = 'time-spent';
+                        timeCell.setAttribute('data-ticket-id', ticketId);
+                        timeCell.textContent = 'Loading...';
+                        loadTimeSpent();
+                        // Hide the close button
+                        this.style.display = 'none';
+                    } else {
+                        alert('Failed to close the ticket. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred. Please try again.');
+                });
+            }
+        });
+    });
 });
 </script>

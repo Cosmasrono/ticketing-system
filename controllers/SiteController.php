@@ -232,25 +232,27 @@ class SiteController extends Controller
 
     public function  actionAdmin(){
 
+        // Ensure only admins can access this page
+        if (!Yii::$app->user->identity->isAdmin()) {
+            throw new ForbiddenHttpException('You are not allowed to access this page.');
+        }
+
+        // Create a data provider for tickets
         $dataProvider = new ActiveDataProvider([
-            'query' => Ticket::find(),
+            'query' => Ticket::find()->with('assignedDeveloper'),
+            'pagination' => [
+                'pageSize' => 20,
+            ],
+            'sort' => [
+                'defaultOrder' => [
+                    'created_at' => SORT_DESC,
+                ]
+            ],
         ]);
 
-        $ticketCounts = [
-            'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
-            'approved' => Ticket::find()->where(['status' => 'approved'])->count(),
-            'cancelled' => Ticket::find()->where(['status' => 'cancelled'])->count(), // Add this line
-            'assigned' => Ticket::find()->where(['not', ['assigned_to' => null]])->count(),
-            'notAssigned' => Ticket::find()->where(['assigned_to' => null])->count(),
-            'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
-        ];
-
-        // Calculate total tickets
-        $ticketCounts['total'] = Ticket::find()->count();
-
+        // Render the admin view with the data provider
         return $this->render('admin', [
             'dataProvider' => $dataProvider,
-            'ticketCounts' => $ticketCounts,
         ]);
     }
 

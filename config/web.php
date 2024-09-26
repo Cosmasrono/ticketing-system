@@ -39,7 +39,8 @@ $config = [
             'targets' => [
                 [
                     'class' => 'yii\log\FileTarget',
-                    'levels' => ['error', 'warning'],
+                    'levels' => ['error', 'warning', 'info'],
+                    'categories' => ['ticket'],
                 ],
             ],
         ],
@@ -58,6 +59,7 @@ $config = [
                 // 'ticket/assign/<id:\d+>' => 'ticket/assign',
                 'developer/<id:\d+>' => 'site/developer-dashboard',
                 'developer/close-ticket/<id:\d+>' => 'developer/close-ticket',
+                'ticket/approve/<id:\d+>' => 'ticket/approve',
             ],
         ],
      

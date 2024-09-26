@@ -12,8 +12,6 @@ $this->params['breadcrumbs'][] = $this->title;
 ?>
 <div class="ticket-index container mt-5">
     <h1 class="text-center"><?= Html::encode($this->title) ?></h1>
-
-    <!-- Ticket Statistics Cards -->
     <div class="row text-center mb-4">
         <!-- Pending Tickets -->
         <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
@@ -60,7 +58,7 @@ $this->params['breadcrumbs'][] = $this->title;
                 </div>
             </div>
         </div>
-        <!-- closed tickets -->
+        <!-- Closed Tickets -->
         <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
             <div class="card text-white bg-secondary h-100">
                 <div class="card-header">Closed Tickets</div>
@@ -99,11 +97,26 @@ $this->params['breadcrumbs'][] = $this->title;
             'status',
             'company_email',
             'created_at:datetime',
+         
+    
             [
                 'attribute' => 'developer.name',
                 'label' => 'Assigned Developer',
                 'value' => function ($model) {
                     return $model->developer ? $model->developer->name : 'Not Assigned';
+                }
+            ],
+
+            [
+                'label' => 'Time Taken',
+                'value' => function ($model) {
+                    if ($model->status === 'Closed' && $model->closed_at !== null) {
+                        $createdAt = new DateTime($model->created_at);
+                        $closedAt = new DateTime($model->closed_at);
+                        $interval = $createdAt->diff($closedAt);
+                        return $interval->format('%a days, %h hours, %i minutes');
+                    }
+                    return 'Not closed yet';
                 }
             ],
             [
@@ -152,7 +165,6 @@ function showLoading() {
 function hideLoading() {
     $('#loading').hide();
 }
-
 function approveTicket(button, ticketId) {
     showLoading();
     $.ajax({
@@ -206,7 +218,6 @@ function cancelTicket(button) {
                 var row = button.closest('tr');
                 row.find('td').eq(3).text('Cancelled');
                 disableButtons(row);
-                updateTicketCounts();
             } else {
                 alert('Failed to cancel the ticket: ' + (response.message || 'Unknown error'));
             }
@@ -223,142 +234,51 @@ function disableButtons(row) {
     row.find('a.btn').addClass('disabled').attr('disabled', true);
 }
 
-function updateTicketCounts() {
-    // Optionally, implement AJAX to update the ticket counts dynamically
-    // For example:
-    /*
-    $.ajax({
-        url: '<?= \yii\helpers\Url::to(['/ticket/counts']) ?>',
-        type: 'GET',
-        success: function(response) {
-            if(response.success){
-                // Update each card's count
-                $('.card-header').each(function(){
-                    var header = $(this).text().trim();
-                    var count = response.data[header.toLowerCase().replace(' ', '')] || 0;
-                    $(this).next('.card-body').find('.card-title').text(count);
-                });
-            }
-        }
-    });
-    */
+function updateTimeTaken(row, closedAt) {
+    var createdAt = new Date(row.find('td').eq(5).text()); // Assuming created_at is the 6th column
+    var closedDate = new Date(closedAt);
+    var diff = Math.abs(closedDate - createdAt);
+    var days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    var hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    var minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    row.find('td').eq(7).text(days + ' days, ' + hours + ' hours, ' + minutes + ' minutes');
 }
 </script>
 
-<!-- Enhanced CSS Styling -->
+<!-- Enhanced Professional CSS Styling -->
 <style>
-/* Card Styling */
-.card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-}
-
-.card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-}
-
-/* Table Styling */
-.table th {
-    background-color: #e9ecef;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05rem;
+/* General Body Styling */
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
     color: #343a40;
 }
 
-.table td {
-    vertical-align: middle;
-    padding: 15px;
-    color: #495057;
-    font-size: 0.95rem;
+/* Card Styling */
+.card {
+    border-radius: 8px;
+    transition: transform 0.2s;
 }
-
-.table-bordered {
-    border: 1px solid #dee2e6;
-}
-
-.table-bordered th, .table-bordered td {
-    border: 1px solid #dee2e6;
+.card:hover {
+    transform: scale(1.05);
 }
 
 /* Button Styling */
-a.btn {
-    border-radius: 5px;
-    padding: 8px 12px;
-    font-size: 0.9rem;
-    font-weight: 500;
-    transition: background-color 0.2s ease, transform 0.2s ease;
-}
-
-a.btn:hover {
-    transform: translateY(-3px);
-}
-
-a.disabled {
-    opacity: 0.6;
-    pointer-events: none;
-}
-
-/* Loading Spinner */
-#loading {
-    margin-top: 20px;
-}
-
-.spinner-border {
-    width: 3rem;
-    height: 3rem;
-    animation: spinner-grow 0.8s linear infinite;
-}
-
-@keyframes spinner-grow {
-    0% {
-        transform: scale(0.5);
-    }
-    50% {
-        transform: scale(1.2);
-    }
-    100% {
-        transform: scale(0.5);
-    }
-}
-
-/* Grid Spacing */
-.row {
-    margin-bottom: 30px;
-}
-
-.card-title {
-    font-size: 1.5rem;
+.btn {
     font-weight: bold;
 }
 
-/* Global Text Styling */
-h1 {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin-bottom: 40px;
-    color: #343a40;
+/* Loading Spinner Styling */
+.spinner-border {
+    width: 3rem;
+    height: 3rem;
 }
 
-.container {
-    padding: 40px 0;
-}
-
-.text-center {
-    text-align: center !important;
-}
-
-.text-white {
-    color: #fff !important;
-}
-
-/* Adjust card hover effect on mobile */
-@media (max-width: 768px) {
-    .card:hover {
-        transform: none;
-        box-shadow: none;
-    }
+/* Time Taken Column Styling */
+.grid-view td:nth-child(8) {
+    font-weight: bold;
+    color: #28a745;
 }
 </style>

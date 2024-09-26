@@ -28,8 +28,10 @@ class Ticket extends ActiveRecord
         return [
             [
                 'class' => TimestampBehavior::class,
-                'createdAtAttribute' => 'created_at',
-                'updatedAtAttribute' => false, // This disables the updated_at attribute
+                'attributes' => [
+                    ActiveRecord::EVENT_BEFORE_INSERT => ['assigned_at'],
+                    ActiveRecord::EVENT_BEFORE_UPDATE => ['assigned_at'],
+                ],
                 'value' => new Expression('NOW()'),
             ],
         ];
@@ -38,19 +40,16 @@ class Ticket extends ActiveRecord
     public function rules()
     {
         return [
-            [['title', 'description'], 'required'],
-            [['assigned_to', 'closed_by'], 'integer'],
+            [['assigned_to'], 'integer'],
+            [['assigned_at'], 'safe'], // Change this to 'safe' instead of 'datetime'
             [['status', 'company_email'], 'string'],
             [['title'], 'string', 'max' => 255],
             [['description'], 'string'],
-            [['assigned_at'], 'datetime'],
+            [['assigned_at'], 'date', 'format' => 'php:Y-m-d H:i:s'],
+            [['created_at', 'assigned_at'], 'date', 'format' => 'php:Y-m-d H:i:s'],
+            [['timer_start'], 'safe'],
         ];
     }
-
-
- 
-
-
 
 
     public function attributeLabels()
@@ -62,6 +61,11 @@ class Ticket extends ActiveRecord
             'status' => 'Status',
             'closed_by' => 'Closed By',
             'assigned_to' => 'Assigned To',
+            'created_at' => 'Created At',
+            'updated_at' => 'Updated At',
+            'assigned_at' => 'Assigned At',
+         
+
         ];
     }
  
@@ -130,15 +134,18 @@ class Ticket extends ActiveRecord
     }
 
 
+    public function scenarios()
+    {
+        $scenarios = parent::scenarios();
+        $scenarios['assign'] = ['assigned_to', 'assigned_at'];
+        return $scenarios;
+    }
+
     public function beforeSave($insert)
     {
         if (parent::beforeSave($insert)) {
-            if ($this->isNewRecord) {
-                $this->status = 'pending'; // Set default status to 'pending'
-                $this->company_email = Yii::$app->user->identity->company_email; // Set company_email to the current user's company email
-            }
-            if ($this->assigned_to && !$this->assigned_at) {
-                $this->assigned_at = date('Y-m-d H:i:s'); // Set assigned_at to the current timestamp
+            if ($this->isAttributeChanged('assigned_to') && $this->assigned_to !== null) {
+                $this->timer_start = new \yii\db\Expression('NOW()');
             }
             return true;
         }
@@ -186,6 +193,17 @@ class Ticket extends ActiveRecord
             return $totalSecondsRemaining > 0 ? $totalSecondsRemaining : 0;
         }
         return null;
+    }
+
+    public function getElapsedTime()
+    {
+        if ($this->timer_start === null) {
+            return '0:00:00';
+        }
+        $now = new \DateTime();
+        $start = new \DateTime($this->timer_start);
+        $interval = $now->diff($start);
+        return $interval->format('%H:%I:%S');
     }
 
 }

@@ -15,6 +15,8 @@ use yii\filters\AccessControl;
 use yii\data\ActiveDataProvider;
 use yii\helpers\ArrayHelper;
 use yii\web\Response;
+use yii\db\Expression;
+use yii\web\BadRequestHttpException;
 
 class TicketController extends Controller
 {
@@ -37,39 +39,41 @@ class TicketController extends Controller
         'approve' => ['POST'],
         'approve-ticket' => ['POST'],
         'cancel-ticket' => ['POST'],
+        'get-elapsed-time' => ['GET'],
     ],
 
             ],
         ];
     }
 
-
-//     public function actionIndex()
-// {
-//     $query = Ticket::find();
-
-//     $dataProvider = new ActiveDataProvider([
-//         'query' => $query,
-//     ]);
-
-//     return $this->render('index', [
-//         'dataProvider' => $dataProvider,
-//     ]);
-// }
-
-    public function actionView()
+    public function actionIndex()
     {
-        $user = Yii::$app->user->identity;
-        $companyEmail = $user->company_email;
-
-        $query = Ticket::find()->where(['company_email' => $companyEmail]);
-        $dataProvider = new \yii\data\ActiveDataProvider([
-            'query' => $query,
-            'pagination' => [
-                'pageSize' => 20,
-            ],
+        $dataProvider = new ActiveDataProvider([
+            'query' => Ticket::find(),
+            // ... other configurations ...
         ]);
 
+        return $this->render('index', [
+            'dataProvider' => $dataProvider,
+        ]);
+    }
+
+    public function actionView($id = null)
+    {
+        $companyEmail = Yii::$app->user->identity->company_email;
+        
+        $query = Ticket::find()->where(['company_email' => $companyEmail]);
+        
+        $dataProvider = new ActiveDataProvider([
+            'query' => $query,
+            'sort' => [
+                'defaultOrder' => ['created_at' => SORT_DESC]
+            ],
+            'pagination' => [
+                'pageSize' => 10,
+            ],
+        ]);
+        
         $hasResults = $query->exists();
 
         return $this->render('view', [
@@ -80,11 +84,27 @@ class TicketController extends Controller
     }
     public function actionCreate()
     {
+        // Check if the current user is an admin
+        if (Yii::$app->user->identity->isAdmin()) {
+            throw new ForbiddenHttpException('Admins are not allowed to create tickets.');
+        }
+
         $model = new Ticket();
     
-        if ($model->load(Yii::$app->request->post()) && $model->save()) {
-            Yii::$app->session->setFlash('success', 'Ticket created successfully.');
-            return $this->redirect(['view', 'id' => $model->id]);
+        // Get the logged-in user's company email
+        $userCompanyEmail = Yii::$app->user->identity->company_email;
+    
+        if ($model->load(Yii::$app->request->post())) {
+            // Set the company_email to the logged-in user's company email
+            $model->company_email = $userCompanyEmail;
+            
+            if ($model->save()) {
+                Yii::$app->session->setFlash('success', 'Ticket created successfully.');
+                return $this->redirect(['view', 'id' => $model->id]);
+            }
+        } else {
+            // Pre-fill the company_email field
+            $model->company_email = $userCompanyEmail;
         }
     
         return $this->render('create', [
@@ -107,47 +127,37 @@ class TicketController extends Controller
         }
     }
 
-    public function actionAssign($id = null)
+    public function actionAssign($id)
     {
-        if ($id === null) {
-            $id = Yii::$app->request->post('id');
-        }
-        
-        $ticket = $this->findModel($id);
-    
+        $model = $this->findModel($id);
         $developers = Developer::find()->all();
-    
-        if ($ticket->load(Yii::$app->request->post())) {
-            $postData = Yii::$app->request->post('Ticket');
-    
-            if (isset($postData['assigned_to'])) {
-                $newAssignedTo = $postData['assigned_to'];
-                $newDeveloper = Developer::findOne($newAssignedTo);
-    
-                if (!$newDeveloper) {
-                    Yii::$app->session->setFlash('error', 'Selected developer not found.');
-                } else {
-                    $ticket->assigned_to = $newAssignedTo;
-                    $ticket->developer_id = $newAssignedTo;
-                    if ($ticket->save()) {
-                        Yii::$app->session->setFlash('success', 'Ticket assigned successfully.');
-                        return $this->refresh();
-                    } else {
-                        Yii::$app->session->setFlash('error', 'Failed to assign ticket.');
-                    }
-                }
+
+        // Determine if the ticket is already assigned
+        $isAssigned = !empty($model->assigned_to);
+
+        if (Yii::$app->request->isAjax) {
+            Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+            if ($model->load(Yii::$app->request->post()) && $model->save()) {
+                return [
+                    'success' => true,
+                    'message' => 'Ticket assigned successfully.',
+                    'redirectUrl' => Yii::$app->request->referrer ?: ['index'],
+                ];
             } else {
-                Yii::$app->session->setFlash('error', 'Developer not selected.');
+                return [
+                    'success' => false,
+                    'message' => 'Failed to assign ticket.',
+                    'errors' => $model->errors,
+                ];
             }
         }
-    
+
         return $this->render('assign', [
-            'model' => $ticket,
+            'model' => $model,
             'developers' => $developers,
-            'isAssigned' => !empty($ticket->assigned_to),
+            'isAssigned' => $isAssigned,
         ]);
     }
-
     public function actionApprove()
     {
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
@@ -184,70 +194,31 @@ class TicketController extends Controller
 
     public function actionCancel($id)
     {
-        $ticket = Ticket::findOne($id);
-
-        if ($ticket) {
-            $ticket->status = 'cancelled'; // Change status to 'cancelled'
-            if ($ticket->save(false, ['status'])) { // Only save the status field
-                Yii::$app->session->setFlash('success', 'Ticket cancelled successfully.');
+        $ticket = $this->findModel($id);
+        
+        if (Yii::$app->request->isPost) {
+            if ($ticket->status === 'approved') {
+                Yii::$app->session->setFlash('error', 'Approved tickets cannot be cancelled.');
+            } elseif ($ticket->status !== 'cancelled') {
+                $ticket->status = 'cancelled';
+                
+                if ($ticket->save()) {
+                    Yii::$app->session->setFlash('success', 'Ticket cancelled successfully');
+                } else {
+                    Yii::$app->session->setFlash('error', 'Failed to cancel ticket: ' . json_encode($ticket->errors));
+                }
             } else {
-                Yii::$app->session->setFlash('error', 'Failed to cancel the ticket.');
+                Yii::$app->session->setFlash('error', 'Ticket is already cancelled');
             }
-        } else {
-            Yii::$app->session->setFlash('error', 'Ticket not found.');
+            
+            return $this->redirect(['/site/admin']);
         }
-
-        return $this->redirect(['view', 'id' => $ticket->id]);
+        
+        throw new BadRequestHttpException('Invalid request method.');
     }
     
 
-    
-    // public function actionView($id = null)
-    // {
-    //     if (Yii::$app->user->isGuest) {
-    //         return $this->redirect(['site/login']);
-    //     }
-
-    //     $companyEmail = Yii::$app->user->identity->company_email;
-        
-    //     if ($id === null) {
-    //         $query = Ticket::find()
-    //             ->where(['company_email' => $companyEmail])
-    //             ->orderBy(['created_at' => SORT_DESC]);
-    //         $dataProvider = new ActiveDataProvider([
-    //             'query' => $query,
-    //             'sort' => [
-    //                 'defaultOrder' => ['created_at' => SORT_DESC],
-    //             ],
-    //             'pagination' => [
-    //                 'pageSize' => 50,
-    //             ],
-    //         ]);
-    //         return $this->render('index', [
-    //             'dataProvider' => $dataProvider,
-    //             'companyEmail' => $companyEmail,
-    //         ]);
-    //     } else {
-    //         try {
-    //             $model = $this->findModel($id);
-                
-    //             if ($model->company_email !== $companyEmail) {
-    //                 throw new ForbiddenHttpException('You are not allowed to view this ticket.');
-    //             }
-                
-    //             return $this->render('view', [
-    //                 'model' => $model,
-    //             ]);
-    //         } catch (NotFoundHttpException $e) {
-    //             Yii::error('Ticket not found: ' . $id, 'ticket.view');
-    //             throw $e;
-    //         } catch (\Exception $e) {
-    //             Yii::error('Error while fetching ticket: ' . $e->getMessage(), 'ticket.view');
-    //             return $this->redirect(['view']);
-    //         }
-    //     }
-    // }
-
+   
     protected function findModel($id)
     {
         if (($model = Ticket::findOne($id)) !== null) {
@@ -255,5 +226,57 @@ class TicketController extends Controller
         }
 
         throw new NotFoundHttpException('The requested ticket does not exist.');
+    }
+
+    public function actionGetElapsedTime($id)
+    {
+        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        $ticket = $this->findModel($id);
+        return [
+            'elapsed_time' => $ticket->getElapsedTime(),
+        ];
+    }
+
+    public function actionClose()
+    {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        
+        $id = Yii::$app->request->post('id');
+        $model = $this->findModel($id);
+        
+        if ($model->status !== 'Closed') {
+            $model->status = 'Closed';
+            $model->closed_at = new \yii\db\Expression('NOW()');
+            if ($model->save()) {
+                return ['success' => true];
+            }
+        }
+        
+        return ['success' => false];
+    }
+
+    public function actionGetTimeSpent($id)
+    {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        
+        $model = $this->findModel($id);
+        
+        if ($model->status === 'Closed' && $model->closed_at !== null) {
+            $createdAt = new \DateTime($model->created_at);
+            $closedAt = new \DateTime($model->closed_at);
+            $interval = $createdAt->diff($closedAt);
+            
+            $timeSpent = sprintf(
+                '%d days, %02d:%02d:%02d',
+                $interval->days,
+                $interval->h,
+                $interval->i,
+                $interval->s
+            );
+            
+            return ['success' => true, 'timeSpent' => $timeSpent];
+        }
+        
+        return ['success' => false];
     }
 }

@@ -185,7 +185,13 @@ class User extends ActiveRecord implements IdentityInterface
 
     public function isAdmin()
     {
-        return Admin::isAdminEmail($this->company_email);
+        // Adjust this condition based on how you determine if a user is an admin
+        return $this->role === 'admin';
+    }
+
+    public function getCompanyEmail()
+    {
+        return $this->company_email;
     }
 
 }

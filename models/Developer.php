@@ -9,7 +9,7 @@ class Developer extends ActiveRecord
 {
     public static function tableName()
     {
-        return '{{%developer}}';  // Note the singular form
+        return 'developer'; // or whatever your table name is
     }
 
     public function rules()

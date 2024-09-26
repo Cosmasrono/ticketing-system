@@ -31,10 +31,13 @@ class AdminController extends Controller
 
     public function actionDashboard()
     {
-        $cancelledTickets = Ticket::find()->where(['status' => 'cancelled'])->count();
         $totalTickets = Ticket::find()->count();
+        $cancelledTickets = Ticket::find()->where(['status' => 'cancelled'])->count();
         $pendingTickets = Ticket::find()->where(['status' => 'pending'])->count();
         $approvedTickets = Ticket::find()->where(['status' => 'approved'])->count();
+        $closedTickets = Ticket::find()->where(['status' => 'closed'])->count();
+        $assignedTickets = Ticket::find()->where(['not', ['assigned_to' => null]])->count();
+        $notAssignedTickets = Ticket::find()->where(['assigned_to' => null])->count();
         $totalUsers = User::find()->count();
         $totalDevelopers = Developer::find()->count();
 
@@ -48,10 +51,12 @@ class AdminController extends Controller
             'cancelledTickets' => $cancelledTickets,
             'pendingTickets' => $pendingTickets,
             'approvedTickets' => $approvedTickets,
+            'closedTickets' => $closedTickets,
+            'assignedTickets' => $assignedTickets,
+            'notAssignedTickets' => $notAssignedTickets,
             'totalUsers' => $totalUsers,
             'totalDevelopers' => $totalDevelopers,
             'recentTickets' => $recentTickets,
-            'closedTickets' => $closedTickets,
         ]);
     }
 }

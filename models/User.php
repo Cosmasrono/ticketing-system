@@ -34,6 +34,8 @@ class User extends ActiveRecord implements IdentityInterface
             [['password_hash', 'auth_key'], 'string'],
             ['auth_key', 'string', 'max' => 32],
             ['role', 'safe'],
+            ['company_email', 'email'],
+            ['company_email', 'string', 'max' => 255],
         ['role', 'in', 'range' => [User::ROLE_USER, User::ROLE_ADMIN, User::ROLE_DEVELOPER]],
 
         ];

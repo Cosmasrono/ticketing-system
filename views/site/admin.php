@@ -159,28 +159,32 @@ function assignTicket(button, ticketId) {
     window.location.href = '<?= \yii\helpers\Url::to(['/ticket/assign']) ?>' + '?id=' + ticketId;
 }
 
+
+
 function cancelTicket(button, ticketId) {
+    console.log('Cancel function called with ticketId:', ticketId);
     if (confirm('Are you sure you want to cancel this ticket?')) {
-        console.log('Attempting to cancel ticket:', ticketId);
-        
-        var data = {
-            id: ticketId,
-            _csrf: '<?= Yii::$app->request->csrfToken ?>'
-        };
-        console.log('Request data:', data);
+        var formData = new FormData();
+        formData.append('id', ticketId);
+        formData.append('_csrf', '<?= Yii::$app->request->csrfToken ?>');
+
+        console.log('FormData entries:');
+        for (var pair of formData.entries()) {
+            console.log(pair[0] + ': ' + pair[1]);
+        }
 
         $.ajax({
             url: '<?= \yii\helpers\Url::to(['/ticket/cancel']) ?>',
             type: 'POST',
-            data: data,
+            data: formData,
+            processData: false, // Important: Prevent jQuery from automatically transforming the data into a query string
+            contentType: false, // Important: Prevent jQuery from overriding the Content-Type
             dataType: 'json',
             success: function(response) {
-                console.log('Success response:', response);
                 if (response.success) {
-                    location.reload();
+                    location.reload(); // Reload or update the UI as needed
                 } else {
-                    console.error('Server reported failure:', response);
-                    alert('Failed to cancel the ticket: ' + (response.message || 'Unknown error'));
+                    alert('Error: ' + response.message);
                 }
             },
             error: function(jqXHR, textStatus, errorThrown) {
@@ -191,12 +195,12 @@ function cancelTicket(button, ticketId) {
                     textStatus: textStatus,
                     errorThrown: errorThrown
                 });
-                console.error('Full XHR object:', jqXHR);
                 alert('Error cancelling ticket. Please check the console for details.');
             }
         });
     }
 }
+
 
 function disableButtons(row) {
     row.find('a.btn').addClass('disabled').attr('disabled', true);

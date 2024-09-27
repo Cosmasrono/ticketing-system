@@ -57,14 +57,23 @@ class TicketController extends Controller
             'dataProvider' => $dataProvider,
         ]);
     }
-
-    public function actionView($id)
+    public function actionView()
     {
-        $model = $this->findModel($id);
+        $companyEmail = Yii::$app->user->identity->company_email;
+        $dataProvider = new ActiveDataProvider([
+            'query' => Ticket::find()->where(['company_email' => $companyEmail]),
+        ]);
+
+        $hasResults = $dataProvider->getCount() > 0;
+
         return $this->render('view', [
-            'model' => $model,
+            'dataProvider' => $dataProvider,
+            'companyEmail' => $companyEmail,
+            'hasResults' => $hasResults,
         ]);
     }
+    
+    
 
     public function actionCreate()
     {
@@ -177,28 +186,25 @@ class TicketController extends Controller
     
     public function actionCancel($id)
     {
-        $ticket = $this->findModel($id);
-        
-        if (Yii::$app->request->isPost) {
-            if ($ticket->status === 'approved') {
-                Yii::$app->session->setFlash('error', 'Approved tickets cannot be cancelled.');
-            } elseif ($ticket->status !== 'cancelled') {
-                $ticket->status = 'cancelled';
-                
-                if ($ticket->save()) {
-                    Yii::$app->session->setFlash('success', 'Ticket cancelled successfully');
-                } else {
-                    Yii::$app->session->setFlash('error', 'Failed to cancel ticket: ' . json_encode($ticket->errors));
-                }
-            } else {
-                Yii::$app->session->setFlash('error', 'Ticket is already cancelled');
+        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+    
+        try {
+            $ticket = Ticket::findOne($id);
+            if (!$ticket) {
+                return ['success' => false, 'message' => 'Ticket not found.'];
             }
-            
-            return $this->redirect(['/site/admin']);
+    
+            $ticket->status = Ticket::STATUS_CANCELLED;
+            if ($ticket->save()) {
+                return ['success' => true, 'message' => 'Ticket cancelled successfully.'];
+            } else {
+                return ['success' => false, 'message' => 'Failed to cancel ticket.', 'errors' => $ticket->errors];
+            }
+        } catch (\Exception $e) {
+            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
         }
-        
-        throw new BadRequestHttpException('Invalid request method.');
     }
+    
 
    
     protected function findModel($id)

@@ -11,9 +11,10 @@ use yii\behaviors\TimestampBehavior;
 class Ticket extends ActiveRecord
 {
 
-   
-
-
+    const STATUS_PENDING = 'pending';
+    const STATUS_APPROVED = 'approved';
+    const STATUS_CANCELLED = 'cancelled';
+    const STATUS_CLOSED = 'closed';
 
     public static function tableName()
     {
@@ -48,6 +49,8 @@ class Ticket extends ActiveRecord
             [['assigned_at'], 'date', 'format' => 'php:Y-m-d H:i:s'],
             [['created_at', 'assigned_at'], 'date', 'format' => 'php:Y-m-d H:i:s'],
             [['timer_start'], 'safe'],
+            ['status', 'default', 'value' => self::STATUS_PENDING],
+            ['status', 'in', 'range' => [self::STATUS_PENDING, self::STATUS_APPROVED, self::STATUS_CANCELLED, self::STATUS_CLOSED]],    
         ];
     }
 
@@ -64,6 +67,7 @@ class Ticket extends ActiveRecord
             'created_at' => 'Created At',
             'updated_at' => 'Updated At',
             'assigned_at' => 'Assigned At',
+            
          
 
         ];
@@ -178,21 +182,13 @@ class Ticket extends ActiveRecord
 
     public function getRemainingTimeInSeconds()
     {
-        if ($this->assigned_at) {
-            $assignedTime = new \DateTime($this->assigned_at);
-            $currentTime = new \DateTime();
-            $interval = $assignedTime->diff($currentTime);
-            
-            $hoursPassed = $interval->h + ($interval->days * 24);
-            $minutesPassed = $interval->i;
-            $secondsPassed = $interval->s;
-            
-            $totalSecondsPassed = ($hoursPassed * 3600) + ($minutesPassed * 60) + $secondsPassed;
-            $totalSecondsRemaining = (48 * 3600) - $totalSecondsPassed;
-            
-            return $totalSecondsRemaining > 0 ? $totalSecondsRemaining : 0;
-        }
-        return null;
+        // Implement your logic here
+        // For example:
+        $createdAt = strtotime($this->created_at);
+        $now = time();
+        $difference = $now - $createdAt;
+        $remainingTime = 3600 - $difference; // Assuming 1 hour limit
+        return max(0, $remainingTime);
     }
 
     public function getElapsedTime()

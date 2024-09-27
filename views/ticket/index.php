@@ -52,6 +52,13 @@ $this->params['breadcrumbs'][] = $this->title;
                     },
                 ],
             ],
+            [
+                'attribute' => 'assigned_to',
+                'label' => 'Assigned Developer',
+                'value' => function ($model) {
+                    return $model->developer ? $model->developer->name : 'Not Assigned';
+                },
+            ],
         ],
     ]); ?>
 

@@ -86,7 +86,7 @@ class Ticket extends ActiveRecord
 
     public function getDeveloper()
     {
-        return $this->hasOne(Developer::class, ['id' => 'developer_id']);
+        return $this->hasOne(Developer::class, ['id' => 'assigned_to']);
     }
 
     public function getAssignedTo()

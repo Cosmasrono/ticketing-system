@@ -58,30 +58,14 @@ class TicketController extends Controller
         ]);
     }
 
-    public function actionView($id = null)
+    public function actionView($id)
     {
-        $companyEmail = Yii::$app->user->identity->company_email;
-        
-        $query = Ticket::find()->where(['company_email' => $companyEmail]);
-        
-        $dataProvider = new ActiveDataProvider([
-            'query' => $query,
-            'sort' => [
-                'defaultOrder' => ['created_at' => SORT_DESC]
-            ],
-            'pagination' => [
-                'pageSize' => 10,
-            ],
-        ]);
-        
-        $hasResults = $query->exists();
-
+        $model = $this->findModel($id);
         return $this->render('view', [
-            'dataProvider' => $dataProvider,
-            'hasResults' => $hasResults,
-            'companyEmail' => $companyEmail,
+            'model' => $model,
         ]);
     }
+
     public function actionCreate()
     {
         // Check if the current user is an admin
@@ -126,34 +110,35 @@ class TicketController extends Controller
             Yii::$app->session->set('company_email', $companyEmail);
         }
     }
-
     public function actionAssign($id)
     {
-        $model = $this->findModel($id);
+        $ticket = $this->findModel($id);
         $developers = Developer::find()->all();
+        $isAssigned = !empty($ticket->assigned_to);
 
-        // Determine if the ticket is already assigned
-        $isAssigned = !empty($model->assigned_to);
+        if (Yii::$app->request->isPost) {
+            $developerId = Yii::$app->request->post('Ticket')['assigned_to'];
+            $developer = Developer::findOne($developerId);
 
-        if (Yii::$app->request->isAjax) {
-            Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-            if ($model->load(Yii::$app->request->post()) && $model->save()) {
-                return [
-                    'success' => true,
-                    'message' => 'Ticket assigned successfully.',
-                    'redirectUrl' => Yii::$app->request->referrer ?: ['index'],
-                ];
+            if (!$developer) {
+                Yii::error("Developer not found with ID: $developerId", 'ticket');
+                Yii::$app->session->setFlash('error', "Developer not found with ID: $developerId");
+                return $this->refresh();
+            }
+
+            $ticket->assigned_to = $developer->id;
+
+            if ($ticket->save()) {
+                Yii::$app->session->setFlash('success', "Ticket successfully " . ($isAssigned ? "reassigned" : "assigned") . " to {$developer->name}.");
+                return $this->redirect(['view', 'id' => $id]);
             } else {
-                return [
-                    'success' => false,
-                    'message' => 'Failed to assign ticket.',
-                    'errors' => $model->errors,
-                ];
+                Yii::error("Failed to assign ticket. Errors: " . json_encode($ticket->errors), 'ticket');
+                Yii::$app->session->setFlash('error', 'Failed to assign ticket: ' . json_encode($ticket->errors));
             }
         }
 
         return $this->render('assign', [
-            'model' => $model,
+            'ticket' => $ticket,
             'developers' => $developers,
             'isAssigned' => $isAssigned,
         ]);
@@ -190,8 +175,6 @@ class TicketController extends Controller
     }
     
     
-    
-
     public function actionCancel($id)
     {
         $ticket = $this->findModel($id);
@@ -216,16 +199,15 @@ class TicketController extends Controller
         
         throw new BadRequestHttpException('Invalid request method.');
     }
-    
 
    
     protected function findModel($id)
     {
-        if (($model = Ticket::findOne($id)) !== null) {
+        if (($model = Ticket::findOne(['id' => $id])) !== null) {
             return $model;
         }
 
-        throw new NotFoundHttpException('The requested ticket does not exist.');
+        throw new NotFoundHttpException('The requested page does not exist.');
     }
 
     public function actionGetElapsedTime($id)

@@ -229,37 +229,10 @@ class SiteController extends Controller
      * @return Response
      */
 
-
-    public function  actionAdmin(){
-
-        // Ensure only admins can access this page
-        if (!Yii::$app->user->identity->isAdmin()) {
-            throw new ForbiddenHttpException('You are not allowed to access this page.');
-        }
-
-        // Create a data provider for tickets
-        $dataProvider = new ActiveDataProvider([
-            'query' => Ticket::find()->with('assignedDeveloper'),
-            'pagination' => [
-                'pageSize' => 20,
-            ],
-            'sort' => [
-                'defaultOrder' => [
-                    'created_at' => SORT_DESC,
-                ]
-            ],
-        ]);
-
-        // Render the admin view with the data provider
-        return $this->render('admin', [
-            'dataProvider' => $dataProvider,
-        ]);
-    }
-
-
     public function actionLogout()
     {
         Yii::$app->user->logout();
+
         return $this->goHome();
     }
 
@@ -361,5 +334,40 @@ public function actionDeveloperDashboard()
     }
 
     throw new ForbiddenHttpException('You are not authorized to view this page.');
+}
+
+public function actionAdmin()
+{
+    // Ensure only admin users can access this action
+    if (!Yii::$app->user->identity->isAdmin) {
+        throw new ForbiddenHttpException('You are not allowed to perform this action.');
+    }
+
+    $ticketCounts = [
+        'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
+        'approved' => Ticket::find()->where(['status' => 'approved'])->count(),
+        'cancelled' => Ticket::find()->where(['status' => 'cancelled'])->count(),
+        'assigned' => Ticket::find()->where(['not', ['assigned_to' => null]])->count(),
+        'notAssigned' => Ticket::find()->where(['assigned_to' => null])->count(),
+        'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
+        'total' => Ticket::find()->count(),
+    ];
+
+    $dataProvider = new ActiveDataProvider([
+        'query' => Ticket::find(),
+        'pagination' => [
+            'pageSize' => 10,
+        ],
+        'sort' => [
+            'defaultOrder' => [
+                'created_at' => SORT_DESC,
+            ]
+        ],
+    ]);
+
+    return $this->render('admin', [
+        'dataProvider' => $dataProvider,
+        'ticketCounts' => $ticketCounts,
+    ]);
 }
 }

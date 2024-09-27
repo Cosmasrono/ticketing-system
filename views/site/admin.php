@@ -10,78 +10,41 @@ use yii\web\JsExpression;
 $this->title = 'Iansoft Ticket Management System';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
-<div class="ticket-index container mt-5">
+<div class="admin-index container mt-5">
     <h1 class="text-center"><?= Html::encode($this->title) ?></h1>
+
+    <!-- Ticket Count Cards -->
     <div class="row text-center mb-4">
-        <!-- Pending Tickets -->
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-            <div class="card text-white bg-primary h-100">
-                <div class="card-header">Pending Tickets</div>
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <h5 class="card-title"><?= $ticketCounts['pending'] ?? 0 ?></h5>
+        <?php
+        $statuses = [
+            ['title' => 'Pending Tickets', 'count' => $ticketCounts['pending'] ?? 0, 'bg' => 'primary'],
+            ['title' => 'Approved Tickets', 'count' => $ticketCounts['approved'] ?? 0, 'bg' => 'success'],
+            ['title' => 'Cancelled Tickets', 'count' => $ticketCounts['cancelled'] ?? 0, 'bg' => 'danger'],
+            ['title' => 'Assigned Tickets', 'count' => $ticketCounts['assigned'] ?? 0, 'bg' => 'info'],
+            ['title' => 'Not Assigned Tickets', 'count' => $ticketCounts['notAssigned'] ?? 0, 'bg' => 'warning'],
+            ['title' => 'Closed Tickets', 'count' => $ticketCounts['closed'] ?? 0, 'bg' => 'secondary'],
+        ];
+        foreach ($statuses as $status): ?>
+            <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
+                <div class="card text-white bg-<?= $status['bg'] ?> h-100">
+                    <div class="card-header"><?= $status['title'] ?></div>
+                    <div class="card-body d-flex flex-column justify-content-center">
+                        <h5 class="card-title"><?= $status['count'] ?></h5>
+                    </div>
                 </div>
             </div>
-        </div>
-        <!-- Approved Tickets -->
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-            <div class="card text-white bg-success h-100">
-                <div class="card-header">Approved Tickets</div>
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <h5 class="card-title"><?= $ticketCounts['approved'] ?? 0 ?></h5>
-                </div>
-            </div>
-        </div>
-        <!-- Cancelled Tickets -->
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-            <div class="card text-white bg-danger h-100">
-                <div class="card-header">Cancelled Tickets</div>
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <h5 class="card-title"><?= $ticketCounts['cancelled'] ?? 0 ?></h5>
-                </div>
-            </div>
-        </div>
-        <!-- Assigned Tickets -->
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-            <div class="card text-white bg-info h-100">
-                <div class="card-header">Assigned Tickets</div>
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <h5 class="card-title"><?= $ticketCounts['assigned'] ?? 0 ?></h5>
-                </div>
-            </div>
-        </div>
-        <!-- Not Assigned Tickets -->
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-            <div class="card text-white bg-warning h-100">
-                <div class="card-header">Not Assigned Tickets</div>
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <h5 class="card-title"><?= $ticketCounts['notAssigned'] ?? 0 ?></h5>
-                </div>
-            </div>
-        </div>
-        <!-- Closed Tickets -->
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-            <div class="card text-white bg-secondary h-100">
-                <div class="card-header">Closed Tickets</div>
-                <div class="card-body d-flex flex-column justify-content-center">
-                    <h5 class="card-title"><?= $ticketCounts['closed'] ?? 0 ?></h5>
-                </div>
-            </div>
-        </div>
-        <!-- Total Tickets -->
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
-            <div class="card text-white bg-secondary h-100">
+        <?php endforeach; ?>
+    </div>
+
+    <!-- Total Tickets -->
+    <div class="row justify-content-center mb-4">
+        <div class="col-lg-4 col-md-6 col-sm-8">
+            <div class="card text-white bg-dark">
                 <div class="card-header">Total Tickets</div>
-                <div class="card-body d-flex flex-column justify-content-center">
+                <div class="card-body">
                     <h5 class="card-title"><?= $ticketCounts['total'] ?? 0 ?></h5>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <!-- Loading Spinner -->
-    <div id="loading" style="display:none;" class="text-center mb-4">
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
         </div>
     </div>
 
@@ -97,8 +60,6 @@ $this->params['breadcrumbs'][] = $this->title;
             'status',
             'company_email',
             'created_at:datetime',
-         
-    
             [
                 'attribute' => 'developer.name',
                 'label' => 'Assigned Developer',
@@ -106,7 +67,6 @@ $this->params['breadcrumbs'][] = $this->title;
                     return $model->developer ? $model->developer->name : 'Not Assigned';
                 }
             ],
-
             [
                 'label' => 'Time Taken',
                 'value' => function ($model) {
@@ -121,18 +81,19 @@ $this->params['breadcrumbs'][] = $this->title;
             ],
             [
                 'class' => 'yii\grid\ActionColumn',
-                'template' => '{approve} {assign} {cancel}',
+                'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel}</div>',
                 'buttons' => [
                     'approve' => function ($url, $model, $key) {
                         $isDisabled = $model->status === 'approved';
                         return Html::a('Approve', '#', [
-                            'class' => 'btn btn-success' . ($isDisabled ? ' disabled' : ''),
+                            'class' => 'btn btn-success btn-sm' . ($isDisabled ? ' disabled' : ''),
                             'title' => 'Approve Ticket',
                             'onclick' => $isDisabled ? 'return false;' : new JsExpression("approveTicket($(this), {$model->id})"),
                             'data-id' => $model->id,
+                            
                         ]);
                     },
-                    'assign' => function ($url, $model, $key) {
+                         'assign' => function ($url, $model, $key) {
                         $isDisabled = $model->assigned_to !== null;
                         return Html::a('Assign', '#', [
                             'class' => 'btn btn-primary' . ($isDisabled ? ' disabled' : ''),
@@ -144,7 +105,7 @@ $this->params['breadcrumbs'][] = $this->title;
                     'cancel' => function ($url, $model, $key) {
                         $isDisabled = $model->status === 'approved' || ($model->assigned_to !== null && $model->status !== 'pending');
                         return Html::a('Cancel', '#', [
-                            'class' => 'btn btn-danger' . ($isDisabled ? ' disabled' : ''),
+                            'class' => 'btn btn-danger btn-sm' . ($isDisabled ? ' disabled' : ''),
                             'title' => 'Cancel Ticket',
                             'onclick' => $isDisabled ? 'return false;' : new JsExpression("cancelTicket($(this))"),
                             'data-id' => $model->id,
@@ -165,6 +126,7 @@ function showLoading() {
 function hideLoading() {
     $('#loading').hide();
 }
+
 function approveTicket(button, ticketId) {
     showLoading();
     $.ajax({
@@ -197,37 +159,43 @@ function assignTicket(button, ticketId) {
     window.location.href = '<?= \yii\helpers\Url::to(['/ticket/assign']) ?>' + '?id=' + ticketId;
 }
 
-function cancelTicket(button) {
-    var ticketId = button.data('id');
-    if (!confirm('Are you sure you want to cancel this ticket?')) {
-        return;
-    }
-
-    showLoading();
-    $.ajax({
-        url: '<?= \yii\helpers\Url::to(['/ticket/cancel']) ?>',
-        type: 'POST',
-        data: {
+function cancelTicket(button, ticketId) {
+    if (confirm('Are you sure you want to cancel this ticket?')) {
+        console.log('Attempting to cancel ticket:', ticketId);
+        
+        var data = {
             id: ticketId,
             _csrf: '<?= Yii::$app->request->csrfToken ?>'
-        },
-        dataType: 'json',
-        success: function(response) {
-            hideLoading();
-            if (response.success) {
-                var row = button.closest('tr');
-                row.find('td').eq(3).text('Cancelled');
-                disableButtons(row);
-            } else {
-                alert('Failed to cancel the ticket: ' + (response.message || 'Unknown error'));
+        };
+        console.log('Request data:', data);
+
+        $.ajax({
+            url: '<?= \yii\helpers\Url::to(['/ticket/cancel']) ?>',
+            type: 'POST',
+            data: data,
+            dataType: 'json',
+            success: function(response) {
+                console.log('Success response:', response);
+                if (response.success) {
+                    location.reload();
+                } else {
+                    console.error('Server reported failure:', response);
+                    alert('Failed to cancel the ticket: ' + (response.message || 'Unknown error'));
+                }
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.error('Error details:', {
+                    status: jqXHR.status,
+                    statusText: jqXHR.statusText,
+                    responseText: jqXHR.responseText,
+                    textStatus: textStatus,
+                    errorThrown: errorThrown
+                });
+                console.error('Full XHR object:', jqXHR);
+                alert('Error cancelling ticket. Please check the console for details.');
             }
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-            hideLoading();
-            console.error('Error cancelling ticket:', textStatus, errorThrown);
-            alert('Error cancelling ticket: ' + errorThrown);
-        }
-    });
+        });
+    }
 }
 
 function disableButtons(row) {
@@ -235,7 +203,7 @@ function disableButtons(row) {
 }
 
 function updateTimeTaken(row, closedAt) {
-    var createdAt = new Date(row.find('td').eq(5).text()); // Assuming created_at is the 6th column
+    var createdAt = new Date(row.find('td').eq(5).text());
     var closedDate = new Date(closedAt);
     var diff = Math.abs(closedDate - createdAt);
     var days = Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -244,9 +212,8 @@ function updateTimeTaken(row, closedAt) {
     row.find('td').eq(7).text(days + ' days, ' + hours + ' hours, ' + minutes + ' minutes');
 }
 </script>
-
-<!-- Enhanced Professional CSS Styling -->
 <style>
+<!-- Enhanced Professional CSS Styling -->
 /* General Body Styling */
 body {
     font-family: 'Roboto', sans-serif;
@@ -256,18 +223,41 @@ body {
     color: #343a40;
 }
 
+/* Container Styling */
+.container {
+    max-width: 100%; /* Allow full width */
+    padding: 15px; /* Add padding for mobile */
+}
+
 /* Card Styling */
 .card {
-    border-radius: 8px;
-    transition: transform 0.2s;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    width: 100%; /* Ensure cards take full width */
 }
 .card:hover {
     transform: scale(1.05);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
 }
 
 /* Button Styling */
 .btn {
     font-weight: bold;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    border-radius: 5px;
+    transition: background-color 0.2s;
+}
+.btn:hover {
+    opacity: 0.9;
+}
+
+/* Small Button Styling */
+.btn-small {
+    padding: 0.25rem 0.5rem; /* Smaller padding */
+    font-size: 0.8rem; /* Smaller font size */
+    border-radius: 3px; /* Slightly rounded corners */
 }
 
 /* Loading Spinner Styling */
@@ -281,4 +271,49 @@ body {
     font-weight: bold;
     color: #28a745;
 }
-</style>
+
+/* Action buttons styling */
+.action-buttons {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-width: 200px;
+}
+
+.action-buttons .btn {
+    flex: 1;
+    margin: 0 5px;
+    white-space: nowrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .action-buttons {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .action-buttons .btn {
+        margin: 5px 0;
+    }
+}
+
+/* Additional Styles for GridView */
+.table {
+    border-radius: 10px;
+    overflow: hidden;
+    width: 100%; /* Ensure the table fits the screen */
+}
+.table thead th {
+    background-color: #343a40;
+    color: #ffffff;
+}
+.table tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* Ensure GridView is responsive */
+.grid-view {
+    width: 100%; /* Full width for GridView */
+    overflow-x: auto; /* Allow horizontal scrolling if necessary */
+}

@@ -194,4 +194,21 @@ class User extends ActiveRecord implements IdentityInterface
         return $this->company_email;
     }
 
+    /**
+     * Checks if the user is an admin.
+     * @return bool whether the user is an admin
+     */
+    public function getIsAdmin()
+    {
+        // Replace this with your actual logic to determine if a user is an admin
+        // For example, if you have a 'role' column in your user table:
+        return $this->role === 'admin';
+
+        // Or if you have a separate 'is_admin' column:
+        // return (bool) $this->is_admin;
+
+        // Or if you're using RBAC:
+        // return \Yii::$app->authManager->checkAccess($this->id, 'admin');
+    }
+
 }

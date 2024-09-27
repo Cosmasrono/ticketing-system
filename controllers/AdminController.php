@@ -1,16 +1,12 @@
 <?php
 
-namespace app\controllers;
-
-use Yii;
-use yii\web\Controller;
-use yii\filters\AccessControl;
+use yii\data\ActiveDataProvider;
 use app\models\Ticket;
-use app\models\User;
-use app\models\Developer;
+use Yii;
+use yii\web\ForbiddenHttpException;
 
-class AdminController extends Controller
-{
+class AdminController extends \yii\web\Controller
+{   
     public function behaviors()
     {
         return [
@@ -19,44 +15,47 @@ class AdminController extends Controller
                 'rules' => [
                     [
                         'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->isAdmin;
-                        }
+                        'roles' => ['admin'],
                     ],
                 ],
             ],
         ];
     }
-
-    public function actionDashboard()
+    
+    public function actionAdmin()
     {
-        $totalTickets = Ticket::find()->count();
-        $cancelledTickets = Ticket::find()->where(['status' => 'cancelled'])->count();
-        $pendingTickets = Ticket::find()->where(['status' => 'pending'])->count();
-        $approvedTickets = Ticket::find()->where(['status' => 'approved'])->count();
-        $closedTickets = Ticket::find()->where(['status' => 'closed'])->count();
-        $assignedTickets = Ticket::find()->where(['not', ['assigned_to' => null]])->count();
-        $notAssignedTickets = Ticket::find()->where(['assigned_to' => null])->count();
-        $totalUsers = User::find()->count();
-        $totalDevelopers = Developer::find()->count();
-
-        $recentTickets = Ticket::find()
-            ->orderBy(['created_at' => SORT_DESC])
-            ->limit(5)
-            ->all();
-
-        return $this->render('dashboard', [
-            'totalTickets' => $totalTickets,
-            'cancelledTickets' => $cancelledTickets,
-            'pendingTickets' => $pendingTickets,
-            'approvedTickets' => $approvedTickets,
-            'closedTickets' => $closedTickets,
-            'assignedTickets' => $assignedTickets,
-            'notAssignedTickets' => $notAssignedTickets,
-            'totalUsers' => $totalUsers,
-            'totalDevelopers' => $totalDevelopers,
-            'recentTickets' => $recentTickets,
-        ]);
+    // Ensure only admin users can access this action
+    if (!Yii::$app->user->identity->isAdmin) {
+        throw new ForbiddenHttpException('You are not allowed to perform this action.');
     }
+
+    $ticketCounts = [
+        'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
+        'approved' => Ticket::find()->where(['status' => 'approved'])->count(),
+        'cancelled' => Ticket::find()->where(['status' => 'cancelled'])->count(),
+        'assigned' => Ticket::find()->where(['not', ['assigned_to' => null]])->count(),
+        'notAssigned' => Ticket::find()->where(['assigned_to' => null])->count(),
+        'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
+        'total' => Ticket::find()->count(),
+    ];
+
+    $dataProvider = new ActiveDataProvider([
+        'query' => Ticket::find(),
+        'pagination' => [
+            'pageSize' => 10, // Adjust this value as needed
+        ],
+        'sort' => [
+            'defaultOrder' => [
+                'created_at' => SORT_DESC,
+            ]
+        ],
+    ]);
+
+    return $this->render('admin', [
+        'dataProvider' => $dataProvider,
+        'ticketCounts' => $ticketCounts,
+    ]);
+
+    
+}
 }

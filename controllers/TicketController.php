@@ -66,6 +66,11 @@ class TicketController extends Controller
 
         $hasResults = $dataProvider->getCount() > 0;
 
+        // Add this logging
+        foreach ($dataProvider->models as $ticket) {
+            Yii::info("Ticket ID: {$ticket->id}, Status: '{$ticket->status}'", 'ticket');
+        }
+
         return $this->render('view', [
             'dataProvider' => $dataProvider,
             'companyEmail' => $companyEmail,
@@ -266,5 +271,57 @@ class TicketController extends Controller
         }
         
         return ['success' => false];
+    }
+
+    public function actionOpenIssue()
+    {
+        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        $id = Yii::$app->request->post('id');
+        $ticket = Ticket::findOne($id);
+
+        if ($ticket && $ticket->status === 'Closed') {
+            // Logic to open an issue for this ticket
+            // This might involve creating a new ticket, changing the status, or adding a flag
+            // For example:
+            $ticket->status = 'Reopened';
+            if ($ticket->save()) {
+                return ['success' => true];
+            }
+        }
+
+        return ['success' => false];
+    }
+
+    public function actionReopen()
+    {
+        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        $id = Yii::$app->request->post('id');
+        
+        $ticket = Ticket::findOne($id);
+
+        if (!$ticket) {
+            return ['success' => false, 'message' => 'Ticket not found.'];
+        }
+
+        if ($ticket->status !== Ticket::STATUS_CLOSED) {
+            return ['success' => false, 'message' => 'Only closed tickets can be reopened.'];
+        }
+
+        $oldStatus = $ticket->status;
+        $ticket->status = Ticket::STATUS_PENDING;  // Set to 'pending' when reopening
+        $ticket->action = 'reopen';
+
+        Yii::info("Attempting to reopen ticket ID: $id. Old status: $oldStatus, New status: {$ticket->status}", 'ticket');
+
+        if ($ticket->save()) {
+            Yii::info("Successfully reopened ticket ID: $id", 'ticket');
+            return ['success' => true, 'message' => "Ticket successfully reopened. Old status: $oldStatus, New status: pending"];
+        } else {
+            Yii::error("Failed to reopen ticket ID: $id. Errors: " . json_encode($ticket->errors), 'ticket');
+            return [
+                'success' => false, 
+                'message' => 'Failed to reopen the ticket. Errors: ' . json_encode($ticket->errors)
+            ];
+        }
     }
 }

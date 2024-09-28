@@ -3,6 +3,7 @@ use yii\helpers\Html;
 use yii\grid\GridView;
 use yii\widgets\Pjax;
 use yii\helpers\Url;
+use app\models\Ticket;  // Add this line
 
 $this->title = 'Company Tickets';
 $this->params['breadcrumbs'][] = $this->title;
@@ -38,20 +39,19 @@ $this->params['breadcrumbs'][] = $this->title;
                 ],
                 [
                     'class' => 'yii\grid\ActionColumn',
-                    'template' => '{close}',
+                    'template' => '{action}',
                     'buttons' => [
-                        'close' => function ($url, $model, $key) {
-                            return Html::button('Close', [
-                                'class' => 'btn btn-danger btn-sm close-ticket',
-                                'data-ticket-id' => $model->id,
-                            ]);
+                        'action' => function ($url, $model, $key) {
+                            if ($model->status === Ticket::STATUS_CLOSED) {
+                                return Html::button('Reopen', [
+                                    'class' => 'btn btn-warning btn-sm reopen-ticket',
+                                    'data-ticket-id' => $model->id,
+                                ]);
+                            }
+                            return '';  // Return empty string for non-closed tickets
                         },
                     ],
-                    'visibleButtons' => [
-                        'close' => function ($model) {
-                            return $model->status !== 'Closed';
-                        },
-                    ],
+                    'header' => 'Action',
                 ],
             ],
         ]); ?>
@@ -66,51 +66,15 @@ $this->params['breadcrumbs'][] = $this->title;
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    function updateTimers() {
-        document.querySelectorAll('.remaining-time').forEach(function(element) {
-            let seconds = parseInt(element.getAttribute('data-seconds'));
-            if (seconds > 0) {
-                seconds--;
-                element.setAttribute('data-seconds', seconds);
-                let hours = Math.floor(seconds / 3600);
-                let minutes = Math.floor((seconds % 3600) / 60);
-                let secs = seconds % 60;
-                element.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-            } else {
-                element.textContent = '00:00:00';
-            }
-        });
-    }
-
-    function loadTimeSpent() {
-        document.querySelectorAll('.time-spent').forEach(function(element) {
-            let ticketId = element.getAttribute('data-ticket-id');
-            fetch('<?= Url::to(['ticket/get-time-spent']) ?>?id=' + ticketId)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        element.textContent = data.timeSpent;
-                    } else {
-                        element.textContent = 'Error';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    element.textContent = 'Error';
-                });
-        });
-    }
-
-    setInterval(updateTimers, 1000);
-    updateTimers(); // Initial call to set the timers immediately
-    loadTimeSpent(); // Load time spent for closed tickets
-
-    // Add event listener for close buttons
-    document.querySelectorAll('.close-ticket').forEach(function(button) {
+    // Add event listener for reopen ticket buttons
+    document.querySelectorAll('.reopen-ticket').forEach(function(button) {
         button.addEventListener('click', function() {
-            if (confirm('Are you sure you want to close this ticket?')) {
+            if (this.disabled) {
+                return;  // Do nothing if the button is disabled
+            }
+            if (confirm('Are you sure you want to reopen this ticket? It will be set to pending status.')) {
                 let ticketId = this.getAttribute('data-ticket-id');
-                fetch('<?= Url::to(['ticket/close']) ?>', {
+                fetch('<?= Url::to(['ticket/reopen']) ?>', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
@@ -121,20 +85,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Update the status in the grid
-                        let row = this.closest('tr');
-                        let statusCell = row.querySelector('td:nth-child(3)');
-                        statusCell.textContent = 'Closed';
-                        // Update the time cell
-                        let timeCell = row.querySelector('.remaining-time');
-                        timeCell.className = 'time-spent';
-                        timeCell.setAttribute('data-ticket-id', ticketId);
-                        timeCell.textContent = 'Loading...';
-                        loadTimeSpent();
-                        // Hide the close button
-                        this.style.display = 'none';
+                        alert('Ticket reopened successfully. ' + data.message);
+                        location.reload();
                     } else {
-                        alert('Failed to close the ticket. Please try again.');
+                        console.error('Failed to reopen ticket:', data.message);
+                        alert('Failed to reopen the ticket: ' + data.message);
                     }
                 })
                 .catch(error => {

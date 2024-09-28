@@ -51,6 +51,8 @@ class Ticket extends ActiveRecord
             [['timer_start'], 'safe'],
             ['status', 'default', 'value' => self::STATUS_PENDING],
             ['status', 'in', 'range' => [self::STATUS_PENDING, self::STATUS_APPROVED, self::STATUS_CANCELLED, self::STATUS_CLOSED]],    
+            [['action'], 'string', 'max' => 255],
+            ['action', 'default', 'value' => 'reopen'],
         ];
     }
 
@@ -147,13 +149,13 @@ class Ticket extends ActiveRecord
 
     public function beforeSave($insert)
     {
-        if (parent::beforeSave($insert)) {
-            if ($this->isAttributeChanged('assigned_to') && $this->assigned_to !== null) {
-                $this->timer_start = new \yii\db\Expression('NOW()');
-            }
-            return true;
+        if (!parent::beforeSave($insert)) {
+            return false;
         }
-        return false;
+
+        Yii::info("Attempting to save ticket ID: {$this->id}, Status: {$this->status}, Action: {$this->action}", 'ticket');
+
+        return true;
     }
 
     public function afterSave($insert, $changedAttributes)

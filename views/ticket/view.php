@@ -29,7 +29,7 @@ $this->params['breadcrumbs'][] = $this->title;
                 [
                     'label' => 'Time',
                     'value' => function ($model) {
-                        if ($model->status === 'Closed') {
+                        if ($model->status === Ticket::STATUS_CLOSED) {
                             return '<span class="time-spent" data-ticket-id="' . $model->id . '">Loading...</span>';
                         } else {
                             return '<span class="remaining-time" data-seconds="' . $model->getRemainingTimeInSeconds() . '"></span>';
@@ -98,6 +98,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
+    });
+
+    // Load time spent for closed tickets
+    document.querySelectorAll('.time-spent').forEach(function(span) {
+        let ticketId = span.getAttribute('data-ticket-id');
+        fetch('<?= Url::to(['ticket/get-time-spent']) ?>?id=' + ticketId)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    span.textContent = data.timeSpent;
+                } else {
+                    span.textContent = 'Error';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                span.textContent = 'Error';
+            });
     });
 });
 </script>

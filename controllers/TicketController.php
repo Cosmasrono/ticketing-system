@@ -250,27 +250,39 @@ class TicketController extends Controller
 
     public function actionGetTimeSpent($id)
     {
-        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         
-        $model = $this->findModel($id);
+        $ticket = Ticket::findOne($id);
         
-        if ($model->status === 'Closed' && $model->closed_at !== null) {
-            $createdAt = new \DateTime($model->created_at);
-            $closedAt = new \DateTime($model->closed_at);
-            $interval = $createdAt->diff($closedAt);
-            
-            $timeSpent = sprintf(
-                '%d days, %02d:%02d:%02d',
-                $interval->days,
-                $interval->h,
-                $interval->i,
-                $interval->s
-            );
-            
-            return ['success' => true, 'timeSpent' => $timeSpent];
+        if (!$ticket || $ticket->status !== Ticket::STATUS_CLOSED) {
+            return ['success' => false];
         }
         
-        return ['success' => false];
+        $createdAt = new \DateTime($ticket->created_at);
+        $closedAt = new \DateTime($ticket->closed_at); // Assuming you have a closed_at field
+        $interval = $createdAt->diff($closedAt);
+        
+        $timeSpent = '';
+        if ($interval->y > 0) {
+            $timeSpent .= $interval->y . ' year' . ($interval->y > 1 ? 's ' : ' ');
+        }
+        if ($interval->m > 0) {
+            $timeSpent .= $interval->m . ' month' . ($interval->m > 1 ? 's ' : ' ');
+        }
+        if ($interval->d > 0) {
+            $timeSpent .= $interval->d . ' day' . ($interval->d > 1 ? 's ' : ' ');
+        }
+        if ($interval->h > 0) {
+            $timeSpent .= $interval->h . ' hour' . ($interval->h > 1 ? 's ' : ' ');
+        }
+        if ($interval->i > 0) {
+            $timeSpent .= $interval->i . ' minute' . ($interval->i > 1 ? 's' : '');
+        }
+        
+        return [
+            'success' => true,
+            'timeSpent' => trim($timeSpent) ?: 'Less than a minute',
+        ];
     }
 
     public function actionOpenIssue()

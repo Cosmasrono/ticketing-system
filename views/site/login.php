@@ -32,4 +32,6 @@ $this->params['breadcrumbs'][] = $this->title;
     <div class="form-group">
         <p>If you are a new user, you can <?= Html::a('signup here', ['site/signup']) ?>.</p>
     </div>
+
+    <?= Html::a('Forgot password?', ['site/request-password-reset']) ?>
 </div>

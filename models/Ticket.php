@@ -204,4 +204,26 @@ class Ticket extends ActiveRecord
         return $interval->format('%H:%I:%S');
     }
 
+    public function getTimeTaken()
+    {
+        if ($this->status === 'closed' && $this->created_at && $this->closed_at) {
+            $createdAt = new \DateTime($this->created_at);
+            $closedAt = new \DateTime($this->closed_at);
+            $interval = $createdAt->diff($closedAt);
+            
+            $days = $interval->d;
+            $hours = $interval->h;
+            $minutes = $interval->i;
+            
+            $timeTaken = [];
+            if ($days > 0) $timeTaken[] = $days . ' day' . ($days > 1 ? 's' : '');
+            if ($hours > 0) $timeTaken[] = $hours . ' hour' . ($hours > 1 ? 's' : '');
+            if ($minutes > 0) $timeTaken[] = $minutes . ' minute' . ($minutes > 1 ? 's' : '');
+            
+            return implode(', ', $timeTaken);
+        } else {
+            return 'Reviewing';
+        }
+    }
+
 }

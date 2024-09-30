@@ -17,6 +17,10 @@ use app\models\Developer;
 use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 use app\models\Admin;
+use app\models\PasswordResetRequestForm;
+use app\models\ResetPasswordForm;
+use yii\base\InvalidArgumentException;
+use yii\web\BadRequestHttpException;
 
 class SiteController extends Controller
 {
@@ -368,6 +372,60 @@ public function actionAdmin()
     return $this->render('admin', [
         'dataProvider' => $dataProvider,
         'ticketCounts' => $ticketCounts,
+    ]);
+}
+
+ 
+
+public function actionRequestPasswordReset()
+{
+    $model = new PasswordResetRequestForm();
+    if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+        $resetLink = $model->sendEmail();
+        if ($resetLink) {
+            Yii::$app->session->setFlash('success', 'Password reset link: <a href="' . $resetLink . '">' . $resetLink . '</a>');
+        } else {
+            Yii::$app->session->setFlash('error', 'Sorry, we are unable to reset password for the provided email address.');
+        }
+        return $this->refresh();
+    }
+
+    return $this->render('requestPasswordReset', [
+        'model' => $model,
+    ]);
+}
+
+public function actionResetPassword($token)
+{
+    try {
+        $model = new ResetPasswordForm($token);
+    } catch (\yii\web\BadRequestHttpException $e) {
+        return $this->goHome();
+    }
+
+    if ($model->load(Yii::$app->request->post()) && $model->validate() && $model->resetPassword()) {
+        Yii::$app->session->setFlash('success', 'New password saved.');
+        return $this->goHome();
+    }
+
+    return $this->render('resetPassword', [
+        'model' => $model,
+    ]);
+}
+public function actionForgotPassword()
+{
+    $model = new ForgotPasswordForm();
+    if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+        if ($model->sendResetLink()) {
+            Yii::$app->session->setFlash('success', 'If an account exists for this email, a password reset link has been sent. Please check your email for further instructions.');
+            return $this->goHome();
+        } else {
+            Yii::$app->session->setFlash('error', 'Sorry, we are unable to process your request at this time. Please try again later.');
+        }
+    }
+
+    return $this->render('forgotPassword', [
+        'model' => $model,
     ]);
 }
 }

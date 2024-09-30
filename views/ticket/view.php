@@ -27,12 +27,15 @@ $this->params['breadcrumbs'][] = $this->title;
                 ],
                 'created_at:datetime',
                 [
-                    'label' => 'Time',
+                    'label' => 'Time Taken',
                     'value' => function ($model) {
-                        if ($model->status === Ticket::STATUS_CLOSED) {
-                            return '<span class="time-spent" data-ticket-id="' . $model->id . '">Loading...</span>';
+                        if ($model->status === Ticket::STATUS_CLOSED && $model->time_taken !== null) {
+                            $days = floor($model->time_taken / 1440);
+                            $hours = floor(($model->time_taken % 1440) / 60);
+                            $minutes = $model->time_taken % 60;
+                            return sprintf('%d days, %d hours, %d minutes', $days, $hours, $minutes);
                         } else {
-                            return '<span class="remaining-time" data-seconds="' . $model->getRemainingTimeInSeconds() . '"></span>';
+                            return 'Reviewing';
                         }
                     },
                     'format' => 'raw',

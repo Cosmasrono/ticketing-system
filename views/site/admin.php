@@ -70,14 +70,10 @@ $this->params['breadcrumbs'][] = $this->title;
             [
                 'label' => 'Time Taken',
                 'value' => function ($model) {
-                    if ($model->status === 'Closed' && $model->closed_at !== null) {
-                        $createdAt = new DateTime($model->created_at);
-                        $closedAt = new DateTime($model->closed_at);
-                        $interval = $createdAt->diff($closedAt);
-                        return $interval->format('%a days, %h hours, %i minutes');
-                    }
-                    return 'Not closed yet';
-                }
+                    return $model->timeTaken;
+                },
+                'format' => 'raw',
+                'contentOptions' => ['style' => 'white-space: normal; word-wrap: break-word;'],
             ],
             [
                 'class' => 'yii\grid\ActionColumn',
@@ -134,15 +130,13 @@ function approveTicket(button, ticketId) {
         type: 'POST',
         data: {
             id: ticketId,
-            _csrf: '<?= Yii::$app->request->csrfToken ?>'
+            _csrf: '<?= Yii::$app->request->csrfToken ?>',
+            closed_at: new Date().toISOString()
         },
         success: function(response) {
             hideLoading();
             if (response.success) {
-                var row = button.closest('tr');
-                row.find('td').eq(3).text('Approved');
-                disableButtons(row);
-                updateTicketCounts();
+                location.reload(); // Reload the page to show updated data
             } else {
                 alert('Failed to approve the ticket: ' + (response.message || 'Unknown error'));
             }
@@ -159,30 +153,25 @@ function assignTicket(button, ticketId) {
     window.location.href = '<?= \yii\helpers\Url::to(['/ticket/assign']) ?>' + '?id=' + ticketId;
 }
 
-
-
-function cancelTicket(button, ticketId) {
+function cancelTicket(button) {
+    var ticketId = button.data('id');
     console.log('Cancel function called with ticketId:', ticketId);
     if (confirm('Are you sure you want to cancel this ticket?')) {
         var formData = new FormData();
         formData.append('id', ticketId);
         formData.append('_csrf', '<?= Yii::$app->request->csrfToken ?>');
-
-        console.log('FormData entries:');
-        for (var pair of formData.entries()) {
-            console.log(pair[0] + ': ' + pair[1]);
-        }
+        formData.append('closed_at', new Date().toISOString());
 
         $.ajax({
             url: '<?= \yii\helpers\Url::to(['/ticket/cancel']) ?>',
             type: 'POST',
             data: formData,
-            processData: false, // Important: Prevent jQuery from automatically transforming the data into a query string
-            contentType: false, // Important: Prevent jQuery from overriding the Content-Type
+            processData: false,
+            contentType: false,
             dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    location.reload(); // Reload or update the UI as needed
+                    location.reload(); // Reload the page to show updated data
                 } else {
                     alert('Error: ' + response.message);
                 }
@@ -201,20 +190,24 @@ function cancelTicket(button, ticketId) {
     }
 }
 
-
 function disableButtons(row) {
     row.find('a.btn').addClass('disabled').attr('disabled', true);
 }
 
-function updateTimeTaken(row, closedAt) {
-    var createdAt = new Date(row.find('td').eq(5).text());
-    var closedDate = new Date(closedAt);
-    var diff = Math.abs(closedDate - createdAt);
-    var days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    var hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    var minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    row.find('td').eq(7).text(days + ' days, ' + hours + ' hours, ' + minutes + ' minutes');
+function updateAllTimeTaken() {
+    $('.time-taken').each(function() {
+        var row = $(this).closest('tr');
+        var closedAt = $(this).data('closed-at');
+        updateTimeTaken(row, closedAt);
+    });
 }
+
+// Call updateAllTimeTaken when the page loads
+$(document).ready(function() {
+    updateAllTimeTaken();
+    // Update every minute
+    setInterval(updateAllTimeTaken, 60000);
+});
 </script>
 <style>
 <!-- Enhanced Professional CSS Styling -->

@@ -29,10 +29,12 @@ $config = [
             'errorAction' => 'site/error',
         ],
         'mailer' => [
-            'class' => \yii\symfonymailer\Mailer::class,
-            'viewPath' => '@app/mail',
-            // send all mails to a file by default.
-            'useFileTransport' => true,
+            'class' => 'yii\symfonymailer\Mailer',
+            'viewPath' => '@app/mail',  // This should point to your mail directory
+            'useFileTransport' => false,  // Set to true for development to store emails as files
+            'transport' => [
+                'dsn' => 'smtp://username:password@smtp.example.com:587',
+            ],
         ],
         'log' => [
             'traceLevel' => YII_DEBUG ? 3 : 0,
@@ -60,11 +62,16 @@ $config = [
                 'developer/<id:\d+>' => 'site/developer-dashboard',
                 'developer/close-ticket/<id:\d+>' => 'developer/close-ticket',
                 'ticket/approve/<id:\d+>' => 'ticket/approve',
+                'site/reset-password/<token:[\w-]+>' => 'site/reset-password',
+                'site/reset' => 'site/reset',
+                'site/reset/<token:[\w-]+>' => 'site/reset',
             ],
         ],
      
     ],
-    'params' => $params,
+    'params' => [
+        'adminEmail' => 'ccosmas001@gmail.com', // Add this line with the email you want to use
+    ],
 ];
 
 if (YII_ENV_DEV) {

@@ -159,55 +159,31 @@ class TicketController extends Controller
     }
     public function actionApprove()
     {
-        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-    
-        try {
-            $ticketId = Yii::$app->request->post('id');
-            $ticket = Ticket::findOne($ticketId);
-    
-            if (!$ticket) {
-                return ['success' => false, 'message' => 'Ticket not found.'];
+        $id = Yii::$app->request->post('id');
+        $ticket = Ticket::findOne($id);
+        if ($ticket) {
+            $ticket->status = 'closed';
+            $ticket->closed_at = date('Y-m-d H:i:s');
+            if ($ticket->save()) {
+                return $this->asJson(['success' => true]);
             }
-    
-            Yii::info("Ticket found: " . json_encode($ticket), __METHOD__);
-    
-            if ($ticket->status === 'pending') {
-                $ticket->status = 'approved'; // Change status to approved
-                if ($ticket->save()) {
-                    return ['success' => true];
-                } else {
-                    Yii::error("Failed to save ticket: " . json_encode($ticket->getErrors()), __METHOD__);
-                    return ['success' => false, 'message' => 'Failed to save ticket.'];
-                }
-            } else {
-                return ['success' => false, 'message' => 'Ticket cannot be approved. Current status: ' . $ticket->status];
-            }
-        } catch (\Exception $e) {
-            Yii::error("Exception occurred: " . $e->getMessage(), __METHOD__);
-            return ['success' => false, 'message' => 'Internal Server Error.'];
         }
+        return $this->asJson(['success' => false, 'message' => 'Failed to approve ticket']);
     }
     
     
-    public function actionCancel($id)
+    public function actionCancel()
     {
-        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-    
-        try {
-            $ticket = Ticket::findOne($id);
-            if (!$ticket) {
-                return ['success' => false, 'message' => 'Ticket not found.'];
-            }
-    
-            $ticket->status = Ticket::STATUS_CANCELLED;
+        $id = Yii::$app->request->post('id');
+        $ticket = Ticket::findOne($id);
+        if ($ticket) {
+            $ticket->status = 'closed';
+            $ticket->closed_at = date('Y-m-d H:i:s');
             if ($ticket->save()) {
-                return ['success' => true, 'message' => 'Ticket cancelled successfully.'];
-            } else {
-                return ['success' => false, 'message' => 'Failed to cancel ticket.', 'errors' => $ticket->errors];
+                return $this->asJson(['success' => true]);
             }
-        } catch (\Exception $e) {
-            return ['success' => false, 'message' => 'Error: ' . $e->getMessage()];
         }
+        return $this->asJson(['success' => false, 'message' => 'Failed to cancel ticket']);
     }
     
 

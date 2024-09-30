@@ -8,6 +8,7 @@ use yii\bootstrap5\Breadcrumbs;
 use yii\bootstrap5\Html;
 use yii\bootstrap5\Nav;
 use yii\bootstrap5\NavBar;
+use yii\web\JqueryAsset;
 
 AppAsset::register($this);
 
@@ -17,6 +18,8 @@ $this->registerMetaTag(['name' => 'viewport', 'content' => 'width=device-width, 
 $this->registerMetaTag(['name' => 'description', 'content' => $this->params['meta_description'] ?? '']);
 $this->registerMetaTag(['name' => 'keywords', 'content' => $this->params['meta_keywords'] ?? '']);
 $this->registerLinkTag(['rel' => 'icon', 'type' => 'image/x-icon', 'href' => Yii::getAlias('@web/favicon.ico')]);
+$this->registerJsFile('@web/js/jquery.js', ['position' => \yii\web\View::POS_HEAD]);
+JqueryAsset::register($this);
 ?>
 <?php $this->beginPage() ?>
 <!DOCTYPE html>

@@ -159,16 +159,33 @@ class TicketController extends Controller
     }
     public function actionApprove()
     {
-        $id = Yii::$app->request->post('id');
-        $ticket = Ticket::findOne($id);
-        if ($ticket) {
-            $ticket->status = 'closed';
-            $ticket->closed_at = date('Y-m-d H:i:s');
-            if ($ticket->save()) {
-                return $this->asJson(['success' => true]);
+        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        
+        try {
+            $id = Yii::$app->request->post('id');
+            $closed_at = Yii::$app->request->post('closed_at');
+            
+            if (!$id) {
+                throw new \yii\web\BadRequestHttpException('Ticket ID is required.');
             }
+            
+            $ticket = Ticket::findOne($id);
+            if (!$ticket) {
+                throw new \yii\web\NotFoundHttpException('Ticket not found.');
+            }
+            
+            $ticket->status = 'approved';
+            $ticket->closed_at = $closed_at;
+            
+            if (!$ticket->save()) {
+                throw new \yii\web\ServerErrorHttpException('Failed to approve ticket: ' . json_encode($ticket->errors));
+            }
+            
+            return ['success' => true];
+        } catch (\Exception $e) {
+            \Yii::error('Error in actionApprove: ' . $e->getMessage());
+            return ['success' => false, 'message' => $e->getMessage()];
         }
-        return $this->asJson(['success' => false, 'message' => 'Failed to approve ticket']);
     }
     
     

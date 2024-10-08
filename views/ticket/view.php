@@ -122,3 +122,103 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<style>
+/* Orange-themed Ticket View Styles */
+.ticket-view {
+    max-width: 1000px;
+    margin: 20px auto;
+    padding: 20px;
+    background-color: #FFFFFF;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.ticket-view h1 {
+    color: #FF6F00;
+    text-align: center;
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+/* GridView styles */
+.grid-view {
+    background-color: #FFFFFF;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.grid-view table {
+    margin-bottom: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+}
+
+.grid-view th {
+    background-color: #FF9800;
+    color: #FFFFFF;
+    border-bottom: 2px solid #F57C00;
+    padding: 12px;
+    font-weight: bold;
+}
+
+.grid-view td {
+    border-bottom: 1px solid #FFE0B2;
+    padding: 10px;
+}
+
+.grid-view tr:nth-child(even) {
+    background-color: #FFF8E1;
+}
+
+.grid-view tr:hover {
+    background-color: #FFE0B2;
+}
+
+/* Button styles */
+.btn-warning {
+    background-color: #FFB74D;
+    border-color: #FFB74D;
+    color: #FFFFFF;
+}
+
+.btn-warning:hover, .btn-warning:focus {
+    background-color: #F57C00;
+    border-color: #F57C00;
+    color: #FFFFFF;
+}
+
+/* Alert styles */
+.alert-info {
+    background-color: #FFF3E0;
+    border-color: #FFE0B2;
+    color: #F57C00;
+}
+
+.alert-link {
+    color: #FF5722;
+    font-weight: bold;
+}
+
+.alert-link:hover {
+    color: #E64A19;
+}
+
+/* Status colors */
+.status-open { color: #4CAF50; font-weight: bold; }
+.status-closed { color: #F44336; font-weight: bold; }
+.status-pending { color: #FFC107; font-weight: bold; }
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .ticket-view {
+        max-width: 100%;
+        margin: 10px;
+    }
+    
+    .grid-view {
+        overflow-x: auto;
+    }
+}

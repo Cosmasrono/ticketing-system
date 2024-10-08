@@ -6,39 +6,46 @@ $db = require __DIR__ . '/db.php';
 $config = [
     'id' => 'basic',
     'basePath' => dirname(__DIR__),
-    'bootstrap' => [
-        'log',
-        // Remove or comment out the following line:
-        // 'debug',
-    ],
+    'bootstrap' => ['log', 'debug', 'gii'],
     'aliases' => [
         '@bower' => '@vendor/bower-asset',
         '@npm'   => '@vendor/npm-asset',
     ],
     'components' => [
         'request' => [
-            // !!! insert a secret key in the following (if it is empty) - this is required by cookie validation
             'cookieValidationKey' => 'your-secret-key',
-            'enableCsrfValidation' => true, // Make sure this is true or remove this line
+            'enableCsrfValidation' => true,
+            'class' => 'yii\web\Request',
         ],
-        // 'defaultRoute' => 'site/index',
         'cache' => [
             'class' => 'yii\caching\FileCache',
         ],
+
+
+        'brevoMailer' => [
+            'class' => 'app\components\BrevoMailer',
+
+                'apiKey'=> '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',
+            
+        ],
+        
+        
         'user' => [
             'identityClass' => 'app\models\User',
             'enableAutoLogin' => true,
+            'class' => 'yii\web\User',
+        ],
+      'mailer' => [
+    'class' => 'yii\symfonymailer\Mailer',
+    'viewPath' => '@app/mail',
+    'useFileTransport' => false,
+    'transport' => [
+        'dsn' => 'sendinblue+api://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@default',
+    ],
+
         ],
         'errorHandler' => [
             'errorAction' => 'site/error',
-        ],
-        'mailer' => [
-            'class' => 'yii\symfonymailer\Mailer',
-            'viewPath' => '@app/mail',  // This should point to your mail directory
-            'useFileTransport' => false,  // Set to true for development to store emails as files
-            'transport' => [
-                'dsn' => 'smtp://username:password@smtp.example.com:587',
-            ],
         ],
         'log' => [
             'traceLevel' => YII_DEBUG ? 3 : 0,
@@ -46,7 +53,8 @@ $config = [
                 [
                     'class' => 'yii\log\FileTarget',
                     'levels' => ['error', 'warning', 'info'],
-                    'categories' => ['ticket'],
+                    'categories' => ['email-verification'],
+                    'logFile' => '@runtime/logs/email-verification.log',
                 ],
             ],
         ],
@@ -69,13 +77,17 @@ $config = [
                 'site/reset-password/<token:[\w-]+>' => 'site/reset-password',
                 'site/reset' => 'site/reset',
                 'site/reset/<token:[\w-]+>' => 'site/reset',
+                'site/verify-email' => 'site/verify-email',
+                'verify-email/<token:\w+>' => 'site/verify-email',
+
             ],
         ],
      
     ],
-    'params' => [
-        'adminEmail' => 'ccosmas001@gmail.com', // Add this line with the email you want to use
-    ],
+    'params' => array_merge($params, [
+        'senderEmail' => 'francismwaniki630@gmail.com',
+        'senderName' => 'Iansoft',
+    ]),
 ];
 
 if (YII_ENV_DEV) {

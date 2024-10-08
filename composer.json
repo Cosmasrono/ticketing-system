@@ -17,10 +17,21 @@
         "php": ">=7.4.0",
         "yiisoft/yii2": "~2.0.45",
         "yiisoft/yii2-bootstrap5": "~2.0.2",
-        "yiisoft/yii2-symfonymailer": "^3.0"
+        "yiisoft/yii2-symfonymailer": "^3.0",
+        "mailboxvalidator/mailboxvalidator-yii": "^2.1",
+        "yiisoft/yii2-swiftmailer": "^2.1",
+        "mailboxvalidator/mailboxvalidator-php": "^2.1",
+        "phpmailer/phpmailer": "*",
+        "guzzlehttp/guzzle": "^7.9",
+        "getbrevo/brevo-php": "^2.0",
+        "yiisoft/yii2-httpclient": "^2.0",
+        "symfony/mailer": "^6.0",
+        "symfony/http-client": "^6.0",
+        "nyholm/psr7": "^1.8",
+        "symfony/sendinblue-mailer": "^6.0"
     },
     "require-dev": {
-        "yiisoft/yii2-debug": "~2.1.0",
+        "yiisoft/yii2-debug": "^2.1",
         "yiisoft/yii2-gii": "^2.2",
         "yiisoft/yii2-faker": "~2.0.0",
         "codeception/codeception": "^5.0.0 || ^4.0",

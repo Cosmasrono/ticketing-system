@@ -21,6 +21,11 @@ use app\models\PasswordResetRequestForm;
 use app\models\ResetPasswordForm;
 use yii\base\InvalidArgumentException;
 use yii\web\BadRequestHttpException;
+use app\components\BrevoMailer;
+use yii\web\ServerErrorHttpException;
+
+ 
+
 
 class SiteController extends Controller
 {
@@ -35,7 +40,7 @@ class SiteController extends Controller
                 'only' => ['admin'],
                 'rules' => [
                     [
-                        'actions' => ['admin'],
+                        'actions' => ['admin','verify-email' => ['get', 'post'],],
                         'allow' => true,
                         'matchCallback' => function ($rule, $action) {
                             return !Yii::$app->user->isGuest && Yii::$app->user->identity->isAdmin();
@@ -128,40 +133,107 @@ class SiteController extends Controller
         
     ]);
 }
+ 
+public function actionSignup()
+{
+    $model = new User(['scenario' => User::SCENARIO_SIGNUP]);
 
-    /**
-     * Signup action.
-     *
-     * @return Response|string
-     */
-    public function actionSignup()
-    {
-        $model = new SignupForm();
-        if ($model->load(Yii::$app->request->post())) {
-            Yii::info('Form data loaded: ' . json_encode($model->attributes), __METHOD__);
-            if ($model->validate()) {
-                Yii::info('Form data validated', __METHOD__);
-                if ($user = $model->signup()) {
-                    Yii::info('User signed up: ' . json_encode($user->attributes), __METHOD__);
-                    Yii::$app->session->setFlash('success', 'Signup successful! Please log in.');
-                    return $this->redirect(['site/login']);
-                } else {
-                    Yii::error('User signup failed: ' . json_encode($model->errors), __METHOD__);
-                    Yii::$app->session->setFlash('error', 'Signup failed. Please check your input and try again.');
+    if (Yii::$app->request->isPost) {
+        if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+            // Set user password and generate necessary tokens
+            $model->setPassword($model->password);
+            $model->generateAuthKey();
+            $model->generateVerificationToken();
+            $model->status = User::STATUS_UNVERIFIED; // Set status to unverified
+            $model->is_verified = 0; // Ensure is_verified is set to 0
+
+            Yii::debug('Before save: ' . print_r($model->attributes, true));
+
+            if ($model->save()) {
+                Yii::debug('After save: ' . print_r($model->attributes, true));
+
+                // Create verification link
+                $verificationLink = Yii::$app->urlManager->createAbsoluteUrl([
+                    'site/verify-email',
+                    'token' => $model->verification_token,
+                    'companyEmail' => $model->company_email // Assuming you need this
+                ]);
+
+                Yii::debug('Brevo API Key: ' . (isset(Yii::$app->params['brevoApiKey']) ? 'Set' : 'Not Set'));
+
+                try {
+                    // Send verification email
+                    $result = $this->sendVerificationEmail($model, $verificationLink);
+                    if ($result['success']) {
+                        Yii::$app->session->setFlash('success', 'Please check your email to verify your account.');
+                        return $this->redirect(['site/login']);
+                    } else {
+                        Yii::error("Failed to send email. API response: " . json_encode($result));
+                        Yii::$app->session->setFlash('error', 'There was an error sending the verification email. Please try again. Error: ' . $result['message']);
+                    }
+                } catch (\Exception $e) {
+                    Yii::error("Exception when sending email: " . $e->getMessage());
+                    Yii::$app->session->setFlash('error', 'There was an error sending the verification email: ' . $e->getMessage());
                 }
             } else {
-                Yii::error('Signup validation failed: ' . json_encode($model->errors), __METHOD__);
-                Yii::$app->session->setFlash('error', 'Signup validation failed. Please check your input and try again.');
+                Yii::error("Failed to save user model. Errors: " . json_encode($model->errors));
+                Yii::$app->session->setFlash('error', 'There was an error creating your account. Please try again.');
             }
         } else {
-            Yii::error('Signup form not loaded', __METHOD__);
-            Yii::$app->session->setFlash('error', 'Signup form not loaded. Please try again.');
+            Yii::error("Validation failed. Errors: " . json_encode($model->errors));
         }
-        
-        return $this->render('signup', [
-            'model' => $model,
-        ]);
     }
+
+    return $this->render('signup', ['model' => $model]);
+}
+
+    
+
+    private function sendVerificationEmail($user, $verificationLink)
+    {
+        try {
+            $result = Yii::$app->mailer->compose('emailVerify-html', ['user' => $user, 'verificationLink' => $verificationLink])
+                ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->params['senderName']])
+                ->setTo($user->company_email)
+                ->setSubject('Verify your email')
+                ->send();
+    
+            if ($result) {
+                return ['success' => true, 'message' => 'Verification email sent successfully.'];
+            } else {
+                Yii::error("Failed to send email.");
+                return ['success' => false, 'message' => 'Failed to send verification email. Please try again later.'];
+            }
+        } catch (\Exception $e) {
+            Yii::error("Exception when sending email: " . $e->getMessage());
+            return ['success' => false, 'message' => 'An error occurred while sending the verification email: ' . $e->getMessage()];
+        }
+    }
+
+
+
+    public function actionVerifyEmail($token, $companyEmail)
+{
+    // Log the incoming token and company email for debugging
+    Yii::info("Attempting to verify email with token: " . substr($token, 0, 10) . ' and company email: ' . $companyEmail);
+
+    // Call the method to find the user by token and company email
+    $user = User::findByVerificationToken($token, $companyEmail);
+
+    if (!$user) {
+        Yii::$app->session->setFlash('error', 'Invalid or expired verification token.');
+        return $this->redirect(['site/index']);
+    }
+
+    // Proceed with verification if the user is found
+    $user->status = User::STATUS_ACTIVE;
+    $user->verification_token = null; // Clear the token
+    $user->save(false); // Save the changes without validation
+
+    Yii::$app->session->setFlash('success', 'Your email has been successfully verified.');
+    return $this->redirect(['site/index']);
+}
+
     
     /**
      * Login action.
@@ -428,4 +500,26 @@ public function actionForgotPassword()
         'model' => $model,
     ]);
 }
+
+
+//email verification
+
+
+// public function actionVerifyEmail($token)
+// {
+//     $user = User::findByVerificationToken($token);
+//     if (!$user) {
+//         throw new NotFoundHttpException('The verification link is invalid or has expired.');
+//     }
+
+//     if ($user->verify()) {
+//         Yii::$app->session->setFlash('success', 'Your email has been confirmed!');
+//         return $this->goHome();
+//     }
+
+//     Yii::$app->session->setFlash('error', 'Sorry, we are unable to verify your account with provided token.');
+//     return $this->goHome();
+// }
+
+
 }

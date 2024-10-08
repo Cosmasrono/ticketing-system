@@ -12,7 +12,7 @@ $this->params['breadcrumbs'][] = $this->title;
 ?>
 <div class="admin-index container mt-5">
     <h1 class="text-center"><?= Html::encode($this->title) ?></h1>
-z
+
     <!-- Ticket Count Cards -->
     <div class="row text-center mb-4">
         <?php
@@ -209,9 +209,10 @@ $(document).ready(function() {
     setInterval(updateAllTimeTaken, 60000);
 });
 </script>
-<style>
-<!-- Enhanced Professional CSS Styling -->
 /* General Body Styling */
+
+
+<style>
 body {
     font-family: 'Roboto', sans-serif;
     background-color: #f8f9fa;
@@ -232,6 +233,8 @@ body {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s, box-shadow 0.2s;
     width: 100%; /* Ensure cards take full width */
+    background-color: #ffe4b5; /* Light orange background */
+    border: none; /* Remove borders */
 }
 .card:hover {
     transform: scale(1.05);
@@ -245,8 +248,12 @@ body {
     font-size: 0.9rem;
     border-radius: 5px;
     transition: background-color 0.2s;
+    background-color: #ff8c00; /* Orange button */
+    color: white; /* White text for contrast */
+    border: none;
 }
 .btn:hover {
+    background-color: #ffa500; /* Slightly darker orange on hover */
     opacity: 0.9;
 }
 
@@ -255,6 +262,7 @@ body {
     padding: 0.25rem 0.5rem; /* Smaller padding */
     font-size: 0.8rem; /* Smaller font size */
     border-radius: 3px; /* Slightly rounded corners */
+    background-color: #ffcc80; /* Light orange shade for smaller buttons */
 }
 
 /* Loading Spinner Styling */
@@ -266,7 +274,7 @@ body {
 /* Time Taken Column Styling */
 .grid-view td:nth-child(8) {
     font-weight: bold;
-    color: #28a745;
+    color: #ff8c00; /* Bright orange for the time taken column */
 }
 
 /* Action buttons styling */
@@ -302,11 +310,11 @@ body {
     width: 100%; /* Ensure the table fits the screen */
 }
 .table thead th {
-    background-color: #343a40;
+    background-color: #ff8c00; /* Orange for the table header */
     color: #ffffff;
 }
 .table tbody tr:hover {
-    background-color: #f1f1f1;
+    background-color: #ffe4b5; /* Light orange on row hover */
 }
 
 /* Ensure GridView is responsive */

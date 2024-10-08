@@ -1,6 +1,7 @@
 <?php
 
 namespace app\models;
+use yii\db\Expression;
 
 use Yii;
 use yii\db\ActiveRecord;
@@ -9,16 +10,27 @@ use app\models\Admin;
 
 class User extends ActiveRecord implements IdentityInterface
 {
+ 
+    public $password;
+
+    const SCENARIO_SIGNUP = 'signup';
+
+    public function scenarios()
+    {
+        $scenarios = parent::scenarios();
+        $scenarios[self::SCENARIO_SIGNUP] = ['name', 'company_email', 'company_name', 'password', 'role'];
+        return $scenarios;
+    }
 
     const ROLE_USER = 'user';
     const ROLE_ADMIN = 'admin';
     const ROLE_DEVELOPER = 'developer'; // Add this line
 
     // Remove or comment out the status constants if not needed
-    const STATUS_DELETED = 0;
-    const STATUS_INACTIVE = 9;
+    const STATUS_INACTIVE = 0;
     const STATUS_ACTIVE = 10;
-
+    const STATUS_DELETED=9;
+    const STATUS_UNVERIFIED=20;
     /**
      * {@inheritdoc}
      */
@@ -33,22 +45,26 @@ class User extends ActiveRecord implements IdentityInterface
     public function rules()
     {
         return [
-            [['company_email'], 'required'],
-            [['company_email'], 'email'],
-            [['company_email'], 'unique'],
-            [['password_hash', 'auth_key'], 'string'],
-            ['auth_key', 'string', 'max' => 32],
-            ['role', 'safe'],
+            [['name', 'company_email', 'company_name', 'password'], 'required'],
+            [['name', 'company_name'], 'string', 'max' => 255],
             ['company_email', 'email'],
-            ['company_email', 'string', 'max' => 255],
-        ['role', 'in', 'range' => [User::ROLE_USER, User::ROLE_ADMIN, User::ROLE_DEVELOPER]],
-
+            ['company_email', 'unique', 'targetClass' => '\app\models\User', 'message' => 'This email address has already been taken.'],
+            ['password', 'string', 'min' => 6],
+            ['role', 'default', 'value' => self::ROLE_USER],
+            ['role', 'in', 'range' => [self::ROLE_USER, self::ROLE_ADMIN, self::ROLE_DEVELOPER]],
+            ['status', 'default', 'value' => self::STATUS_INACTIVE],
+        ['status', 'in', 'range' => [self::STATUS_ACTIVE, self::STATUS_INACTIVE, self::STATUS_DELETED]],
+            ['verification_token', 'string'],
+            [['created_at'], 'safe'],
+            ['auth_key', 'string', 'max' => 32],
         ];
     }
 
     /**
      * {@inheritdoc}
      */
+ 
+
     public function attributeLabels()
     {
         return [
@@ -58,13 +74,38 @@ class User extends ActiveRecord implements IdentityInterface
             'company_name' => 'Company Name',
             'password_hash' => 'Password Hash',
             'auth_key' => 'Auth Key',
-            'role' => 'Role',
+            'role' => 'Role', 
+            'verification_token',
+            'created_at' => 'Created At',
         ];
     }
 
     /**
      * {@inheritdoc}
      */
+
+
+
+     public function beforeSave($insert)
+     {
+         if (!parent::beforeSave($insert)) {
+             return false;
+         }
+ 
+         // Log the current state of the model before saving
+         Yii::info("Attempting to save User model. Current state: " . json_encode($this->attributes));
+ 
+         return true;
+     }
+ 
+     public function afterSave($insert, $changedAttributes)
+     {
+         parent::afterSave($insert, $changedAttributes);
+ 
+         // Log the changes made to the model
+         Yii::info("User model saved. Changed attributes: " . json_encode($changedAttributes));
+     }
+     
     public static function findIdentity($id)
     {
         return static::findOne($id);
@@ -106,6 +147,15 @@ class User extends ActiveRecord implements IdentityInterface
     /**
      * {@inheritdoc}
      */
+
+
+     public function generateAuthKey()
+     {
+         $this->auth_key = Yii::$app->security->generateRandomString();
+     }
+
+
+     
     public function getAuthKey()
     {
         return $this->auth_key;
@@ -143,10 +193,10 @@ class User extends ActiveRecord implements IdentityInterface
     /**
      * Generates "remember me" authentication key
      */
-    public function generateAuthKey()
-    {
-        $this->auth_key = Yii::$app->security->generateRandomString();
-    }
+    // public function generateAuthKey()
+    // {
+    //     $this->auth_key = Yii::$app->security->generateRandomString();
+    // }
 
     // public function isDeveloper()
     // {
@@ -270,4 +320,94 @@ class User extends ActiveRecord implements IdentityInterface
             ->setSubject('Password reset for ' . Yii::$app->name)
             ->send();
     }
+
+    //email verification
+
+    public function generateVerificationToken()
+    {
+        $this->verification_token = Yii::$app->security->generateRandomString() . '_' . time();
+        return $this->verification_token;
+    }
+    
+    public static function findByVerificationToken($token, $companyEmail)
+    {
+        if (empty($token) || empty($companyEmail)) {
+            return null;
+        }
+
+        $user = static::findOne([
+            'verification_token' => $token,
+            'company_email' => $companyEmail,
+            'status' => self::STATUS_UNVERIFIED, // Check for unverified status
+        ]);
+
+        return $user;
+    }
+    
+
+    
+    
+    
+    
+    
+public function verify($token, $companyEmail)
+{
+    Yii::info("Verifying user: ID = {$this->id}, Email = {$this->email}, Company Email = {$companyEmail}, Current Status = {$this->status}");
+
+    $user = self::findByVerificationToken($token, $companyEmail);
+    
+    if ($user === null) {
+        Yii::error("Invalid or expired token for user ID {$this->id} with company email {$companyEmail}");
+        return false;
+    }
+
+    // Proceed with verification
+    $this->status = self::STATUS_ACTIVE;
+    $this->verification_token = null;
+    $this->verification_token_created_at = null;
+    $this->verified_at = new Expression('NOW()');
+
+    if ($this->save()) {
+        Yii::info("User verified successfully: ID = {$this->id}");
+        return true;
+    }
+
+    Yii::error("Failed to verify user: ID = {$this->id}. Errors: " . json_encode($this->getErrors()));
+    return false;
+}
+
+    public static function isValidTokenFormat($token)
+{
+    // Adjust this regex pattern based on your token format
+    return preg_match('/^[A-Za-z0-9_-]{32,64}$/', $token) === 1;
+}
+
+    
+
+        
+    
+    public function removeVerificationToken()
+    {
+        Yii::info("Removing verification token for user ID: {$this->id}");
+        $this->verification_token = null;
+        // If you have a verification_token_created_at field, reset it here as well
+        // $this->verification_token_created_at = null;
+    }
+
+    public static function isValidToken($token)
+{
+    if (empty($token)) {
+        return false;
+    }
+
+    $parts = explode('_', $token);
+    $timestamp = (int) end($parts);
+
+    // Check if the token has expired (e.g., after 24 hours)
+    $expire = Yii::$app->params['user.passwordResetTokenExpire'] ?? 3600;
+    return $timestamp + $expire >= time();
+}
+    
+    
+
 }

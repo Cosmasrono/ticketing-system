@@ -44,3 +44,126 @@ $this->registerCss("
     }
 ");
 ?>
+
+
+<style>
+/* Orange-themed Login, Signup, and Dashboard Styles */
+body {
+    background-color: #FFF3E0;
+    color: #E65100;
+}
+
+.site-login, .site-signup, .site-index {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #FFF;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+h1, h2 {
+    color: #FF9800;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+p {
+    color: #F57C00;
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-control {
+    border-color: #FFB74D;
+}
+
+.form-control:focus {
+    border-color: #FF9800;
+    box-shadow: 0 0 0 0.2rem rgba(255, 152, 0, 0.25);
+}
+
+.btn-primary {
+    background-color: #FF9800;
+    border-color: #FF9800;
+}
+
+.btn-secondary {
+    background-color: #FFA726;
+    border-color: #FFA726;
+    color: #FFF;
+}
+
+.btn-primary:hover, .btn-primary:focus,
+.btn-secondary:hover, .btn-secondary:focus {
+    background-color: #F57C00;
+    border-color: #F57C00;
+}
+
+a {
+    color: #FF5722;
+}
+
+a:hover {
+    color: #E64A19;
+}
+
+/* Dashboard specific styles */
+.jumbotron {
+    background-color: #FFF3E0;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    border-radius: 8px;
+}
+
+.display-4 {
+    color: #FF9800;
+    font-weight: bold;
+}
+
+.lead {
+    color: #F57C00;
+}
+
+.btn-lg {
+    margin: 0.5rem;
+}
+
+.body-content {
+    background-color: #FFF;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Navbar styles */
+.navbar {
+    background-color: #FF9800;
+}
+
+.navbar-nav .nav-item .nav-link {
+    color: #FFF;
+    padding: 0.5rem 1rem;
+    margin: 0 0.5rem;
+}
+
+.navbar-nav .nav-item .nav-link:hover {
+    background-color: #F57C00;
+    border-radius: 4px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .site-login, .site-signup, .site-index {
+        max-width: 100%;
+        margin: 0 15px;
+    }
+    
+    .btn-lg {
+        width: 100%;
+        margin: 0.5rem 0;
+    }
+}

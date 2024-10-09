@@ -83,6 +83,7 @@ class User extends ActiveRecord implements IdentityInterface
     /**
      * {@inheritdoc}
      */
+ 
 
 
 
@@ -270,6 +271,7 @@ class User extends ActiveRecord implements IdentityInterface
     public static function findByPasswordResetToken($token)
     {
         if (!static::isPasswordResetTokenValid($token)) {
+            Yii::error("Invalid password reset token: $token");
             return null;
         }
 
@@ -281,44 +283,52 @@ class User extends ActiveRecord implements IdentityInterface
     public static function isPasswordResetTokenValid($token)
     {
         if (empty($token)) {
+            Yii::error("Empty password reset token");
             return false;
         }
         
         $timestamp = (int) substr($token, strrpos($token, '_') + 1);
-        $expire = Yii::$app->params['user.passwordResetTokenExpire'] ?? 3600; // Default to 1 hour if not set
-        return $timestamp + $expire >= time();
+        $expire = Yii::$app->params['user.passwordResetTokenExpire'];
+        $isValid = $timestamp + $expire >= time();
+        
+        if (!$isValid) {
+            Yii::error("Expired password reset token: $token");
+        }
+        
+        return $isValid;
     }
     public function generatePasswordResetToken()
     {
         $this->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
+        if (!$this->save(false)) {
+            Yii::error("Failed to save user with new password reset token: " . json_encode($this->errors));
+            return false;
+        }
+        Yii::info("Generated password reset token for user {$this->id}: {$this->password_reset_token}");
+        return true;
     }
     
     public function removePasswordResetToken()
     {
         $this->password_reset_token = null;
+        return $this->save(false);
     }
 
-    public function sendResetLink() 
+    public function sendEmail()
     {
-        if (!$this->validate()) {
-            return false;
+        if (!User::isPasswordResetTokenValid($this->password_reset_token)) {
+            $this->generatePasswordResetToken();
+            if (!$this->save()) {
+                Yii::error("Failed to save user with new reset token: " . json_encode($this->errors));
+                return false;
+            }
         }
 
-        $user = User::findOne(['company_email' => $this->company_email]);
-        if (!$user) {
-            return false;
-        }
+        $resetLink = Yii::$app->urlManager->createAbsoluteUrl(['site/reset-password', 'token' => $this->password_reset_token]);
 
-        $user->generatePasswordResetToken();
-        if (!$user->save()) {
-            return false;
-        }
-
-        return Yii::$app->mailer->compose('passwordResetToken', ['user' => $user])
-            ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name . ' robot'])
-            ->setTo($this->company_email)
-            ->setSubject('Password reset for ' . Yii::$app->name)
-            ->send();
+        Yii::info("Sending password reset email to company email: {$this->company_email}");
+        
+        return Yii::$app->brevoMailer->sendPasswordResetEmail($this->company_email, $this->username, $resetLink);
     }
 
     //email verification
@@ -345,7 +355,6 @@ class User extends ActiveRecord implements IdentityInterface
     }
     
 
-    
     
     
     
@@ -409,5 +418,53 @@ public function verify($token, $companyEmail)
 }
     
     
+    public function sendPasswordResetEmail()
+    {
+        if (!$this->password_reset_token) {
+            Yii::error("Attempted to send password reset email without a token for user: {$this->id}");
+            return false;
+        }
 
+        $resetLink = Yii::$app->urlManager->createAbsoluteUrl(['site/reset-password', 'token' => $this->password_reset_token]);
+
+        Yii::info("Sending password reset email to user: {$this->id} with token: {$this->password_reset_token}");
+
+        $supportEmail = Yii::$app->params['supportEmail'] ?? 'support@example.com';
+        $senderEmail = Yii::$app->params['senderEmail'] ?? $supportEmail;
+        $senderName = Yii::$app->params['senderName'] ?? Yii::$app->name . ' robot';
+
+        return Yii::$app->mailer->compose(
+            ['html' => 'passwordResetToken-html', 'text' => 'passwordResetToken-text'],
+            ['user' => $this, 'resetLink' => $resetLink]
+        )
+            ->setFrom([$senderEmail => $senderName])
+            ->setTo($this->company_email)
+            ->setSubject('Password reset for ' . Yii::$app->name)
+            ->send();
+    }
+
+    private function getPasswordResetEmailContent($resetLink)
+    {
+        return "
+            <html>
+            <body>
+                <h2>Password Reset for " . Yii::$app->name . "</h2>
+                <p>Hello {$this->username},</p>
+                <p>Follow the link below to reset your password:</p>
+                <p><a href='{$resetLink}'>{$resetLink}</a></p>
+                <p>If you didn't request this, you can ignore this email.</p>
+            </body>
+            </html>
+        ";
+    }
+
+    public function resetPassword($password)
+    {
+        $this->password_hash = Yii::$app->security->generatePasswordHash($password);
+        $this->password_reset_token = null;
+        $this->password_reset_token_created_at = null;
+        return $this->save(false);
+    }
+
+    // ... other methods ...
 }

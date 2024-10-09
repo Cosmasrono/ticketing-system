@@ -3,20 +3,27 @@
 namespace app\models;
 
 use yii\base\Model;
-use app\models\User;
+use yii\base\InvalidArgumentException;
+use Yii;
 
 class ResetPasswordForm extends Model
 {
     public $password;
-    public $confirm_password;
+    public $password_repeat;
 
+    /**
+     * @var \app\models\User
+     */
     private $_user;
 
     public function __construct($token, $config = [])
     {
+        if (empty($token) || !is_string($token)) {
+            throw new InvalidArgumentException('Password reset token cannot be blank.');
+        }
         $this->_user = User::findByPasswordResetToken($token);
         if (!$this->_user) {
-            throw new \yii\web\BadRequestHttpException('Wrong password reset token.');
+            throw new InvalidArgumentException('Wrong password reset token.');
         }
         parent::__construct($config);
     }
@@ -24,18 +31,14 @@ class ResetPasswordForm extends Model
     public function rules()
     {
         return [
-            [['password', 'confirm_password'], 'required'],
-            ['password', 'string', 'min' => 6],
-            ['confirm_password', 'compare', 'compareAttribute' => 'password', 'message' => 'Passwords do not match.'],
+            [['password', 'password_repeat'], 'required'],
+            [['password', 'password_repeat'], 'string', 'min' => 6],
+            ['password_repeat', 'compare', 'compareAttribute' => 'password', 'message' => 'Passwords don\'t match.'],
         ];
     }
 
     public function resetPassword()
     {
-        if (!$this->validate()) {
-            return false;
-        }
-        
         $user = $this->_user;
         $user->setPassword($this->password);
         $user->removePasswordResetToken();

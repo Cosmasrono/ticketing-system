@@ -190,25 +190,29 @@ public function actionSignup()
     
 
     private function sendVerificationEmail($user, $verificationLink)
-    {
-        try {
-            $result = Yii::$app->mailer->compose('emailVerify-html', ['user' => $user, 'verificationLink' => $verificationLink])
-                ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->params['senderName']])
-                ->setTo($user->company_email)
-                ->setSubject('Verify your email')
-                ->send();
-    
-            if ($result) {
-                return ['success' => true, 'message' => 'Verification email sent successfully.'];
-            } else {
-                Yii::error("Failed to send email.");
-                return ['success' => false, 'message' => 'Failed to send verification email. Please try again later.'];
-            }
-        } catch (\Exception $e) {
-            Yii::error("Exception when sending email: " . $e->getMessage());
-            return ['success' => false, 'message' => 'An error occurred while sending the verification email: ' . $e->getMessage()];
+{
+    try {
+        Yii::info("Attempting to send verification email to: " . $user->company_email);
+        Yii::info("Verification link: " . $verificationLink);
+
+        $result = Yii::$app->mailer->compose('emailVerify-html', ['user' => $user, 'verificationLink' => $verificationLink])
+            ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->params['senderName']])
+            ->setTo($user->company_email)
+            ->setSubject('Verify your company email')
+            ->send();
+
+        if ($result) {
+            Yii::info("Verification email sent successfully to: " . $user->company_email);
+            return ['success' => true, 'message' => 'Verification email sent successfully.'];
+        } else {
+            Yii::error("Failed to send email to: " . $user->company_email);
+            return ['success' => false, 'message' => 'Failed to send verification email. Please try again later.'];
         }
+    } catch (\Exception $e) {
+        Yii::error("Exception when sending email to " . $user->company_email . ": " . $e->getMessage());
+        return ['success' => false, 'message' => 'An error occurred while sending the verification email: ' . $e->getMessage()];
     }
+}
 
 
 
@@ -453,26 +457,27 @@ public function actionRequestPasswordReset()
 {
     $model = new PasswordResetRequestForm();
     if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-        $resetLink = $model->sendEmail();
-        if ($resetLink) {
-            Yii::$app->session->setFlash('success', 'Password reset link: <a href="' . $resetLink . '">' . $resetLink . '</a>');
-        } else {
-            Yii::$app->session->setFlash('error', 'Sorry, we are unable to reset password for the provided email address.');
+        if ($model->sendEmail()) {
+            Yii::$app->session->setFlash('success', 'Check your company email for further instructions.');
+            return $this->goHome();
         }
-        return $this->refresh();
+        Yii::$app->session->setFlash('error', 'Sorry, we are unable to reset password for the provided company email address.');
     }
 
-    return $this->render('requestPasswordReset', [
+    return $this->render('requestPasswordResetToken', [
         'model' => $model,
     ]);
 }
 
 public function actionResetPassword($token)
 {
+    Yii::info("Attempting to reset password with token: $token");
+
     try {
         $model = new ResetPasswordForm($token);
-    } catch (\yii\web\BadRequestHttpException $e) {
-        return $this->goHome();
+    } catch (InvalidArgumentException $e) {
+        Yii::error("Invalid password reset attempt: " . $e->getMessage());
+        throw new BadRequestHttpException($e->getMessage());
     }
 
     if ($model->load(Yii::$app->request->post()) && $model->validate() && $model->resetPassword()) {
@@ -484,6 +489,7 @@ public function actionResetPassword($token)
         'model' => $model,
     ]);
 }
+
 public function actionForgotPassword()
 {
     $model = new ForgotPasswordForm();

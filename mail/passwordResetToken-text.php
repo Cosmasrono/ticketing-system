@@ -1,14 +1,11 @@
 <?php
 
-/* @var $this yii\web\View */
 /* @var $user app\models\User */
 /* @var $resetLink string */
 
 ?>
-Hello Administrator,
+Hello <?= $user->username ?>,
 
-A password reset has been requested for the user: <?= $user->company_email ?>
-
-Follow the link below to reset the password:
+Follow the link below to reset your password:
 
 <?= $resetLink ?>

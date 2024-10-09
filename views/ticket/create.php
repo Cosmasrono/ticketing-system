@@ -22,7 +22,7 @@ $this->params['breadcrumbs'][] = $this->title;
         <?= $form->field($model, 'title')->textInput(['maxlength' => true]) ?>
         <?= $form->field($model, 'description')->textarea(['rows' => 6]) ?>
 
-        <?= Html::submitButton('S', ['class' => 'btn btn-success']) ?>
+        <?= Html::submitButton('Submit', ['class' => 'btn btn-success']) ?>
 
         <?php ActiveForm::end(); ?>
 

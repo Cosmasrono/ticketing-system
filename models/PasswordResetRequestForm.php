@@ -4,7 +4,6 @@ namespace app\models;
 
 use Yii;
 use yii\base\Model;
-use app\models\User;
 
 class PasswordResetRequestForm extends Model
 {
@@ -22,7 +21,7 @@ class PasswordResetRequestForm extends Model
             ['company_email', 'exist',
                 'targetClass' => '\app\models\User',
                 'filter' => ['status' => User::STATUS_ACTIVE],
-                'message' => 'There is no user with this email address.'
+                'message' => 'There is no user with this company email address.'
             ],
         ];
     }
@@ -51,19 +50,17 @@ class PasswordResetRequestForm extends Model
         ]);
 
         if (!$user) {
+            Yii::error("User not found for email: {$this->company_email}");
             return false;
         }
 
-        if (!User::isPasswordResetTokenValid($user->password_reset_token)) {
-            $user->generatePasswordResetToken();
-            if (!$user->save()) {
+        if (!$user->password_reset_token || !User::isPasswordResetTokenValid($user->password_reset_token)) {
+            if (!$user->generatePasswordResetToken()) {
+                Yii::error("Failed to generate password reset token for user: {$user->id}");
                 return false;
             }
         }
 
-        $resetLink = Yii::$app->urlManager->createAbsoluteUrl(['site/reset-password', 'token' => $user->password_reset_token]);
-
-        // Instead of sending an email, we'll return the reset link
-        return $resetLink;
+        return $user->sendPasswordResetEmail();
     }
 }

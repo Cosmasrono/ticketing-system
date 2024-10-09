@@ -34,7 +34,35 @@ $this->params['breadcrumbs'][] = $this->title;
 
     <?php ActiveForm::end(); ?>
 
-    <p>
-        Forgot your password? <?= Html::a('Reset it here', ['site/reset']) ?>
-    </p>
+    
 </div>
+
+<style>
+/* Orange-themed Signup Form Styles */
+.site-signup {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #FFF3E0; /* Light orange background */
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.site-signup h1 {
+    color: #FF9800; /* Orange */
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.site-signup p {
+    color: #F57C00; /* Dark orange */
+    margin-bottom: 20px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-control {
+    border-color: #
+</style>

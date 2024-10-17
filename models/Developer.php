@@ -9,7 +9,7 @@ class Developer extends ActiveRecord
 {
     public static function tableName()
     {
-        return 'developer'; // or whatever your table name is
+        return '{{%developer}}';
     }
 
     public function rules()
@@ -31,21 +31,25 @@ class Developer extends ActiveRecord
         ];
     }
 
+    /**
+     * Finds a developer by company email
+     *
+     * @param string $email
+     * @return Developer|null
+     */
     public static function findByCompanyEmail($email)
     {
-        Yii::info("Searching for developer with email: $email", __METHOD__);
-        $developer = self::findOne(['company_email' => $email]);
-        if ($developer === null) {
-            Yii::error("No developer found with email: $email", __METHOD__);
-        } else {
-            Yii::info("Developer found: " . json_encode($developer->attributes), __METHOD__);
-        }
-        return $developer;
+        return static::findOne(['company_email' => $email]);
     }
 
     public function getAssignedTickets()
     {
         return $this->hasMany(Ticket::class, ['assigned_to' => 'id']);
+    }
+
+    public function getTickets()
+    {
+        return $this->hasMany(Ticket::className(), ['assigned_to' => 'id']);
     }
 
     // Remove these methods as they're causing confusion between 'email' and 'company_email'
@@ -67,4 +71,9 @@ class Developer extends ActiveRecord
         return false;
     }
     */
+
+    public static function emailExists($email)
+    {
+        return self::find()->where(['company_email' => $email])->exists();
+    }
 }

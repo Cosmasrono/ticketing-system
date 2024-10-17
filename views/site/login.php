@@ -7,6 +7,9 @@ use yii\widgets\ActiveForm;
 /** @var yii\bootstrap5\ActiveForm $form */
 /** @var app\models\LoginForm $model */
 
+// echo "CSRF Parameter: " . Yii::$app->request->csrfParam . "<br>";
+// echo "CSRF Token: " . Yii::$app->request->csrfToken . "<br>";
+
 $this->title = 'Login';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
@@ -15,7 +18,10 @@ $this->params['breadcrumbs'][] = $this->title;
 
     <p>Please fill out the following fields to login:</p>
 
-    <?php $form = ActiveForm::begin(['id' => 'login-form']); ?>
+    <?php $form = ActiveForm::begin([
+        'id' => 'login-form',
+        'options' => ['class' => 'form-horizontal'],
+    ]) ?>
 
         <?= $form->field($model, 'company_email')->textInput(['autofocus' => true]) ?>
 

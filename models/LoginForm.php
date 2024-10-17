@@ -5,7 +5,7 @@ namespace app\models;
 use Yii;
 use yii\base\Model;
 use app\models\User;
-use app\models\Developer;
+use app\models\Client; // Add this line to import the Client model
 
 class LoginForm extends Model
 {
@@ -25,6 +25,16 @@ class LoginForm extends Model
         ];
     }
 
+    public function validateClientEmail($attribute, $params)
+    {
+        if (!$this->hasErrors()) {
+            $client = Client::findOne(['company_email' => $this->company_email]);
+            if (!$client) {
+                $this->addError($attribute, 'This email is not registered as a client.');
+            }
+        }
+    }
+
     public function validatePassword($attribute, $params)
     {
         if (!$this->hasErrors()) {
@@ -40,19 +50,21 @@ class LoginForm extends Model
     {
         if ($this->validate()) {
             $user = $this->getUser();
-            if ($user && $user->status === User::STATUS_INACTIVE) {
-                $this->addError('username', 'Your account is not verified. Please check your email for the verification link.');
-                return false;
+            if (Yii::$app->user->login($user, $this->rememberMe ? 3600*24*30 : 0)) {
+                // Check if the user is an admin after successful login
+                if ($user->isAdmin()) {
+                    Yii::$app->session->set('isAdmin', true);
+                }
+                return true;
             }
-            return Yii::$app->user->login($user, $this->rememberMe ? 3600 * 24 * 30 : 0);
         }
         return false;
     }
 
-    protected function getUser()
+    public function getUser()
     {
         if ($this->_user === false) {
-            $this->_user = User::findByEmail($this->company_email);
+            $this->_user = User::findOne(['company_email' => $this->company_email]);
         }
 
         return $this->_user;

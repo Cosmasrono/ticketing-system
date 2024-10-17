@@ -1,61 +1,75 @@
 <?php
 
-use yii\data\ActiveDataProvider;
-use app\models\Ticket;
-use Yii;
-use yii\web\ForbiddenHttpException;
+namespace app\controllers;
 
-class AdminController extends \yii\web\Controller
-{   
+use Yii;
+use yii\web\Controller;
+use yii\filters\AccessControl;
+use yii\web\ForbiddenHttpException;
+use app\models\Admin;
+use app\models\Ticket;
+use app\models\Developer;
+
+class AdminController extends Controller
+{
     public function behaviors()
     {
         return [
             'access' => [
-                'class' => AccessControl::class,
+                'class' => AccessControl::className(),
                 'rules' => [
                     [
                         'allow' => true,
-                        'roles' => ['admin'],
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            $user = Yii::$app->user->identity;
+                            return $user && Admin::find()->where(['company_email' => $user->company_email])->exists();
+                        }
                     ],
                 ],
+                'denyCallback' => function ($rule, $action) {
+                    throw new ForbiddenHttpException('You are not allowed to access this page.');
+                }
             ],
         ];
     }
     
-    public function actionAdmin()
+    public function actionIndex()
     {
-    // Ensure only admin users can access this action
-    if (!Yii::$app->user->identity->isAdmin) {
-        throw new ForbiddenHttpException('You are not allowed to perform this action.');
+        return $this->render('index');
     }
 
-    $ticketCounts = [
-        'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
-        'approved' => Ticket::find()->where(['status' => 'approved'])->count(),
-        'cancelled' => Ticket::find()->where(['status' => 'cancelled'])->count(),
-        'assigned' => Ticket::find()->where(['not', ['assigned_to' => null]])->count(),
-        'notAssigned' => Ticket::find()->where(['assigned_to' => null])->count(),
-        'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
-        'total' => Ticket::find()->count(),
-    ];
+    public function actionAssignTicket($id)
+    {
+        $ticket = Ticket::findOne($id);
+        if ($ticket === null) {
+            throw new NotFoundHttpException('The requested ticket does not exist.');
+        }
 
-    $dataProvider = new ActiveDataProvider([
-        'query' => Ticket::find(),
-        'pagination' => [
-            'pageSize' => 10, // Adjust this value as needed
-        ],
-        'sort' => [
-            'defaultOrder' => [
-                'created_at' => SORT_DESC,
-            ]
-        ],
-    ]);
+        if ($ticket->status !== 'escalated') {
+            throw new ForbiddenHttpException('This ticket cannot be assigned as it is not escalated.');
+        }
 
-    return $this->render('admin', [
-        'dataProvider' => $dataProvider,
-        'ticketCounts' => $ticketCounts,
-    ]);
+        // Load available developers
+        $developers = Developer::find()->all();
 
-    
-}
+        if (Yii::$app->request->isPost) {
+            $developerId = Yii::$app->request->post('developer_id');
+            $ticket->assigned_to = $developerId;
+            $ticket->status = 'assigned';
+            if ($ticket->save()) {
+                Yii::$app->session->setFlash('success', 'Ticket has been assigned successfully.');
+                return $this->redirect(['view', 'id' => $ticket->id]);
+            } else {
+                Yii::$app->session->setFlash('error', 'There was an error assigning the ticket.');
+            }
+        }
+
+        return $this->render('assign-ticket', [
+            'ticket' => $ticket,
+            'developers' => $developers,
+        ]);
+    }
+
+    // Add other admin-specific actions here
 }

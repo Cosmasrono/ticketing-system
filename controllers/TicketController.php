@@ -17,6 +17,8 @@ use yii\helpers\ArrayHelper;
 use yii\web\Response;
 use yii\db\Expression;
 use yii\web\BadRequestHttpException;
+ 
+use app\models\Client;
 
 class TicketController extends Controller
 {
@@ -49,62 +51,48 @@ class TicketController extends Controller
     public function actionIndex()
     {
         $dataProvider = new ActiveDataProvider([
-            'query' => Ticket::find(),
-            // ... other configurations ...
+            'query' => Ticket::find()->where(['company_email' => Yii::$app->user->identity->company_email]),
         ]);
 
         return $this->render('index', [
             'dataProvider' => $dataProvider,
         ]);
     }
-    public function actionView()
+
+
+       public function actionView($id = null)
     {
-        $companyEmail = Yii::$app->user->identity->company_email;
-        $dataProvider = new ActiveDataProvider([
-            'query' => Ticket::find()->where(['company_email' => $companyEmail]),
-        ]);
+        if ($id === null) {
+            return $this->redirect(['index']);
+        }
 
-        $hasResults = $dataProvider->getCount() > 0;
-
-        // Add this logging
-        foreach ($dataProvider->models as $ticket) {
-            Yii::info("Ticket ID: {$ticket->id}, Status: '{$ticket->status}'", 'ticket');
+        $model = $this->findModel($id);
+        
+        // Check if the ticket belongs to the current user
+        if ($model->company_email !== Yii::$app->user->identity->company_email) {
+            throw new \yii\web\ForbiddenHttpException('You are not allowed to view this ticket.');
         }
 
         return $this->render('view', [
-            'dataProvider' => $dataProvider,
-            'companyEmail' => $companyEmail,
-            'hasResults' => $hasResults,
+            'model' => $model,
         ]);
     }
-    
     
 
     public function actionCreate()
     {
-        // Check if the current user is an admin
-        if (Yii::$app->user->identity->isAdmin()) {
-            throw new ForbiddenHttpException('Admins are not allowed to create tickets.');
+        if (!$this->isClient()) {
+            Yii::$app->session->setFlash('error', 'Only registered customers are allowed to create tickets.');
+            return $this->redirect(['site/index']); // or wherever you want to redirect non-clients
         }
 
         $model = new Ticket();
-    
-        // Get the logged-in user's company email
-        $userCompanyEmail = Yii::$app->user->identity->company_email;
-    
-        if ($model->load(Yii::$app->request->post())) {
-            // Set the company_email to the logged-in user's company email
-            $model->company_email = $userCompanyEmail;
-            
-            if ($model->save()) {
-                Yii::$app->session->setFlash('success', 'Ticket created successfully.');
-                return $this->redirect(['view', 'id' => $model->id]);
-            }
-        } else {
-            // Pre-fill the company_email field
-            $model->company_email = $userCompanyEmail;
+
+        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+            Yii::$app->session->setFlash('success', 'Ticket created successfully.');
+            return $this->redirect(['view', 'id' => $model->id]);
         }
-    
+
         return $this->render('create', [
             'model' => $model,
         ]);
@@ -124,39 +112,49 @@ class TicketController extends Controller
             Yii::$app->session->set('company_email', $companyEmail);
         }
     }
+
+
     public function actionAssign($id)
     {
-        $ticket = $this->findModel($id);
-        $developers = Developer::find()->all();
-        $isAssigned = !empty($ticket->assigned_to);
+        $ticket = Ticket::findOne($id);
+        if (!$ticket) {
+            Yii::$app->session->setFlash('error', "Ticket with ID {$id} not found.");
+            return $this->redirect(['site/admin']); // Redirect back to the admin page
+        }
+
+        $developers = Developer::find()
+            ->where(['!=', 'id', $ticket->assigned_to])
+            ->all();
 
         if (Yii::$app->request->isPost) {
             $developerId = Yii::$app->request->post('Ticket')['assigned_to'];
             $developer = Developer::findOne($developerId);
-
-            if (!$developer) {
-                Yii::error("Developer not found with ID: $developerId", 'ticket');
-                Yii::$app->session->setFlash('error', "Developer not found with ID: $developerId");
-                return $this->refresh();
-            }
-
-            $ticket->assigned_to = $developer->id;
-
-            if ($ticket->save()) {
-                Yii::$app->session->setFlash('success', "Ticket successfully " . ($isAssigned ? "reassigned" : "assigned") . " to {$developer->name}.");
-                return $this->redirect(['site/admin']);  // This line is changed
+            
+            if ($developer) {
+                $ticket->assigned_to = $developer->id;
+                $ticket->status = Ticket::STATUS_PENDING; // or whatever status you want after reassignment
+                
+                if ($ticket->save()) {
+                    Yii::$app->session->setFlash('success', 'Ticket successfully reassigned to ' . $developer->name);
+                    return $this->redirect(['site/admin']);
+                } else {
+                    Yii::$app->session->setFlash('error', 'Failed to reassign ticket: ' . json_encode($ticket->errors));
+                }
             } else {
-                Yii::error("Failed to assign ticket. Errors: " . json_encode($ticket->errors), 'ticket');
-                Yii::$app->session->setFlash('error', 'Failed to assign ticket: ' . json_encode($ticket->errors));
+                Yii::$app->session->setFlash('error', 'Selected developer not found.');
             }
         }
 
         return $this->render('assign', [
             'ticket' => $ticket,
             'developers' => $developers,
-            'isAssigned' => $isAssigned,
         ]);
     }
+
+
+
+
+    
     public function actionApprove()
     {
         \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
@@ -205,6 +203,7 @@ class TicketController extends Controller
     }
     
     
+      
     public function actionCancel()
     {
         \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
@@ -236,11 +235,16 @@ class TicketController extends Controller
    
     protected function findModel($id)
     {
-        if (($model = Ticket::findOne(['id' => $id])) !== null) {
+        $model = Ticket::findOne([
+            'id' => $id,
+            'company_email' => Yii::$app->user->identity->company_email
+        ]);
+
+        if ($model !== null) {
             return $model;
         }
 
-        throw new NotFoundHttpException('The requested page does not exist.');
+        throw new \yii\web\NotFoundHttpException('The requested ticket does not exist or you do not have permission to view it.');
     }
 
     public function actionGetElapsedTime($id)
@@ -328,33 +332,90 @@ class TicketController extends Controller
 
     public function actionReopen()
     {
-        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
         $id = Yii::$app->request->post('id');
-        
         $ticket = Ticket::findOne($id);
 
         if (!$ticket) {
-            return ['success' => false, 'message' => 'Ticket not found.'];
-        }
-
-        if ($ticket->status !== Ticket::STATUS_CLOSED) {
-            return ['success' => false, 'message' => 'Only closed tickets can be reopened.'];
-        }
-
-        $oldStatus = $ticket->status;
-        $ticket->status = Ticket::STATUS_PENDING;  // Set to 'pending' when reopening
-        $ticket->action = 'reopen';
-
-        Yii::info("Attempting to reopen ticket ID: $id. Old status: $oldStatus, New status: {$ticket->status}", 'ticket');
-
-        if ($ticket->save()) {
-            Yii::info("Successfully reopened ticket ID: $id", 'ticket');
-            return ['success' => true, 'message' => "Ticket successfully reopened. Old status: $oldStatus, New status: pending"];
-        } else {
-            Yii::error("Failed to reopen ticket ID: $id. Errors: " . json_encode($ticket->errors), 'ticket');
             return [
-                'success' => false, 
-                'message' => 'Failed to reopen the ticket. Errors: ' . json_encode($ticket->errors)
+                'success' => false,
+                'message' => 'Ticket not found'
+            ];
+        }
+
+        if ($ticket->status !== Ticket::STATUS_CLOSED && $ticket->status !== Ticket::STATUS_DELETED) {
+            return [
+                'success' => false,
+                'message' => 'Only closed or deleted tickets can be reopened'
+            ];
+        }
+
+        $ticket->status = Ticket::STATUS_PENDING; // or whatever status you use for reopened tickets
+        
+        if ($ticket->save()) {
+            return [
+                'success' => true,
+                'message' => 'Ticket successfully reopened'
+            ];
+        } else {
+            Yii::error('Failed to reopen ticket: ' . json_encode($ticket->errors), 'ticket');
+            return [
+                'success' => false,
+                'message' => 'Failed to reopen ticket: ' . json_encode($ticket->errors)
+            ];
+        }
+    }
+
+  
+
+    private function isClient()
+    {
+        return Client::find()->where(['company_email' => Yii::$app->user->identity->company_email])->exists();
+    }
+
+    public function actionGetAssignInfo($id)
+    {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        
+        $ticket = Ticket::findOne($id);
+        if (!$ticket) {
+            return ['canAssign' => false, 'message' => 'Ticket not found.'];
+        }
+        
+        if ($ticket->status !== 'escalated') {
+            return ['canAssign' => false, 'message' => 'Only escalated tickets can be assigned or reassigned.'];
+        }
+        
+        return ['canAssign' => true];
+    }
+
+    public function actionSoftDelete()
+    {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+        $id = Yii::$app->request->post('id');
+        $ticket = Ticket::findOne($id);
+
+        if (!$ticket) {
+            return [
+                'success' => false,
+                'message' => 'Ticket not found'
+            ];
+        }
+
+        $ticket->status = Ticket::STATUS_DELETED;
+        
+        if ($ticket->save()) {
+            return [
+                'success' => true,
+                'message' => 'Ticket successfully deleted'
+            ];
+        } else {
+            Yii::error('Failed to delete ticket: ' . json_encode($ticket->errors), 'ticket');
+            return [
+                'success' => false,
+                'message' => 'Failed to delete ticket: ' . json_encode($ticket->errors)
             ];
         }
     }

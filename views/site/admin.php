@@ -2,6 +2,7 @@
 use yii\helpers\Html;
 use yii\grid\GridView;
 use yii\web\JsExpression;
+use app\models\Ticket; // Add this line to import the Ticket model
 
 /* @var $this yii\web\View */
 /* @var $dataProvider yii\data\ActiveDataProvider */
@@ -10,11 +11,27 @@ use yii\web\JsExpression;
 $this->title = 'Iansoft Ticket Management System';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
+<div class="row mb-2">
+    <div class="col text-end">
+        <?= Html::a('New Client', ['/site/create-client'], [
+            'class' => 'btn btn-sm btn-success',
+            'style' => 'font-size: 0.8rem; padding: 0.25rem 0.5rem;'
+        ]) ?>
+    </div>
+</div>
 <div class="admin-index container mt-5">
     <h1 class="text-center"><?= Html::encode($this->title) ?></h1>
 
     <!-- Ticket Count Cards -->
+     <!-- just lik any other button -->
+     <div class="row text-center mb-4">
+    
+   
     <div class="row text-center mb-4">
+
+
+
+    
         <?php
         $statuses = [
             ['title' => 'Pending Tickets', 'count' => $ticketCounts['pending'] ?? 0, 'bg' => 'primary'],
@@ -23,6 +40,8 @@ $this->params['breadcrumbs'][] = $this->title;
             ['title' => 'Assigned Tickets', 'count' => $ticketCounts['assigned'] ?? 0, 'bg' => 'info'],
             ['title' => 'Not Assigned Tickets', 'count' => $ticketCounts['notAssigned'] ?? 0, 'bg' => 'warning'],
             ['title' => 'Closed Tickets', 'count' => $ticketCounts['closed'] ?? 0, 'bg' => 'secondary'],
+            // escalated tickets
+            ['title' => 'Escalated Tickets', 'count' => $ticketCounts['escalated'] ?? 0, 'bg' => 'warning'],
         ];
         foreach ($statuses as $status): ?>
             <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
@@ -54,8 +73,10 @@ $this->params['breadcrumbs'][] = $this->title;
         'options' => ['class' => 'table-responsive'],
         'tableOptions' => ['class' => 'table table-striped table-bordered'],
         'columns' => [
-            'id',
-            'title',
+            'id',   
+            'module',
+            'issue',
+         
             'description',
             'status',
             'company_email',
@@ -77,25 +98,28 @@ $this->params['breadcrumbs'][] = $this->title;
             ],
             [
                 'class' => 'yii\grid\ActionColumn',
-                'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel}</div>',
+                'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel} {reopen}</div>',
                 'buttons' => [
-                    'approve' => function ($url, $model, $key) {
-                        $isDisabled = $model->status === 'approved';
+                   'approve' => function ($url, $model, $key) {
+                        $isDisabled = $model->status === Ticket::STATUS_APPROVED || $model->status === Ticket::STATUS_ESCALATED;
                         return Html::a('Approve', '#', [
                             'class' => 'btn btn-success btn-sm' . ($isDisabled ? ' disabled' : ''),
                             'title' => 'Approve Ticket',
                             'onclick' => $isDisabled ? 'return false;' : new JsExpression("approveTicket($(this), {$model->id})"),
                             'data-id' => $model->id,
-                            
                         ]);
                     },
-                         'assign' => function ($url, $model, $key) {
-                        $isDisabled = $model->assigned_to !== null;
-                        return Html::a('Assign', '#', [
-                            'class' => 'btn btn-primary' . ($isDisabled ? ' disabled' : ''),
-                            'title' => 'Assign to Dev',
-                            'onclick' => $isDisabled ? 'return false;' : new JsExpression("assignTicket($(this), {$model->id})"),
+                   'assign' => function ($url, $model, $key) {
+                        $isEscalated = $model->status === Ticket::STATUS_ESCALATED;
+                        $isDisabled = !$isEscalated && $model->assigned_to !== null;
+                        $buttonText = $isEscalated ? 'Reassign' : 'Assign';
+                        $assignUrl = \yii\helpers\Url::to(['ticket/assign', 'id' => $model->id]);
+                        
+                        return Html::a($buttonText, $assignUrl, [
+                            'class' => 'btn btn-primary assign-button' . ($isDisabled ? ' disabled' : ''),
+                            'title' => $buttonText . ' to Dev',
                             'data-id' => $model->id,
+                            'data-method' => 'get',
                         ]);
                     },
                     'cancel' => function ($url, $model, $key) {
@@ -106,6 +130,16 @@ $this->params['breadcrumbs'][] = $this->title;
                             'onclick' => $isDisabled ? 'return false;' : new JsExpression("cancelTicket($(this))"),
                             'data-id' => $model->id,
                         ]);
+                    },
+                    'reopen' => function ($url, $model, $key) {
+                        if ($model->status === Ticket::STATUS_CLOSED) {
+                            return Html::a('Reopen', '#', [
+                                'class' => 'btn btn-warning btn-sm',
+                                'onclick' => new JsExpression("reopenTicket({$model->id}); return false;"),
+                                'data-id' => $model->id,
+                            ]);
+                        }
+                        return '';
                     },
                 ],
             ],
@@ -149,65 +183,81 @@ function approveTicket(button, ticketId) {
     });
 }
 
-function assignTicket(button, ticketId) {
-    window.location.href = '<?= \yii\helpers\Url::to(['/ticket/assign']) ?>' + '?id=' + ticketId;
+
+function assignTicket(button, ticketId, currentDeveloperId) {
+    $.ajax({
+        url: '<?= \yii\helpers\Url::to(['/ticket/assign']) ?>',
+        type: 'POST',
+        data: {
+            id: ticketId,
+            current_developer_id: currentDeveloperId,
+            _csrf: '<?= Yii::$app->request->csrfToken ?>'
+        },
+        success: function(response) {
+            if (response.success) {
+                button.addClass('disabled').attr('onclick', 'return false;');
+                alert('Ticket successfully ' + (currentDeveloperId ? 'reassigned' : 'assigned') + ' to ' + response.developerName);
+            } else {
+                alert('Failed to assign the ticket: ' + (response.message || 'Unknown error'));
+            }
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+            console.error('Error assigning ticket:', textStatus, errorThrown);
+            alert('Error assigning ticket: ' + errorThrown);
+        }
+    });
 }
-
 function cancelTicket(button) {
-    var ticketId = button.data('id');
-    console.log('Cancel function called with ticketId:', ticketId);
-    if (confirm('Are you sure you want to cancel this ticket?')) {
-        var formData = new FormData();
-        formData.append('id', ticketId);
-        formData.append('_csrf', '<?= Yii::$app->request->csrfToken ?>');
-        formData.append('closed_at', new Date().toISOString());
-
+    var id = $(button).data('id');
+    var isDisabled = $(button).hasClass('disabled');
+    if (!isDisabled) {
         $.ajax({
             url: '<?= \yii\helpers\Url::to(['/ticket/cancel']) ?>',
             type: 'POST',
-            data: formData,
-            processData: false,
-            contentType: false,
-            dataType: 'json',
+            data: {
+                id: id,
+                _csrf: '<?= Yii::$app->request->csrfToken ?>',
+            },
             success: function(response) {
                 if (response.success) {
                     location.reload(); // Reload the page to show updated data
                 } else {
-                    alert('Error: ' + response.message);
+                    alert('Failed to cancel the ticket: ' + (response.message || 'Unknown error'));
                 }
             },
             error: function(jqXHR, textStatus, errorThrown) {
-                console.error('Error details:', {
-                    status: jqXHR.status,
-                    statusText: jqXHR.statusText,
-                    responseText: jqXHR.responseText,
-                    textStatus: textStatus,
-                    errorThrown: errorThrown
-                });
-                alert('Error cancelling ticket. Please check the console for details.');
+                console.error('Error canceling ticket:', textStatus, errorThrown);
+                alert('Error canceling ticket: ' + errorThrown);
             }
         });
     }
 }
 
-function disableButtons(row) {
-    row.find('a.btn').addClass('disabled').attr('disabled', true);
+function reopenTicket(ticketId) {
+    if (confirm('Are you sure you want to reopen this ticket?')) {
+        $.ajax({
+            url: '<?= \yii\helpers\Url::to(['ticket/reopen']) ?>',
+            type: 'POST',
+            data: {
+                id: ticketId,
+                _csrf: '<?= Yii::$app->request->csrfToken ?>'
+            },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    alert(response.message);
+                    location.reload(); // Reload the page to reflect changes
+                } else {
+                    alert('Error: ' + response.message);
+                }
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.error('Error reopening ticket:', textStatus, errorThrown);
+                alert('An error occurred while trying to reopen the ticket: ' + errorThrown);
+            }
+        });
+    }
 }
-
-function updateAllTimeTaken() {
-    $('.time-taken').each(function() {
-        var row = $(this).closest('tr');
-        var closedAt = $(this).data('closed-at');
-        updateTimeTaken(row, closedAt);
-    });
-}
-
-// Call updateAllTimeTaken when the page loads
-$(document).ready(function() {
-    updateAllTimeTaken();
-    // Update every minute
-    setInterval(updateAllTimeTaken, 60000);
-});
 </script>
 /* General Body Styling */
 
@@ -270,7 +320,6 @@ body {
     width: 3rem;
     height: 3rem;
 }
-
 /* Time Taken Column Styling */
 .grid-view td:nth-child(8) {
     font-weight: bold;
@@ -322,3 +371,47 @@ body {
     width: 100%; /* Full width for GridView */
     overflow-x: auto; /* Allow horizontal scrolling if necessary */
 }
+
+/* Custom Styles for Create Client Button */
+.btn-success {
+    background-color: #28a745;
+    border-color: #28a745;
+    transition: all 0.3s ease;
+}
+
+.btn-success:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Custom Styles for New Client Button */
+.btn-outline-success {
+    color: #28a745;
+    border-color: #28a745;
+    transition: all 0.2s ease;
+}
+
+.btn-outline-success:hover {
+    color: #fff;
+    background-color: #28a745;
+    border-color: #28a745;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

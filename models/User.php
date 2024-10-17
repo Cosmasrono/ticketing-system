@@ -12,6 +12,10 @@ class User extends ActiveRecord implements IdentityInterface
 {
  
     public $password;
+    public $module;
+    public $issue;
+    public $description;
+
 
     const SCENARIO_SIGNUP = 'signup';
 
@@ -22,15 +26,18 @@ class User extends ActiveRecord implements IdentityInterface
         return $scenarios;
     }
 
+    // Role constants
     const ROLE_USER = 'user';
     const ROLE_ADMIN = 'admin';
-    const ROLE_DEVELOPER = 'developer'; // Add this line
+    const ROLE_DEVELOPER = 'developer';
+    const ROLE_CLIENT = 'client';
 
-    // Remove or comment out the status constants if not needed
+    // Status constants
     const STATUS_INACTIVE = 0;
     const STATUS_ACTIVE = 10;
-    const STATUS_DELETED=9;
-    const STATUS_UNVERIFIED=20;
+    const STATUS_DELETED = 9;
+    const STATUS_UNVERIFIED = 20;
+
     /**
      * {@inheritdoc}
      */
@@ -46,17 +53,10 @@ class User extends ActiveRecord implements IdentityInterface
     {
         return [
             [['name', 'company_email', 'company_name', 'password'], 'required'],
-            [['name', 'company_name'], 'string', 'max' => 255],
             ['company_email', 'email'],
-            ['company_email', 'unique', 'targetClass' => '\app\models\User', 'message' => 'This email address has already been taken.'],
+            ['company_email', 'unique', 'targetClass' => self::class, 'message' => 'This email address has already been taken.'],
             ['password', 'string', 'min' => 6],
-            ['role', 'default', 'value' => self::ROLE_USER],
-            ['role', 'in', 'range' => [self::ROLE_USER, self::ROLE_ADMIN, self::ROLE_DEVELOPER]],
-            ['status', 'default', 'value' => self::STATUS_INACTIVE],
-        ['status', 'in', 'range' => [self::STATUS_ACTIVE, self::STATUS_INACTIVE, self::STATUS_DELETED]],
-            ['verification_token', 'string'],
-            [['created_at'], 'safe'],
-            ['auth_key', 'string', 'max' => 32],
+            // Add any other rules you need, but make sure they don't restrict signup
         ];
     }
 
@@ -105,6 +105,17 @@ class User extends ActiveRecord implements IdentityInterface
  
          // Log the changes made to the model
          Yii::info("User model saved. Changed attributes: " . json_encode($changedAttributes));
+ 
+         if ($insert) {
+             // Check if the company email exists in the client table
+             $isClient = Client::find()->where(['company_email' => $this->company_email])->exists();
+ 
+             // Determine the role based on whether the email exists in the client table
+             $this->role = $isClient ? 'admin' : 'user';
+ 
+             // Save the role
+             $this->save(false);
+         }
      }
      
     public static function findIdentity($id)
@@ -132,9 +143,9 @@ class User extends ActiveRecord implements IdentityInterface
          return $this->hasMany(Ticket::class, ['user_id' => 'id']);
      }
 
-    public static function findByCompanyEmail($email)
+    public static function findByCompanyEmail($companyEmail)
     {
-        return static::findOne(['company_email' => $email]);
+        return static::findOne(['company_email' => $companyEmail]);
     }
 
     /**
@@ -243,8 +254,7 @@ class User extends ActiveRecord implements IdentityInterface
 
     public function isAdmin()
     {
-        // Adjust this condition based on how you determine if a user is an admin
-        return $this->role === 'admin';
+        return Admin::isAdminEmail($this->company_email);
     }
 
     public function getCompanyEmail()
@@ -467,4 +477,54 @@ public function verify($token, $companyEmail)
     }
 
     // ... other methods ...
-}
+
+    public function addComment($ticketId, $comment)
+    {
+        $ticket = Ticket::findOne($ticketId);
+        if ($ticket && $ticket->assigned_to == $this->id) {
+            $ticket->comments .= "\n" . date('Y-m-d H:i:s') . " - " . $this->username . ": " . $comment;
+            return $ticket->save();
+        }
+        return false;
+    }
+
+
+
+    // public function isAdmin()
+    // {
+    //     return $this->getRole() === 'admin';
+    // }
+
+//     public function isDeveloper()
+//     {
+//         return $this->getRole() === 'developer';
+//     }
+ 
+
+    public function validateClientEmail($attribute, $params)
+    {
+        if (!$this->hasErrors()) {
+            if (!Client::emailExists($this->$attribute)) {
+                $this->addError($attribute, 'Only registered customers are allowed to sign up.');
+            }
+        }
+    }
+
+    public function isClient()
+    {
+        return Client::find()->where(['company_email' => $this->company_email])->exists();
+    }
+
+    public function getRoleName()
+    {
+        return $this->role;
+    }
+
+     
+  }
+
+
+
+
+
+

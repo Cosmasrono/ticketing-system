@@ -1,8 +1,8 @@
 <?php
+
 use yii\helpers\Html;
 use yii\grid\GridView;
-use yii\widgets\Pjax;
-use yii\helpers\Url;
+use app\models\Ticket; // Add this line to import the Ticket model
 
 /* @var $this yii\web\View */
 /* @var $dataProvider yii\data\ActiveDataProvider */
@@ -14,76 +14,101 @@ $this->params['breadcrumbs'][] = $this->title;
 
     <h1><?= Html::encode($this->title) ?></h1>
 
-    <?php Pjax::begin(); ?>
+    <p>
+        <?= Html::a('Create Ticket', ['create'], ['class' => 'btn btn-success']) ?>
+    </p>
 
     <?= GridView::widget([
         'dataProvider' => $dataProvider,
         'columns' => [
             ['class' => 'yii\grid\SerialColumn'],
             'id',
-            'title',
+            'module',
+            'issue',
             'description:ntext',
             'status',
             'created_at:datetime',
             [
                 'class' => 'yii\grid\ActionColumn',
-                'template' => '{approve} {assign} {cancel}',
+                'template' => '{softDelete} {reopen}',
                 'buttons' => [
-                    'approve' => function ($url, $model, $key) {
-                        $isDisabled = $model->status === 'cancelled' || $model->status === 'approved';
-                        return Html::button('Approve', [
-                            'class' => 'btn btn-sm btn-success' . ($isDisabled ? ' disabled' : ''),
-                            'onclick' => $isDisabled ? 'return false;' : "ticketAction('approve', $model->id)",
-                        ]);
+                    'softDelete' => function ($url, $model, $key) {
+                        if ($model->status !== Ticket::STATUS_DELETED) {
+                            return Html::a('Delete', '#', [
+                                'class' => 'btn btn-danger btn-xs soft-delete-ticket',
+                                'data-ticket-id' => $model->id,
+                            ]);
+                        }
+                        return '';
                     },
-                    'assign' => function ($url, $model, $key) {
-                        $isDisabled = $model->status === 'cancelled' || $model->assigned_to !== null;
-                        return Html::button('Assign', [
-                            'class' => 'btn btn-sm btn-primary' . ($isDisabled ? ' disabled' : ''),
-                            'onclick' => $isDisabled ? 'return false;' : "ticketAction('assign', $model->id)",
-                        ]);
-                    },
-                    'cancel' => function ($url, $model, $key) {
-                        $isDisabled = $model->status === 'cancelled';
-                        return Html::button('Cancel', [
-                            'class' => 'btn btn-sm btn-danger' . ($isDisabled ? ' disabled' : ''),
-                            'onclick' => $isDisabled ? 'return false;' : "ticketAction('cancel', $model->id)",
-                        ]);
+                    'reopen' => function ($url, $model, $key) {
+                        if ($model->status === Ticket::STATUS_CLOSED || $model->status === Ticket::STATUS_DELETED) {
+                            return Html::a('Reopen', '#', [
+                                'class' => 'btn btn-warning btn-xs reopen-ticket',
+                                'data-ticket-id' => $model->id,
+                            ]);
+                        }
+                        return '';
                     },
                 ],
             ],
-            [
-                'attribute' => 'assigned_to',
-                'label' => 'Assigned Developer',
-                'value' => function ($model) {
-                    return $model->developer ? $model->developer->name : 'Not Assigned';
-                },
-            ],
         ],
     ]); ?>
-
-    <?php Pjax::end(); ?>
 
 </div>
 
 <?php
 $this->registerJs("
-    function ticketAction(action, id) {
-        $.ajax({
-            url: '" . Url::to(['ticket/action']) . "',
-            type: 'POST',
-            data: {action: action, id: id},
-            success: function(response) {
-                if (response.success) {
-                    $.pjax.reload({container:'#w0'});
-                } else {
-                    alert('Action failed: ' + response.message);
+    $('.soft-delete-ticket').on('click', function(e) {
+        e.preventDefault();
+        var ticketId = $(this).data('ticket-id');
+        if (confirm('Are you sure you want to delete this ticket?')) {
+            $.ajax({
+                url: '" . \yii\helpers\Url::to(['ticket/soft-delete']) . "',
+                type: 'POST',
+                data: {id: ticketId},
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        alert(response.message);
+                        location.reload();
+                    } else {
+                        alert('Error: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('An error occurred while trying to delete the ticket.');
                 }
-            },
-            error: function() {
-                alert('An error occurred while processing your request');
-            }
-        });
-    }
+            });
+        }
+    });
+
+    $('.reopen-ticket').on('click', function(e) {
+        e.preventDefault();
+        var ticketId = $(this).data('ticket-id');
+        if (confirm('Are you sure you want to reopen this ticket?')) {
+            $.ajax({
+                url: '" . \yii\helpers\Url::to(['ticket/reopen']) . "',
+                type: 'POST',
+                data: {id: ticketId},
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        alert(response.message);
+                        if (response.redirectUrl) {
+                            window.location.href = response.redirectUrl;
+                        } else {
+                            location.reload();
+                        }
+                    } else {
+                        alert('Error: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('An error occurred while trying to reopen the ticket.');
+                }
+            });
+        }
+    });
 ");
 ?>

@@ -4,13 +4,12 @@ use yii\widgets\ActiveForm;
 
 /* @var $this yii\web\View */
 /* @var $ticket app\models\Ticket */
-/* @var $developers app\models\Developer[] */
-/* @var $isAssigned boolean */
+/* @var $developers app\models\User[] */
 
-$this->title = $isAssigned ? 'Reassign Ticket #' . $ticket->id : 'Assign Ticket #' . $ticket->id;
+$this->title = 'Assign Ticket: ' . $ticket->title;
 $this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
-$this->params['breadcrumbs'][] = ['label' => $ticket->id, 'url' => ['view', 'id' => $ticket->id]];
-$this->params['breadcrumbs'][] = $isAssigned ? 'Reassign' : 'Assign';
+$this->params['breadcrumbs'][] = ['label' => $ticket->title, 'url' => ['view', 'id' => $ticket->id]];
+$this->params['breadcrumbs'][] = 'Assign';
 ?>
 <div class="ticket-assign">
 
@@ -19,12 +18,12 @@ $this->params['breadcrumbs'][] = $isAssigned ? 'Reassign' : 'Assign';
     <?php $form = ActiveForm::begin(); ?>
 
     <?= $form->field($ticket, 'assigned_to')->dropDownList(
-        \yii\helpers\ArrayHelper::map($developers, 'id', 'name'),
+        \yii\helpers\ArrayHelper::map($developers, 'id', 'username'),
         ['prompt' => 'Select Developer']
     ) ?>
 
     <div class="form-group">
-        <?= Html::submitButton($isAssigned ? 'Reassign Developer' : 'Assign Developer', ['class' => 'btn btn-primary']) ?>
+        <?= Html::submitButton('Assign', ['class' => 'btn btn-success']) ?>
     </div>
 
     <?php ActiveForm::end(); ?>

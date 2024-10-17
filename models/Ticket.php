@@ -15,10 +15,12 @@ class Ticket extends ActiveRecord
     const STATUS_APPROVED = 'approved';
     const STATUS_CANCELLED = 'cancelled';
     const STATUS_CLOSED = 'closed';
+    const STATUS_ESCALATED = 'escalated';
+    const STATUS_DELETED = 'deleted'; // Add this new status
 
     public static function tableName()
     {
-        return '{{%ticket}}';
+        return 'ticket';
     }
 
 
@@ -29,10 +31,8 @@ class Ticket extends ActiveRecord
         return [
             [
                 'class' => TimestampBehavior::class,
-                'attributes' => [
-                    ActiveRecord::EVENT_BEFORE_INSERT => ['assigned_at'],
-                    ActiveRecord::EVENT_BEFORE_UPDATE => ['assigned_at'],
-                ],
+                'createdAtAttribute' => 'created_at',
+                'updatedAtAttribute' => false,
                 'value' => new Expression('NOW()'),
             ],
         ];
@@ -41,18 +41,12 @@ class Ticket extends ActiveRecord
     public function rules()
     {
         return [
-            [['assigned_to'], 'integer'],
-            [['assigned_at'], 'safe'], // Change this to 'safe' instead of 'datetime'
-            [['status', 'company_email'], 'string'],
-            [['title'], 'string', 'max' => 255],
-            [['description'], 'string'],
-            [['assigned_at'], 'date', 'format' => 'php:Y-m-d H:i:s'],
-            [['created_at', 'assigned_at'], 'date', 'format' => 'php:Y-m-d H:i:s'],
-            [['timer_start'], 'safe'],
-            ['status', 'default', 'value' => self::STATUS_PENDING],
-            ['status', 'in', 'range' => [self::STATUS_PENDING, self::STATUS_APPROVED, self::STATUS_CANCELLED, self::STATUS_CLOSED]],    
-            [['action'], 'string', 'max' => 255],
-            ['action', 'default', 'value' => 'reopen'],
+            [['module', 'issue', 'user_id'], 'required'],
+            [['description', 'status'], 'string'],
+            [['created_at'], 'safe'],
+            [['user_id'], 'integer'],
+            [['module', 'issue'], 'string', 'max' => 255],
+            [['company_email'], 'email'],
         ];
     }
 
@@ -61,23 +55,19 @@ class Ticket extends ActiveRecord
     {
         return [
             'id' => 'ID',
-            'title' => 'Title',
+            'module' => 'Module',
+            'issue' => 'Issue',
             'description' => 'Description',
             'status' => 'Status',
-            'closed_by' => 'Closed By',
-            'assigned_to' => 'Assigned To',
             'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
-            'assigned_at' => 'Assigned At',
-            
-         
-
+            'user_id' => 'User ID',
+            'company_email' => 'Company Email',
         ];
     }
  
     public function getUser()
     {
-        return $this->hasOne(User::class, ['email' => 'company_email']);
+        return $this->hasOne(User::class, ['id' => 'user_id']);
     }
 
 
@@ -224,6 +214,36 @@ class Ticket extends ActiveRecord
         } else {
             return 'Reviewing';
         }
+    }
+
+    public function getModule()
+    {
+        return $this->hasOne(Module::class, ['id' => 'module_id']);
+    }
+
+    public static function getStatusCounts()
+    {
+        $counts = static::find()
+            ->select(['status', 'COUNT(*) as count'])
+            ->groupBy('status')
+            ->indexBy('status')
+            ->column();
+
+        $statuses = ['approved', 'assigned', 'pending', 'cancelled'];
+        foreach ($statuses as $status) {
+            if (!isset($counts[$status])) {
+                $counts[$status] = 0;
+            }
+        }
+
+        return $counts;
+    }
+
+    // Add other relations and methods as needed
+
+    public function getAssignButtonText()
+    {
+        return $this->status === self::STATUS_ESCALATED ? 'Reassign' : 'Assign';
     }
 
 }

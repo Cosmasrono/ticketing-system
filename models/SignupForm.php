@@ -4,6 +4,10 @@ namespace app\models;
 
 use Yii;
 use yii\base\Model;
+use app\models\User;
+use app\models\Admin;
+use app\models\Developer;
+use app\models\Client;
 
 class SignupForm extends Model
 {
@@ -13,37 +17,80 @@ class SignupForm extends Model
     public $password;
     public $role;
 
+    /**
+     * {@inheritdoc}
+     */
     public function rules()
     {
         return [
             [['name', 'company_email', 'company_name', 'password', 'role'], 'required'],
             ['company_email', 'email'],
-            ['company_email', 'unique', 'targetClass' => '\app\models\User', 'message' => 'This email address has already been taken.'],
+            ['company_email', 'validateClientEmail'],
             ['password', 'string', 'min' => 6],
+            ['role', 'in', 'range' => [User::ROLE_USER, User::ROLE_ADMIN, User::ROLE_DEVELOPER]],
         ];
     }
 
+    public function validateClientEmail($attribute, $params)
+    {
+        if (!$this->hasErrors()) {
+            if (!Client::emailExists($this->company_email)) {
+                $this->addError($attribute, 'Only registered customers are allowed to sign up.');
+            }
+        }
+    }
+
+    /**
+     * Signs up the user.
+     *
+     * @return User|null the saved model or null if saving fails
+     */
     public function signup()
     {
         if ($this->validate()) {
             $user = new User();
-            $user->username = $this->username;
-            $user->email = $this->email;
+            $user->name = $this->name;
+            $user->company_email = $this->company_email;
+            $user->company_name = $this->company_name;
             $user->setPassword($this->password);
+            $user->role = $this->role;
             $user->generateAuthKey();
-            $user->generateVerificationToken(); // Make sure this method exists and works correctly
-            
-            Yii::info("Generated verification token for new user: " . $user->verification_token);
             
             if ($user->save()) {
-                Yii::info("New user saved successfully: ID = {$user->id}, Email = {$user->email}");
                 return $user;
             }
-            
-            Yii::error("Failed to save new user. Errors: " . print_r($user->getErrors(), true));
         }
         
         return null;
+    }
+
+    private function determineUserType()
+    {
+        // You need to implement logic here to determine the user type
+        // This could be based on the email domain, a selection made during signup, etc.
+        // For now, let's assume all new signups are clients
+        return 'client';
+    }
+
+    private function createUserTypeRecord($userId, $userType)
+    {
+        switch ($userType) {
+            case 'admin':
+                $admin = new Admin();
+                $admin->user_id = $userId;
+                $admin->save();
+                break;
+            case 'developer':
+                $developer = new Developer();
+                $developer->user_id = $userId;
+                $developer->save();
+                break;
+            case 'client':
+                $client = new Client();
+                $client->user_id = $userId;
+                $client->save();
+                break;
+        }
     }
     
     protected function sendVerificationEmail($user)
@@ -67,7 +114,6 @@ class SignupForm extends Model
     
         return $sent;
     }
-    
 
     private function renderEmailTemplate($view, $params)
     {

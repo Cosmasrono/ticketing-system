@@ -12,18 +12,20 @@ $config = [
     'aliases' => [
         '@bower' => '@vendor/bower-asset',
         '@npm'   => '@vendor/npm-asset',
+        '@rules' => '@app/rules',
     ],
     'components' => [
         'request' => [
             // !!! insert a secret key in the following (if it is empty) - this is required by cookie validation
             'cookieValidationKey' => 'your-secret-key',
+            'enableCsrfValidation' => true,
+            // 'enableCsrfCookie' => true,
         ],
         'cache' => [
             'class' => 'yii\caching\FileCache',
         ],
         'user' => [
             'identityClass' => 'app\models\User',
-            'enableAutoLogin' => true,
         ],
         'errorHandler' => [
             'errorAction' => 'site/error',
@@ -37,13 +39,12 @@ $config = [
             ],
         ],
         'log' => [
-            'traceLevel' => 3,
+            'traceLevel' => YII_DEBUG ? 3 : 0,
             'targets' => [
                 [
                     'class' => 'yii\log\FileTarget',
-                    'levels' => ['error', 'warning', 'info'],
-                    'categories' => ['yii\mail\*'],
-                    'logFile' => '@runtime/logs/email.log',
+                    'levels' => ['error', 'warning'],
+                    'logFile' => '@runtime/logs/app.log',
                 ],
             ],
         ],
@@ -52,26 +53,38 @@ $config = [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
             'rules' => [
+                'admin/<id:\d+>' => 'site/admin',
+                'ticket/view/<id:\d+>' => 'ticket/view',
+                'developer/add-comment' => 'developer/add-comment',
+                'developer/close-ticket' => 'developer/close-ticket',
+                'ticket/approve/<id:\d+>' => 'ticket/approve',
+                'ticket/assign/<id:\d+>' => 'ticket/assign',
+                'ticket/cancel/<id:\d+>' => 'ticket/cancel',
+                'client/create' => 'client/create',
+                'ticket/index' => 'ticket/index',
+                'ticket/reopen' => 'ticket/reopen',
             ],
+        ],
+        'session' => [
+            'class' => 'yii\web\Session',
+            'cookieParams' => ['httponly' => true],
         ],
     ],
     'params' => $params,
+    'modules' => [
+        // 'admin' => [
+        //     'class' => 'app\modules\admin\Module',
+        // ],
+    ],
 ];
 
+// Temporarily enable debug module
 if (YII_ENV_DEV) {
-    // configuration adjustments for 'dev' environment
     $config['bootstrap'][] = 'debug';
     $config['modules']['debug'] = [
         'class' => 'yii\debug\Module',
-        // uncomment the following to add your IP if you are not connecting from localhost.
-        //'allowedIPs' => ['127.0.0.1', '::1'],
-    ];
-
-    $config['bootstrap'][] = 'gii';
-    $config['modules']['gii'] = [
-        'class' => 'yii\gii\Module',
-        // uncomment the following to add your IP if you are not connecting from localhost.
-        //'allowedIPs' => ['127.0.0.1', '::1'],
+        // uncomment and adjust the following line to restrict access to your IP
+        //'allowedIPs' => ['127.0.0.1', '::1', 'your.ip.address.here'],
     ];
 }
 

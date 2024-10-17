@@ -5,6 +5,7 @@ namespace app\controllers;
 use yii\web\Controller;
 use yii\filters\AccessControl;
 use yii\web\ForbiddenHttpException;
+use yii\web\NotFoundHttpException;
 use app\models\Ticket;
 use app\models\Developer;
 use Yii;
@@ -76,6 +77,23 @@ class DeveloperController extends Controller
         }
 
         return $this->redirect(['view']);
+    }
+
+    public function actionEscalateTicket($id)
+    {
+        $ticket = Ticket::findOne($id);
+        if ($ticket === null) {
+            throw new NotFoundHttpException('The requested ticket does not exist.');
+        }
+
+        $ticket->status = 'escalated';
+        if ($ticket->save()) {
+            Yii::$app->session->setFlash('success', 'Ticket has been escalated successfully.');
+        } else {
+            Yii::$app->session->setFlash('error', 'There was an error escalating the ticket.');
+        }
+
+        return $this->redirect(['view', 'id' => $ticket->developer_id]);
     }
 
     // Other actions...

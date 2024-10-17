@@ -31,66 +31,67 @@ JqueryAsset::register($this);
 <body class="d-flex flex-column h-100">
 <?php $this->beginBody() ?>
 
-<header id="header">
-    <?php
-    NavBar::begin([
-        // 'brandLabel' => Yii::$app->name,
-        'brandUrl' => Yii::$app->homeUrl,
-        'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
-    ]);
-
-    $menuItems = [
-        ['label' => 'Home', 'url' => ['/site/index']],
-    ];
-
-    if (Yii::$app->user->isGuest) {
-        $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
-    } else {
-        if (Yii::$app->user->identity->isAdmin()) {
-            $menuItems[] = ['label' => 'Admin', 'url' => ['/site/admin']];
-        } else {
-            $menuItems[] = ['label' => 'Developer Dashboard', 'url' => ['/developer/view']];
-        }
-        $menuItems[] = '<li>'
-            . Html::beginForm(['/site/logout'], 'post')
-            . Html::submitButton(
-                'Logout (' . Yii::$app->user->identity->username . ')',
-                ['class' => 'btn btn-link logout']
-            )
-            . Html::endForm()
-            . '</li>';
-    }
-
-    echo Nav::widget([
-        'options' => ['class' => 'navbar-nav'],
-        'items' => $menuItems,
-    ]);
-
-    NavBar::end();
-    ?>
-</header>
-
-<main id="main" class="flex-shrink-0" role="main">
+<div class="wrap">
     <div class="container">
-        <?php if (!empty($this->params['breadcrumbs'])): ?>
-            <?= Breadcrumbs::widget(['links' => $this->params['breadcrumbs']]) ?>
-        <?php endif ?>
-        <?= Alert::widget() ?>
-        <?php foreach (Yii::$app->session->getAllFlashes() as $key => $message): ?>
-            <div class="alert alert-<?= $key ?>"><?= $message ?></div>
-        <?php endforeach; ?>
-        <?= $content ?>
-    </div>
-</main>
+        <nav id="w0" class="navbar-inverse navbar-fixed-top navbar" role="navigation">
+            <div class="container">
+                <?php
+                NavBar::begin([
+                    // 'brandLabel' => Yii::$app->name,
+                    'brandUrl' => Yii::$app->homeUrl,
+                    'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
+                ]);
 
-<footer id="footer" class="mt-auto py-3 bg-light">
-    <div class="container">
-        <div class="row ">
-            <div class="col-md-6 text-center text-md-start">&copy; Iansoft Technologies <?= date('Y') ?></div>
-            <div class="col-md-6 text-center text-md-end"><?= Yii::powered() ?></div>
-        </div>
+                $menuItems = [
+                    ['label' => 'Home', 'url' => ['/site/index']],
+                ];
+
+                if (!Yii::$app->user->isGuest) {
+                    // Show all menu items
+                    $menuItems[] = ['label' => 'Admin', 'url' => ['/site/admin']];
+                    $menuItems[] = '<li>'
+                        . Html::beginForm(['/site/logout'], 'post')
+                        . Html::submitButton(
+                            'Logout (' . Html::encode(Yii::$app->user->identity->company_name) . ')',
+                            ['class' => 'btn btn-link logout']
+                        )
+                        . Html::endForm()
+                        . '</li>';
+                }
+
+                echo Nav::widget([
+                    'options' => ['class' => 'navbar-nav'],
+                    'items' => $menuItems,
+                ]);
+
+                NavBar::end();
+                ?>
+            </div>
+        </nav>
+        
+        <main id="main" class="flex-shrink-0" role="main">
+            <div class="container">
+                <?php if (!empty($this->params['breadcrumbs'])): ?>
+                    <?= Breadcrumbs::widget(['links' => $this->params['breadcrumbs']]) ?>
+                <?php endif ?>
+                <?= Alert::widget() ?>
+                <?php foreach (Yii::$app->session->getAllFlashes() as $key => $message): ?>
+                    <div class="alert alert-<?= $key ?>"><?= $message ?></div>
+                <?php endforeach; ?>
+                <?= $content ?>
+            </div>
+        </main>
+
+        <footer id="footer" class="mt-auto py-3 bg-light">
+            <div class="container">
+                <div class="row ">
+                    <div class="col-md-6 text-center text-md-start">&copy; Iansoft Technologies <?= date('Y') ?></div>
+                    <div class="col-md-6 text-center text-md-end"><?= Yii::powered() ?></div>
+                </div>
+            </div>
+        </footer>
     </div>
-</footer>
+</div>
 
 <?php $this->endBody() ?>
 </body>

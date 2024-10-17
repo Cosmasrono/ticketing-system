@@ -1,5 +1,4 @@
 <?php
-
 namespace app\models;
 
 use yii\db\ActiveRecord;
@@ -30,6 +29,6 @@ class Admin extends ActiveRecord
 
     public static function isAdminEmail($email)
     {
-        return self::find()->where(['company_email' => $email])->exists();
+        return static::find()->where(['company_email' => $email])->exists();
     }
 }

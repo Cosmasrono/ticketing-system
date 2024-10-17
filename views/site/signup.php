@@ -33,8 +33,6 @@ $this->params['breadcrumbs'][] = $this->title;
         </div>
 
     <?php ActiveForm::end(); ?>
-
-    
 </div>
 
 <style>
@@ -64,5 +62,26 @@ $this->params['breadcrumbs'][] = $this->title;
 }
 
 .form-control {
-    border-color: #
+    border-color: #FFB74D; /* Light orange */
+    background-color: #FFFFFF;
+}
+
+.form-control:focus {
+    border-color: #FF9800; /* Orange */
+    box-shadow: 0 0 0 0.2rem rgba(255, 152, 0, 0.25);
+}
+
+.btn-primary {
+    background-color: #FF9800; /* Orange */
+    border-color: #FF9800;
+}
+
+.btn-primary:hover {
+    background-color: #F57C00; /* Dark orange */
+    border-color: #F57C00;
+}
+
+.help-block {
+    color: #D84315; /* Deep orange for error messages */
+}
 </style>

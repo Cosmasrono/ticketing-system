@@ -1,12 +1,16 @@
 <?php
 
-// Comment out or remove these lines
-// defined('YII_DEBUG') or define('YII_DEBUG', true);
-// defined('YII_ENV') or define('YII_ENV', 'dev');
+// Temporarily enable debugging
+defined('YII_DEBUG') or define('YII_DEBUG', true);
+defined('YII_ENV') or define('YII_ENV', 'dev');
 
-// Uncomment these lines for production
-defined('YII_DEBUG') or define('YII_DEBUG', false);
-defined('YII_ENV') or define('YII_ENV', 'prod');
+
+//production
+// Revert to production settings
+// defined('YII_DEBUG') or define('YII_DEBUG', false);
+// defined('YII_ENV') or define('YII_ENV', 'prod');
+
+// ... rest of the file remains unchanged ...
 
 require __DIR__ . '/../vendor/autoload.php';
 require __DIR__ . '/../vendor/yiisoft/yii2/Yii.php';

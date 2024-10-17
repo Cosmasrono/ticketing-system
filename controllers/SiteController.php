@@ -23,6 +23,7 @@ use yii\base\InvalidArgumentException;
 use yii\web\BadRequestHttpException;
 use app\components\BrevoMailer;
 use yii\web\ServerErrorHttpException;
+use app\models\Client;
 
  
 
@@ -37,14 +38,12 @@ class SiteController extends Controller
         return [
             'access' => [
                 'class' => AccessControl::class,
-                'only' => ['admin'],
+                'only' => ['logout'],
                 'rules' => [
                     [
-                        'actions' => ['admin','verify-email' => ['get', 'post'],],
+                        'actions' => ['logout'],
                         'allow' => true,
-                        'matchCallback' => function ($rule, $action) {
-                            return !Yii::$app->user->isGuest && Yii::$app->user->identity->isAdmin();
-                        }
+                        'roles' => ['@'],
                     ],
                 ],
             ],
@@ -72,7 +71,6 @@ class SiteController extends Controller
             ],
         ];
     }
-
     /**
      * Displays homepage.
      *
@@ -118,19 +116,17 @@ class SiteController extends Controller
 
     public function actionIndex()
 {
-    $userId = Yii::$app->user->id;
-    $user = User::findOne($userId);
-    
-    // Get company details
- 
-
+    Yii::debug('Accessing index action');
+    // Remove any permission checks here
     $dataProvider = new ActiveDataProvider([
-        'query' => Ticket::find()->where(['user_id' => $userId]),
+        'query' => Ticket::find(),
+        'pagination' => [
+            'pageSize' => 20,
+        ],
     ]);
 
     return $this->render('index', [
         'dataProvider' => $dataProvider,
-        
     ]);
 }
  
@@ -140,26 +136,19 @@ public function actionSignup()
 
     if (Yii::$app->request->isPost) {
         if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-            // Set user password and generate necessary tokens
             $model->setPassword($model->password);
             $model->generateAuthKey();
             $model->generateVerificationToken();
-            $model->status = User::STATUS_UNVERIFIED; // Set status to unverified
-            $model->is_verified = 0; // Ensure is_verified is set to 0
-
-            Yii::debug('Before save: ' . print_r($model->attributes, true));
+            $model->status = User::STATUS_UNVERIFIED;
+            $model->is_verified = 0;
 
             if ($model->save()) {
-                Yii::debug('After save: ' . print_r($model->attributes, true));
-
                 // Create verification link
                 $verificationLink = Yii::$app->urlManager->createAbsoluteUrl([
                     'site/verify-email',
                     'token' => $model->verification_token,
-                    'companyEmail' => $model->company_email // Assuming you need this
+                    'companyEmail' => $model->company_email
                 ]);
-
-                Yii::debug('Brevo API Key: ' . (isset(Yii::$app->params['brevoApiKey']) ? 'Set' : 'Not Set'));
 
                 try {
                     // Send verification email
@@ -168,19 +157,14 @@ public function actionSignup()
                         Yii::$app->session->setFlash('success', 'Please check your email to verify your account.');
                         return $this->redirect(['site/login']);
                     } else {
-                        Yii::error("Failed to send email. API response: " . json_encode($result));
-                        Yii::$app->session->setFlash('error', 'There was an error sending the verification email. Please try again. Error: ' . $result['message']);
+                        Yii::$app->session->setFlash('error', 'There was an error sending the verification email. Please try again.');
                     }
                 } catch (\Exception $e) {
-                    Yii::error("Exception when sending email: " . $e->getMessage());
                     Yii::$app->session->setFlash('error', 'There was an error sending the verification email: ' . $e->getMessage());
                 }
             } else {
-                Yii::error("Failed to save user model. Errors: " . json_encode($model->errors));
                 Yii::$app->session->setFlash('error', 'There was an error creating your account. Please try again.');
             }
-        } else {
-            Yii::error("Validation failed. Errors: " . json_encode($model->errors));
         }
     }
 
@@ -416,8 +400,22 @@ public function actionDeveloperDashboard()
     throw new ForbiddenHttpException('You are not authorized to view this page.');
 }
 
+
 public function actionAdmin()
 {
+    // Check if the user is logged in
+    if (Yii::$app->user->isGuest) {
+        // Redirect to login page if the user is not logged in
+        return $this->redirect(['site/login']);
+    }
+
+    // Check if the user has an identity
+    if (Yii::$app->user->identity === null) {
+        // Handle the case where the user doesn't have an identity
+        Yii::$app->session->setFlash('error', 'User identity not found. Please log in again.');
+        return $this->redirect(['site/login']);
+    }
+
     // Ensure only admin users can access this action
     if (!Yii::$app->user->identity->isAdmin) {
         throw new ForbiddenHttpException('You are not allowed to perform this action.');
@@ -430,6 +428,7 @@ public function actionAdmin()
         'assigned' => Ticket::find()->where(['not', ['assigned_to' => null]])->count(),
         'notAssigned' => Ticket::find()->where(['assigned_to' => null])->count(),
         'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
+        'escalated' => Ticket::find()->where(['status' => 'escalated'])->count(),
         'total' => Ticket::find()->count(),
     ];
 
@@ -527,5 +526,39 @@ public function actionForgotPassword()
 //     return $this->goHome();
 // }
 
+public function actionCreateClient()
+{
+    $model = new Client();
+    
+    if ($model->load(Yii::$app->request->post()) && $model->save()) {
+        Yii::$app->session->setFlash('success', 'Client created successfully.');
+        return $this->redirect(['index']); // or wherever you want to redirect after creation
+    }
 
+    return $this->render('create', [
+        'model' => $model,
+    ]);
 }
+
+ 
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

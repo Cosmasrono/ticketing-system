@@ -2,7 +2,10 @@
 
 use yii\helpers\Html;
 use yii\widgets\ActiveForm;
-use app\models\User;
+
+/* @var $this yii\web\View */
+/* @var $model app\models\SignupForm */
+/* @var $form ActiveForm */
 
 $this->title = 'Signup';
 $this->params['breadcrumbs'][] = $this->title;
@@ -16,17 +19,13 @@ $this->params['breadcrumbs'][] = $this->title;
 
         <?= $form->field($model, 'name')->textInput(['autofocus' => true]) ?>
 
-        <?= $form->field($model, 'company_email') ?>
+        <?= $form->field($model, 'company_email')->textInput(['readonly' => true]) ?>
 
-        <?= $form->field($model, 'company_name') ?>
+        <?= $form->field($model, 'company_name')->textInput() ?>
 
         <?= $form->field($model, 'password')->passwordInput() ?>
 
-        <?= $form->field($model, 'role')->dropDownList([
-            User::ROLE_USER => 'User',
-            User::ROLE_ADMIN => 'Admin',
-            User::ROLE_DEVELOPER => 'Developer',
-        ], ['id' => 'role-dropdown']) ?>
+        <?= $form->field($model, 'role')->textInput(['readonly' => true]) ?>
 
         <div class="form-group">
             <?= Html::submitButton('Signup', ['class' => 'btn btn-primary', 'name' => 'signup-button']) ?>
@@ -34,6 +33,22 @@ $this->params['breadcrumbs'][] = $this->title;
 
     <?php ActiveForm::end(); ?>
 </div>
+
+<?php
+$script = <<< JS
+$(document).ready(function() {
+    $('#signupform-role').change(function() {
+        var selectedRole = $(this).val();
+        if (selectedRole === 'client') {
+            $('#signupform-company_name').parent().show();
+        } else {
+            $('#signupform-company_name').parent().hide();
+        }
+    });
+});
+JS;
+$this->registerJs($script);
+?>
 
 <style>
 /* Orange-themed Signup Form Styles */

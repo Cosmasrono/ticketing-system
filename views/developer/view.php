@@ -5,8 +5,8 @@ use yii\grid\GridView;
 use yii\widgets\Pjax;
 
 /* @var $this yii\web\View */
+/* @var $user app\models\User */
 /* @var $dataProvider yii\data\ActiveDataProvider */
-/* @var $developer app\models\Developer */
 
 $this->title = 'Developer Dashboard';
 $this->params['breadcrumbs'][] = $this->title;
@@ -15,8 +15,8 @@ $this->params['breadcrumbs'][] = $this->title;
 
     <h1><?= Html::encode($this->title) ?></h1>
 
-    <h2>Welcome, <?= Html::encode($developer->name) ?></h2>
-    <p>Email: <?= Html::encode($developer->company_email) ?></p>
+    <h2>Welcome, <?= Html::encode($user->name) ?></h2>
+    <p>Email: <?= Html::encode($user->company_email) ?></p>
 
     <?php if (Yii::$app->session->hasFlash('success')): ?>
         <div class="alert alert-success">
@@ -40,41 +40,41 @@ $this->params['breadcrumbs'][] = $this->title;
             'id',
             [
                 'attribute' => 'user.company_name',
-                'label' => 'Reported By',
+              
             ],
             'module',
             'issue',
-            'description:ntext',
             'status',
             'created_at:datetime',
-  
             [
                 'class' => 'yii\grid\ActionColumn',
-                'template' => '{close} {escalate}',
+                'template' => '{escalate} {close}',
                 'buttons' => [
-                    'close' => function ($url, $model) use ($developer) {
-                        $canClose = $model->status !== 'closed' && $model->status !== 'escalated';
-                        return Html::a('Close', ['close-ticket', 'id' => $model->id], [
-                            'title' => Yii::t('app', 'Close Ticket'),
-                            'data-confirm' => Yii::t('app', 'Are you sure you want to close this ticket?'),
-                            'data-method' => 'post',
-                            'data-pjax' => '0',
-                            'class' => 'btn btn-success btn-xs close-btn' . ($canClose ? '' : ' disabled'),
-                            'onclick' => $canClose ? null : 'return false;',
-                            'data-ticket-id' => $model->id,
+                    'escalate' => function ($url, $model, $key) {
+                        return Html::a('Escalate', ['developer/escalate-ticket', 'id' => $model->id], [
+                            'class' => 'btn btn-warning btn-sm',
+                            'data' => [
+                                'confirm' => 'Are you sure you want to escalate this ticket?',
+                                'method' => 'post',
+                            ],
                         ]);
                     },
-                    'escalate' => function ($url, $model) {
-                        $canEscalate = $model->status !== 'escalated' && $model->status !== 'closed';
-                        return Html::a('Escalate', ['escalate-ticket', 'id' => $model->id], [
-                            'title' => Yii::t('app', 'Escalate Ticket'),
-                            'data-confirm' => Yii::t('app', 'Are you sure you want to escalate this ticket?'),
-                            'data-method' => 'post',
-                            'data-pjax' => '0',
-                            'class' => 'btn btn-warning btn-xs escalate-btn' . ($canEscalate ? '' : ' disabled'),
-                            'onclick' => $canEscalate ? null : 'return false;',
-                            'data-ticket-id' => $model->id,
+                    'close' => function ($url, $model, $key) {
+                        return Html::a('Close', ['developer/close-ticket', 'id' => $model->id], [
+                            'class' => 'btn btn-danger btn-sm',
+                            'data' => [
+                                'confirm' => 'Are you sure you want to close this ticket?',
+                                'method' => 'post',
+                            ],
                         ]);
+                    },
+                ],
+                'visibleButtons' => [
+                    'approve' => function ($model, $key, $index) {
+                        return $model->status !== 'closed' && $model->status !== 'approved';
+                    },
+                    'close' => function ($model, $key, $index) {
+                        return $model->status !== 'closed';
                     },
                 ],
             ],
@@ -83,4 +83,3 @@ $this->params['breadcrumbs'][] = $this->title;
     <?php Pjax::end(); ?>
 
 </div>
-

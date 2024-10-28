@@ -1,5 +1,8 @@
 <?php
 
+defined('YII_DEBUG') or define('YII_DEBUG', true);
+defined('YII_ENV') or define('YII_ENV', 'dev');
+
 $params = require __DIR__ . '/params.php';
 $db = require __DIR__ . '/db.php';
 
@@ -43,7 +46,7 @@ $config = [
             'targets' => [
                 [
                     'class' => 'yii\log\FileTarget',
-                    'levels' => ['error', 'warning'],
+                    'levels' => ['error', 'warning', 'info'],
                     'logFile' => '@runtime/logs/app.log',
                 ],
             ],
@@ -59,15 +62,20 @@ $config = [
                 'developer/close-ticket' => 'developer/close-ticket',
                 'ticket/approve/<id:\d+>' => 'ticket/approve',
                 'ticket/assign/<id:\d+>' => 'ticket/assign',
+                'ticket/assign' => 'ticket/assign',
                 'ticket/cancel/<id:\d+>' => 'ticket/cancel',
                 'client/create' => 'client/create',
                 'ticket/index' => 'ticket/index',
+                'ticket/reopen/<id:\d+>' => 'ticket/reopen',
                 'ticket/reopen' => 'ticket/reopen',
             ],
         ],
         'session' => [
             'class' => 'yii\web\Session',
             'cookieParams' => ['httponly' => true],
+        ],
+        'authManager' => [
+            'class' => 'yii\rbac\DbManager',
         ],
     ],
     'params' => $params,

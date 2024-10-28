@@ -10,6 +10,7 @@ use app\models\Ticket;
 use app\models\Developer;
 use Yii;
 use yii\data\ActiveDataProvider;
+use app\models\User;
 
 class DeveloperController extends Controller
 {
@@ -17,14 +18,17 @@ class DeveloperController extends Controller
     {
         return [
             'access' => [
-                'class' => AccessControl::className(),
+                'class' => AccessControl::class,
                 'rules' => [
                     [
                         'allow' => true,
                         'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
                             $user = Yii::$app->user->identity;
-                            return $user->role === 'developer' && Developer::findByCompanyEmail($user->company_email) !== null;
+                            if ($user->role !== 'developer') {
+                                throw new ForbiddenHttpException('You must be a developer to access this page.');
+                            }
+                            return true;
                         }
                     ],
                 ],
@@ -35,45 +39,86 @@ class DeveloperController extends Controller
     public function actionView()
     {
         $user = Yii::$app->user->identity;
-        $developer = Developer::findByCompanyEmail($user->company_email);
         
-        if (!$developer) {
-            throw new ForbiddenHttpException('Developer not found for the given email.');
-        }
-
         $dataProvider = new ActiveDataProvider([
-            'query' => $developer->getAssignedTickets(),
+            'query' => $user->getAssignedTickets(),
             'pagination' => [
-                'pageSize' => 20,
+                'pageSize' => 10,
+            ],
+            'sort' => [
+                'defaultOrder' => [
+                    'created_at' => SORT_DESC,
+                ]
             ],
         ]);
 
         return $this->render('view', [
+            'user' => $user,
             'dataProvider' => $dataProvider,
-            'developer' => $developer,
         ]);
+    }
+
+    public function actionApproveTicket($id)
+    {
+        $user = Yii::$app->user->identity;
+        
+        if ($user->role !== 'developer') {
+            throw new ForbiddenHttpException('You must be a developer to approve tickets.');
+        }
+
+        $ticket = Ticket::findOne($id);
+
+        if (!$ticket) {
+            throw new NotFoundHttpException('The requested ticket does not exist.');
+        }
+
+        if ($ticket->assigned_to !== $user->id) {
+            throw new ForbiddenHttpException('You can only approve tickets assigned to you.');
+        }
+
+        if ($ticket->status === 'closed') {
+            Yii::$app->session->setFlash('error', 'Cannot approve a closed ticket.');
+            return $this->redirect(['view']);
+        }
+
+        $ticket->status = 'approved';
+        if ($ticket->save()) {
+            Yii::$app->session->setFlash('success', 'Ticket approved successfully.');
+        } else {
+            Yii::$app->session->setFlash('error', 'Failed to approve the ticket.');
+        }
+
+        return $this->redirect(['view']);
     }
 
     public function actionCloseTicket($id)
     {
         $user = Yii::$app->user->identity;
-        $developer = Developer::findByCompanyEmail($user->company_email);
-
-        if (!$developer) {
-            throw new ForbiddenHttpException('Developer not found for the given email.');
+        
+        if ($user->role !== 'developer') {
+            throw new ForbiddenHttpException('You must be a developer to close tickets.');
         }
 
         $ticket = Ticket::findOne($id);
-        if ($ticket && $ticket->assigned_to == $developer->id && $ticket->status !== 'closed') {
-            $ticket->status = 'closed';
-            $ticket->closed_by = $developer->id;
-            if ($ticket->save(false, ['status', 'closed_by'])) {  // Only save these fields
-                Yii::$app->session->setFlash('success', 'Ticket closed successfully.');
-            } else {
-                Yii::$app->session->setFlash('error', 'Failed to close the ticket.');
-            }
+
+        if (!$ticket) {
+            throw new NotFoundHttpException('The requested ticket does not exist.');
+        }
+
+        if ($ticket->assigned_to !== $user->id) {
+            throw new ForbiddenHttpException('You can only close tickets assigned to you.');
+        }
+
+        if ($ticket->status === 'closed') {
+            Yii::$app->session->setFlash('error', 'This ticket is already closed.');
+            return $this->redirect(['view']);
+        }
+
+        $ticket->status = 'closed';
+        if ($ticket->save()) {
+            Yii::$app->session->setFlash('success', 'Ticket closed successfully.');
         } else {
-            Yii::$app->session->setFlash('error', 'Ticket not found, already closed, or you are not authorized to close this ticket.');
+            Yii::$app->session->setFlash('error', 'Failed to close the ticket.');
         }
 
         return $this->redirect(['view']);
@@ -81,19 +126,30 @@ class DeveloperController extends Controller
 
     public function actionEscalateTicket($id)
     {
+        $user = Yii::$app->user->identity;
+        
+        if ($user->role !== 'developer') {
+            throw new ForbiddenHttpException('You must be a developer to escalate tickets.');
+        }
+
         $ticket = Ticket::findOne($id);
-        if ($ticket === null) {
+
+        if (!$ticket) {
             throw new NotFoundHttpException('The requested ticket does not exist.');
+        }
+
+        if ($ticket->assigned_to !== $user->id) {
+            throw new ForbiddenHttpException('You can only escalate tickets assigned to you.');
         }
 
         $ticket->status = 'escalated';
         if ($ticket->save()) {
-            Yii::$app->session->setFlash('success', 'Ticket has been escalated successfully.');
+            Yii::$app->session->setFlash('success', 'Ticket escalated successfully.');
         } else {
-            Yii::$app->session->setFlash('error', 'There was an error escalating the ticket.');
+            Yii::$app->session->setFlash('error', 'Failed to escalate the ticket.');
         }
 
-        return $this->redirect(['view', 'id' => $ticket->developer_id]);
+        return $this->redirect(['view']);
     }
 
     // Other actions...

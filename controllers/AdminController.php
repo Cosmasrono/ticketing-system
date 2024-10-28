@@ -9,6 +9,10 @@ use yii\web\ForbiddenHttpException;
 use app\models\Admin;
 use app\models\Ticket;
 use app\models\Developer;
+use app\models\Client;
+use app\models\User;
+use app\models\AdminInvitation;
+use app\models\InviteForm;
 
 class AdminController extends Controller
 {
@@ -16,27 +20,35 @@ class AdminController extends Controller
     {
         return [
             'access' => [
-                'class' => AccessControl::className(),
+                'class' => AccessControl::class,
                 'rules' => [
                     [
                         'allow' => true,
                         'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
-                            $user = Yii::$app->user->identity;
-                            return $user && Admin::find()->where(['company_email' => $user->company_email])->exists();
-                        }
+                            return Yii::$app->user->identity->isSuperAdmin();
+                        },
                     ],
                 ],
-                'denyCallback' => function ($rule, $action) {
-                    throw new ForbiddenHttpException('You are not allowed to access this page.');
-                }
             ],
         ];
     }
-    
+
     public function actionIndex()
     {
         return $this->render('index');
+    }
+
+    public function actionManageUsers()
+    {
+        // Implement user management logic here
+        return $this->render('manageUsers');
+    }
+
+    public function actionManageTickets()
+    {
+        // Implement ticket management logic here
+        return $this->render('manageTickets');
     }
 
     public function actionAssignTicket($id)
@@ -68,6 +80,62 @@ class AdminController extends Controller
         return $this->render('assign-ticket', [
             'ticket' => $ticket,
             'developers' => $developers,
+        ]);
+    }
+
+    public function actionCreateClient()
+    {
+        $model = new CreateClientForm();
+        if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+            if ($user = $model->createClient()) {
+                Yii::$app->session->setFlash('success', 'New client created successfully.');
+                return $this->redirect(['view-clients']); // Redirect to a list of clients
+            }
+        }
+
+        return $this->render('create-client', [
+            'model' => $model,
+        ]);
+    }
+
+    public function actionInvite()
+    {
+        $model = new InviteForm();
+
+        if ($model->load(Yii::$app->request->post()) && $model->invite()) {
+            Yii::$app->session->setFlash('success', 'Invitation sent successfully.');
+            return $this->refresh();
+        }
+
+        return $this->render('invite', [
+            'model' => $model,
+        ]);
+    }
+
+    public function actionSignup($token)
+    {
+        $invitation = AdminInvitation::findOne(['token' => $token]);
+        if (!$invitation) {
+            throw new NotFoundHttpException('Invalid invitation token.');
+        }
+
+        $user = new User();
+
+        if ($user->load(Yii::$app->request->post()) && $user->save()) {
+            // Assign admin role
+            $auth = Yii::$app->authManager;
+            $adminRole = $auth->getRole('admin');
+            $auth->assign($adminRole, $user->id);
+
+            // Delete the invitation
+            $invitation->delete();
+
+            Yii::$app->session->setFlash('success', 'Admin account created successfully.');
+            return $this->redirect(['site/login']);
+        }
+
+        return $this->render('signup', [
+            'model' => $user,
         ]);
     }
 

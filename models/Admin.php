@@ -1,34 +1,13 @@
 <?php
 namespace app\models;
 
-use yii\db\ActiveRecord;
-use yii\behaviors\TimestampBehavior;
+use Yii;
 
-class Admin extends ActiveRecord
+class Admin extends \yii\base\BaseObject
 {
-    public static function tableName()
-    {
-        return 'admin'; // or whatever your admin table is called
-    }
-
-    public function behaviors()
-    {
-        return [
-            TimestampBehavior::class,
-        ];
-    }
-
-    public function rules()
-    {
-        return [
-            [['company_email'], 'required'],
-            [['company_email'], 'email'],
-            [['company_email'], 'unique'],
-        ];
-    }
-
     public static function isAdminEmail($email)
     {
-        return static::find()->where(['company_email' => $email])->exists();
+        $user = User::findOne(['company_email' => $email]);
+        return $user && Yii::$app->authManager->checkAccess($user->id, 'admin');
     }
 }

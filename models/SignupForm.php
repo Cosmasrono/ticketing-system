@@ -8,6 +8,8 @@ use app\models\User;
 use app\models\Admin;
 use app\models\Developer;
 use app\models\Client;
+use app\models\Invitation;
+use yii\db\Expression;
 
 class SignupForm extends Model
 {
@@ -23,25 +25,30 @@ class SignupForm extends Model
     public function rules()
     {
         return [
-            [['name', 'company_email', 'company_name', 'password', 'role'], 'required'],
+            [['name', 'company_email', 'company_name', 'password'], 'required'],
+            ['name', 'string', 'min' => 2, 'max' => 255],
             ['company_email', 'email'],
-            ['company_email', 'validateClientEmail'],
+            ['company_email', 'validateInvitation'],
+            ['company_email', 'validateUniqueUser'],
+            ['company_name', 'string', 'max' => 255],
             ['password', 'string', 'min' => 6],
-            ['role', 'in', 'range' => [User::ROLE_USER, User::ROLE_ADMIN, User::ROLE_DEVELOPER]],
+            ['role', 'in', 'range' => ['developer', 'admin', 'user']],
         ];
     }
 
-    public function validateClientEmail($attribute, $params)
+    public function attributeLabels()
     {
-        if (!$this->hasErrors()) {
-            if (!Client::emailExists($this->company_email)) {
-                $this->addError($attribute, 'Only registered customers are allowed to sign up.');
-            }
-        }
+        return [
+            'name' => 'Full Name',
+            'company_email' => 'Company Email',
+            'company_name' => 'Company Name',
+            'password' => 'Password',
+            'role' => 'Role',
+        ];
     }
 
     /**
-     * Signs up the user.
+     * Signs user up.
      *
      * @return User|null the saved model or null if saving fails
      */
@@ -52,9 +59,8 @@ class SignupForm extends Model
             $user->name = $this->name;
             $user->company_email = $this->company_email;
             $user->company_name = $this->company_name;
-            $user->setPassword($this->password);
+            $user->password = $this->password;
             $user->role = $this->role;
-            $user->generateAuthKey();
             
             if ($user->save()) {
                 return $user;
@@ -72,26 +78,7 @@ class SignupForm extends Model
         return 'client';
     }
 
-    private function createUserTypeRecord($userId, $userType)
-    {
-        switch ($userType) {
-            case 'admin':
-                $admin = new Admin();
-                $admin->user_id = $userId;
-                $admin->save();
-                break;
-            case 'developer':
-                $developer = new Developer();
-                $developer->user_id = $userId;
-                $developer->save();
-                break;
-            case 'client':
-                $client = new Client();
-                $client->user_id = $userId;
-                $client->save();
-                break;
-        }
-    }
+  
     
     protected function sendVerificationEmail($user)
     {
@@ -118,5 +105,25 @@ class SignupForm extends Model
     private function renderEmailTemplate($view, $params)
     {
         return Yii::$app->view->render("@app/mail/{$view}", $params);
+    }
+
+    public function validateInvitation($attribute, $params)
+    {
+        if (!$this->hasErrors()) {
+            $invitationExists = Yii::$app->db->createCommand('SELECT EXISTS(SELECT 1 FROM invitation WHERE company_email = :email)', [':email' => $this->company_email])->queryScalar();
+            if (!$invitationExists) {
+                $this->addError($attribute, 'No valid invitation found for this email address.');
+            }
+        }
+    }
+
+    public function validateUniqueUser($attribute, $params)
+    {
+        if (!$this->hasErrors()) {
+            $userExists = Yii::$app->db->createCommand('SELECT EXISTS(SELECT 1 FROM user WHERE company_email = :email)', [':email' => $this->company_email])->queryScalar();
+            if ($userExists) {
+                $this->addError($attribute, 'This email address has already been taken.');
+            }
+        }
     }
 }

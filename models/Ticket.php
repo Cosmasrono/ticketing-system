@@ -13,14 +13,15 @@ class Ticket extends ActiveRecord
 
     const STATUS_PENDING = 'pending';
     const STATUS_APPROVED = 'approved';
-    const STATUS_CANCELLED = 'cancelled';
+    const STATUS_ESCALATE = 'escalate';  // Add this line
     const STATUS_CLOSED = 'closed';
-    const STATUS_ESCALATED = 'escalated';
-    const STATUS_DELETED = 'deleted'; // Add this new status
+    const STATUS_DELETED = 'deleted';
+    const STATUS_CANCELLED = 'cancelled';
+    const STATUS_ESCALATED = 'escalated';  // Add this line if you need 'escalated' status
 
     public static function tableName()
     {
-        return 'ticket';
+        return 'ticket'; // make sure this matches your actual table name
     }
 
 
@@ -33,7 +34,7 @@ class Ticket extends ActiveRecord
                 'class' => TimestampBehavior::class,
                 'createdAtAttribute' => 'created_at',
                 'updatedAtAttribute' => false,
-                'value' => new Expression('NOW()'),
+                'value' => function() { return time(); },
             ],
         ];
     }
@@ -41,12 +42,23 @@ class Ticket extends ActiveRecord
     public function rules()
     {
         return [
-            [['module', 'issue', 'user_id'], 'required'],
-            [['description', 'status'], 'string'],
-            [['created_at'], 'safe'],
-            [['user_id'], 'integer'],
-            [['module', 'issue'], 'string', 'max' => 255],
-            [['company_email'], 'email'],
+            [['module', 'issue', 'description', 'created_by', 'status'], 'required'],
+            [['description'], 'string'],
+            [['created_by', 'created_at'], 'integer'],
+            [['module', 'issue', 'status'], 'string', 'max' => 255],
+            ['status', 'in', 'range' => [
+                self::STATUS_PENDING,
+                self::STATUS_APPROVED,
+                self::STATUS_ESCALATE,
+                self::STATUS_CLOSED,
+                self::STATUS_DELETED,
+                self::STATUS_CANCELLED,
+            ]],
+            [['created_at', 'closed_at'], 'integer', 'skipOnEmpty' => true],
+            [['created_at', 'closed_at'], 'default', 'value' => null],
+            ['assigned_to', 'integer'],
+            ['assigned_to', 'exist', 'skipOnError' => true, 'targetClass' => User::class, 'targetAttribute' => ['assigned_to' => 'id']],
+            ['screenshot', 'string'],
         ];
     }
 
@@ -59,8 +71,8 @@ class Ticket extends ActiveRecord
             'issue' => 'Issue',
             'description' => 'Description',
             'status' => 'Status',
+            'created_by' => 'Created By',
             'created_at' => 'Created At',
-            'user_id' => 'User ID',
             'company_email' => 'Company Email',
         ];
     }
@@ -73,7 +85,7 @@ class Ticket extends ActiveRecord
 
     public function getAssignedDeveloper()
     {
-        return $this->hasOne(Developer::class, ['id' => 'assigned_to']);
+        return $this->hasOne(User::class, ['id' => 'assigned_to']);
     }
 
 
@@ -82,7 +94,7 @@ class Ticket extends ActiveRecord
 
     public function getDeveloper()
     {
-        return $this->hasOne(Developer::class, ['id' => 'assigned_to']);
+        return $this->hasOne(User::class, ['id' => 'developer_id']);
     }
 
     public function getAssignedTo()
@@ -143,7 +155,17 @@ class Ticket extends ActiveRecord
             return false;
         }
 
-        Yii::info("Attempting to save ticket ID: {$this->id}, Status: {$this->status}, Action: {$this->action}", 'ticket');
+        if ($this->created_at === null || $this->created_at === '') {
+            $this->created_at = time();
+        } else {
+            $this->created_at = (int)$this->created_at;
+        }
+
+        if ($this->closed_at === '') {
+            $this->closed_at = null;
+        } elseif ($this->closed_at !== null) {
+            $this->closed_at = (int)$this->closed_at;
+        }
 
         return true;
     }
@@ -243,7 +265,65 @@ class Ticket extends ActiveRecord
 
     public function getAssignButtonText()
     {
-        return $this->status === self::STATUS_ESCALATED ? 'Reassign' : 'Assign';
+        return $this->status === self::STATUS_ESCALATE ? 'Reassign' : 'Assign';
     }
 
+    public function getCompanyName()
+    {
+        return $this->user->company_name; // Assuming there's a relation to User model
+    }
+
+    public function getCompanyEmail()
+    {
+        return $this->user ? $this->user->company_email : null;
+    }
+
+    public $company_name; // Add this if it's not a database field but needed in the model
+
+    public function fields()
+    {
+        return array_merge(parent::fields(), [
+            'company_name' => function ($model) {
+                return $model->companyName;
+            },
+        ]);
+    }
+
+    public static function getStatusList()
+    {
+        return [
+            self::STATUS_PENDING => 'Pending',
+            self::STATUS_APPROVED => 'Approved',
+            self::STATUS_ESCALATE => 'Escalate',
+            self::STATUS_CLOSED => 'Closed',
+            self::STATUS_DELETED => 'Deleted',
+            self::STATUS_CANCELLED => 'Cancelled',
+            self::STATUS_ESCALATED => 'Escalated',  // Add this line if you added the constant
+        ];
+    }
+
+    public function attributes()
+    {
+        return array_merge(parent::attributes(), ['updated_at', 'assigned_to']);
+    }
+
+    public function beforeValidate()
+    {
+        if (!parent::beforeValidate()) {
+            return false;
+        }
+
+        $this->created_at = $this->ensureInteger($this->created_at);
+        $this->closed_at = $this->ensureInteger($this->closed_at, true);
+
+        return true;
+    }
+
+    private function ensureInteger($value, $allowNull = false)
+    {
+        if ($allowNull && ($value === null || $value === '')) {
+            return null;
+        }
+        return $value === null || $value === '' ? time() : (int)$value;
+    }
 }

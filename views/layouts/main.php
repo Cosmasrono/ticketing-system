@@ -9,6 +9,7 @@ use yii\bootstrap5\Html;
 use yii\bootstrap5\Nav;
 use yii\bootstrap5\NavBar;
 use yii\web\JqueryAsset;
+ 
 
 AppAsset::register($this);
 
@@ -37,7 +38,6 @@ JqueryAsset::register($this);
             <div class="container">
                 <?php
                 NavBar::begin([
-                    // 'brandLabel' => Yii::$app->name,
                     'brandUrl' => Yii::$app->homeUrl,
                     'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
                 ]);
@@ -47,12 +47,13 @@ JqueryAsset::register($this);
                 ];
 
                 if (!Yii::$app->user->isGuest) {
-                    // Show all menu items
-                    $menuItems[] = ['label' => 'Admin', 'url' => ['/site/admin']];
+                    if (!Yii::$app->user->identity->isAdmin()) {
+                        $menuItems[] = ['label' => 'Tickets', 'url' => ['/ticket/index']];
+                    }
                     $menuItems[] = '<li>'
                         . Html::beginForm(['/site/logout'], 'post')
                         . Html::submitButton(
-                            'Logout (' . Html::encode(Yii::$app->user->identity->company_name) . ')',
+                            'Logout (' . Yii::$app->user->identity->companyName . ')',
                             ['class' => 'btn btn-link logout']
                         )
                         . Html::endForm()
@@ -60,7 +61,7 @@ JqueryAsset::register($this);
                 }
 
                 echo Nav::widget([
-                    'options' => ['class' => 'navbar-nav'],
+                    'options' => ['class' => 'navbar-nav navbar-right'],
                     'items' => $menuItems,
                 ]);
 

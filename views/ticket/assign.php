@@ -4,12 +4,9 @@ use yii\widgets\ActiveForm;
 
 /* @var $this yii\web\View */
 /* @var $ticket app\models\Ticket */
-/* @var $developers app\models\User[] */
+/* @var $developers array */
 
-$this->title = 'Assign Ticket: ' . $ticket->title;
-$this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
-$this->params['breadcrumbs'][] = ['label' => $ticket->title, 'url' => ['view', 'id' => $ticket->id]];
-$this->params['breadcrumbs'][] = 'Assign';
+$this->title = 'Assign Developer to Ticket: ' . $ticket->id;
 ?>
 <div class="ticket-assign">
 
@@ -17,13 +14,10 @@ $this->params['breadcrumbs'][] = 'Assign';
 
     <?php $form = ActiveForm::begin(); ?>
 
-    <?= $form->field($ticket, 'assigned_to')->dropDownList(
-        \yii\helpers\ArrayHelper::map($developers, 'id', 'username'),
-        ['prompt' => 'Select Developer']
-    ) ?>
+    <?= $form->field($ticket, 'assigned_to')->dropDownList($developers, ['prompt' => 'Select Developer']) ?>
 
     <div class="form-group">
-        <?= Html::submitButton('Assign', ['class' => 'btn btn-success']) ?>
+        <?= Html::submitButton('Assign Developer', ['class' => 'btn btn-success']) ?>
     </div>
 
     <?php ActiveForm::end(); ?>

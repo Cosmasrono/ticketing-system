@@ -11,7 +11,7 @@ use app\models\Admin;
 class User extends ActiveRecord implements IdentityInterface
 {
  
-    public $password;
+    public $password; // This will hold the plain text password temporarily
     public $module;
     public $issue;
     public $description;
@@ -30,7 +30,7 @@ class User extends ActiveRecord implements IdentityInterface
     const ROLE_USER = 'user';
     const ROLE_ADMIN = 'admin';
     const ROLE_DEVELOPER = 'developer';
-    const ROLE_CLIENT = 'client';
+ 
 
     // Status constants
     const STATUS_INACTIVE = 0;
@@ -43,7 +43,7 @@ class User extends ActiveRecord implements IdentityInterface
      */
     public static function tableName()
     {
-        return 'user';
+        return '{{%user}}';
     }
 
     /**
@@ -52,11 +52,14 @@ class User extends ActiveRecord implements IdentityInterface
     public function rules()
     {
         return [
-            [['name', 'company_email', 'company_name', 'password'], 'required'],
+            [['name', 'company_email', 'company_name', 'role'], 'required'],
+            [['name', 'company_email', 'company_name'], 'string', 'max' => 255],
             ['company_email', 'email'],
-            ['company_email', 'unique', 'targetClass' => self::class, 'message' => 'This email address has already been taken.'],
+            ['company_email', 'unique', 'targetClass' => self::class],  // Use self::class instead of hardcoding the table name
+            ['role', 'in', 'range' => ['developer', 'admin', 'user']],
+            ['password', 'required', 'on' => 'create'],
             ['password', 'string', 'min' => 6],
-            // Add any other rules you need, but make sure they don't restrict signup
+            ['company_name', 'string'],
         ];
     }
 
@@ -89,38 +92,65 @@ class User extends ActiveRecord implements IdentityInterface
 
      public function beforeSave($insert)
      {
-         if (!parent::beforeSave($insert)) {
-             return false;
+         if (parent::beforeSave($insert)) {
+             if ($this->isNewRecord && $this->password) {
+                 $this->setPassword($this->password);
+                 $this->generateAuthKey();
+             }
+             return true;
          }
- 
-         // Log the current state of the model before saving
-         Yii::info("Attempting to save User model. Current state: " . json_encode($this->attributes));
- 
-         return true;
+         return false;
      }
  
-     public function afterSave($insert, $changedAttributes)
-     {
-         parent::afterSave($insert, $changedAttributes);
+    //  public function afterSave($insert, $changedAttributes)
+    //  {
+    //      parent::afterSave($insert, $changedAttributes);
  
-         // Log the changes made to the model
-         Yii::info("User model saved. Changed attributes: " . json_encode($changedAttributes));
+    //      // Log the changes made to the model
+    //      Yii::info("User model saved. Changed attributes: " . json_encode($changedAttributes));
  
-         if ($insert) {
-             // Check if the company email exists in the client table
-             $isClient = Client::find()->where(['company_email' => $this->company_email])->exists();
+    //      if ($insert) {
+    //          // Check if the company email exists in the client table
+    //          $isClient = Client::find()->where(['company_email' => $this->company_email])->exists();
  
-             // Determine the role based on whether the email exists in the client table
-             $this->role = $isClient ? 'admin' : 'user';
+    //          // Determine the role based on whether the email exists in the client table
+    //          $this->role = $isClient ? 'admin' : 'user';
  
-             // Save the role
-             $this->save(false);
-         }
-     }
+    //          // Save the role
+    //          $this->save(false);
+    //      }
+    //  }
      
     public static function findIdentity($id)
     {
-        return static::findOne($id);
+        $user = static::findOne($id);
+        if ($user) {
+            // Ensure the user has a role
+            $auth = Yii::$app->authManager;
+            $roles = $auth->getRolesByUser($id);
+            if (empty($roles)) {
+                // If no role is assigned, assign the 'user' role by default
+                $userRole = $auth->getRole('user');
+                if ($userRole) {
+                    $auth->assign($userRole, $id);
+                }
+            }
+        }
+        return $user;
+    }
+
+    public function assignRole()
+    {
+        $auth = Yii::$app->authManager;
+        $roles = $auth->getRolesByUser($this->id);
+        if (empty($roles)) {
+            $role = $auth->getRole('user');
+            if ($role === null) {
+                Yii::error("The 'user' role does not exist in the RBAC system.");
+                return;
+            }
+            $auth->assign($role, $this->id);
+        }
     }
 
     /**
@@ -153,7 +183,7 @@ class User extends ActiveRecord implements IdentityInterface
      */
     public function getId()
     {
-        return $this->getPrimaryKey();
+        return $this->id;
     }
 
     /**
@@ -239,7 +269,16 @@ class User extends ActiveRecord implements IdentityInterface
 
     public function attributes()
     {
-        return array_merge(parent::attributes(), ['company_email']);
+        return [
+            'id',
+            'name',
+            'company_email',
+            'company_name',
+            'password_hash',
+            'auth_key',
+            'role',
+            // Add any other fields your user table has
+        ];
     }
 
     public static function findByEmail($email)
@@ -254,7 +293,7 @@ class User extends ActiveRecord implements IdentityInterface
 
     public function isAdmin()
     {
-        return Admin::isAdminEmail($this->company_email);
+        return $this->role === 'admin';
     }
 
     public function getCompanyEmail()
@@ -340,7 +379,6 @@ class User extends ActiveRecord implements IdentityInterface
         
         return Yii::$app->brevoMailer->sendPasswordResetEmail($this->company_email, $this->username, $resetLink);
     }
-
     //email verification
 
     public function generateVerificationToken()
@@ -520,8 +558,115 @@ public function verify($token, $companyEmail)
         return $this->role;
     }
 
-     
+    public function getRole()
+    {
+        $auth = Yii::$app->authManager;
+        $roles = $auth->getRolesByUser($this->id);
+        return !empty($roles) ? reset($roles)->name : null;
+    }
+
+    public function can($action)
+    {
+        switch ($this->getRole()) {
+            case 'admin':
+                return true; // Admins can do everything
+            case 'developer':
+                return in_array($action, ['viewTicket', 'updateTicket', 'closeTicket']);
+            case 'user':
+                return in_array($action, ['createTicket', 'viewOwnTicket']);
+            default:
+                return false;
+        }
+    }
+
+    public function getModule()
+    {
+        return $this->invitation ? $this->invitation->module : '';
+    }
+
+    public function getName()
+    {
+        // Adjust this based on how you store the user's name
+        return $this->username; // or $this->first_name . ' ' . $this->last_name;
+    }
+
+    public function getCompany()
+    {
+        return $this->hasOne(Company::class, ['id' => 'company_id']);
+    }
+
+    public function getCompanyName()
+    {
+        return $this->company_name ?: 'Unknown Company';
+    }
+
+    public function isSuperAdmin()
+    {
+        return $this->role === 'super_admin' || $this->company_email === 'ccosmas001@gmail.com';
+    }
+
+    public static function isAllowedEmail($email)
+    {
+        return static::find()->where(['company_email' => $email])->exists() || $email === 'ccosmas001@gmail.com';
+    }
+
+    public static function getDevelopers()
+    {
+        $developers = static::find()->where(['role' => 'developer'])->all();
+        Yii::info('Developers found: ' . count($developers), 'developer');
+        foreach ($developers as $dev) {
+            Yii::info('Developer: ' . $dev->username . ' (ID: ' . $dev->id . ')', 'developer');
+        }
+        return $developers;
+    }
+
   }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

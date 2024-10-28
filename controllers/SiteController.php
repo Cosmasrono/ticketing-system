@@ -24,6 +24,8 @@ use yii\web\BadRequestHttpException;
 use app\components\BrevoMailer;
 use yii\web\ServerErrorHttpException;
 use app\models\Client;
+use app\models\Invitation;
+use yii\helpers\ArrayHelper;
 
  
 
@@ -38,12 +40,20 @@ class SiteController extends Controller
         return [
             'access' => [
                 'class' => AccessControl::class,
-                'only' => ['logout'],
+                'only' => ['logout', 'super-admin'],
                 'rules' => [
                     [
                         'actions' => ['logout'],
                         'allow' => true,
                         'roles' => ['@'],
+                    ],
+                    [
+                        'actions' => ['super-admin'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            return Yii::$app->user->identity->isSuperAdmin();
+                        },
                     ],
                 ],
             ],
@@ -113,62 +123,75 @@ class SiteController extends Controller
     // }
 
 
-
     public function actionIndex()
-{
-    Yii::debug('Accessing index action');
-    // Remove any permission checks here
-    $dataProvider = new ActiveDataProvider([
-        'query' => Ticket::find(),
-        'pagination' => [
-            'pageSize' => 20,
-        ],
-    ]);
+    {
+        Yii::debug('Accessing index action');
+        // Remove any permission checks here
+        $dataProvider = new ActiveDataProvider([
+            'query' => Ticket::find(),
+            'pagination' => [
+                'pageSize' => 20,
+            ],
+        ]);
+    
+        return $this->render('index', [
+            'dataProvider' => $dataProvider,
+        ]);
+    
+    // The following code is now commented out
+    // if (Yii::$app->user->can('viewReports')) {
+    //     return $this->render('index');
+    // } else {
+    //     return $this->render('no-access');
+    // }
 
-    return $this->render('index', [
-        'dataProvider' => $dataProvider,
-    ]);
+    // ... rest of the method (if any) ...
 }
  
-public function actionSignup()
+public function actionSignup($token = null)
 {
-    $model = new User(['scenario' => User::SCENARIO_SIGNUP]);
+    if (!$token) {
+        throw new NotFoundHttpException('Invalid invitation token.');
+    }
 
-    if (Yii::$app->request->isPost) {
-        if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-            $model->setPassword($model->password);
-            $model->generateAuthKey();
-            $model->generateVerificationToken();
-            $model->status = User::STATUS_UNVERIFIED;
-            $model->is_verified = 0;
+    $invitation = Invitation::findOne(['token' => $token]);
+    if (!$invitation) {
+        throw new NotFoundHttpException('Invalid invitation token.');
+    }
 
-            if ($model->save()) {
-                // Create verification link
-                $verificationLink = Yii::$app->urlManager->createAbsoluteUrl([
-                    'site/verify-email',
-                    'token' => $model->verification_token,
-                    'companyEmail' => $model->company_email
-                ]);
+    $model = new SignupForm();
+    $model->company_email = $invitation->company_email;
+    $model->role = $invitation->role;
 
-                try {
-                    // Send verification email
-                    $result = $this->sendVerificationEmail($model, $verificationLink);
-                    if ($result['success']) {
-                        Yii::$app->session->setFlash('success', 'Please check your email to verify your account.');
-                        return $this->redirect(['site/login']);
-                    } else {
-                        Yii::$app->session->setFlash('error', 'There was an error sending the verification email. Please try again.');
-                    }
-                } catch (\Exception $e) {
-                    Yii::$app->session->setFlash('error', 'There was an error sending the verification email: ' . $e->getMessage());
-                }
+    if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+        $transaction = Yii::$app->db->beginTransaction();
+        try {
+            $user = new User();
+            $user->name = $model->name;
+            $user->company_email = $model->company_email;
+            $user->company_name = $model->company_name;
+            $user->setPassword($model->password);
+            $user->generateAuthKey();
+            $user->role = $model->role;
+
+            if ($user->save()) {
+                
+                $transaction->commit();
+                Yii::$app->session->setFlash('success', 'Thank you for registration. Please check your inbox for verification email.');
+                return $this->goHome();
             } else {
-                Yii::$app->session->setFlash('error', 'There was an error creating your account. Please try again.');
+                $transaction->rollBack();
+                Yii::$app->session->setFlash('error', 'There was an error saving your account: ' . json_encode($user->errors));
             }
+        } catch (\Exception $e) {
+            $transaction->rollBack();
+            Yii::$app->session->setFlash('error', 'An error occurred during registration: ' . $e->getMessage());
         }
     }
 
-    return $this->render('signup', ['model' => $model]);
+    return $this->render('signup', [
+        'model' => $model,
+    ]);
 }
 
     
@@ -255,33 +278,19 @@ public function actionSignup()
  
      public function actionLogin()
      {
-         Yii::info('Session ID: ' . Yii::$app->session->id);
-         Yii::info('CSRF Token: ' . Yii::$app->request->csrfToken);
-         
          if (!Yii::$app->user->isGuest) {
-             return $this->goHome(); // Redirect to home if already logged in
+             return $this->goHome();
          }
-     
+
          $model = new LoginForm();
          if ($model->load(Yii::$app->request->post()) && $model->login()) {
-             $user = Yii::$app->user->identity;
-             if ($user->isAdmin()) {
-                 return $this->redirect(['site/admin']);
-             } elseif ($user->isDeveloper()) {
-                 $developer = Developer::findByCompanyEmail($user->company_email);
-                 if ($developer) {
-                     return $this->redirect(['developer/view', 'id' => $developer->id]);
-                 } else {
-                     Yii::error('Developer not found for company email: ' . $user->company_email);
-                     throw new ForbiddenHttpException('Developer not found for the given email.');
-                 }
+             if (Yii::$app->user->identity->isSuperAdmin()) {
+                 Yii::$app->session->setFlash('success', 'Welcome, Super Admin!');
              }
              return $this->goBack();
          }
-     
-         // Clear the password field for security
+
          $model->password = '';
-     
          return $this->render('login', [
              'model' => $model,
          ]);
@@ -403,6 +412,10 @@ public function actionDeveloperDashboard()
 
 public function actionAdmin()
 {
+    if (Yii::$app->request->referrer && strpos(Yii::$app->request->referrer, 'ticket/assign') !== false) {
+        Yii::$app->session->setFlash('error', 'An error occurred while assigning the ticket. It may have been cancelled.');
+    }
+
     // Check if the user is logged in
     if (Yii::$app->user->isGuest) {
         // Redirect to login page if the user is not logged in
@@ -433,7 +446,7 @@ public function actionAdmin()
     ];
 
     $dataProvider = new ActiveDataProvider([
-        'query' => Ticket::find(),
+        'query' => Ticket::find()->with('user'), // Add this to eager load the user relation
         'pagination' => [
             'pageSize' => 10,
         ],
@@ -526,22 +539,285 @@ public function actionForgotPassword()
 //     return $this->goHome();
 // }
 
-public function actionCreateClient()
+public function actionInvite()
 {
-    $model = new Client();
-    
+    $model = new Invitation();
+
     if ($model->load(Yii::$app->request->post()) && $model->save()) {
-        Yii::$app->session->setFlash('success', 'Client created successfully.');
-        return $this->redirect(['index']); // or wherever you want to redirect after creation
+        // Send invitation email
+        Yii::$app->mailer->compose()
+            ->setFrom(Yii::$app->params['adminEmail'])
+            ->setTo($model->company_email)
+            ->setSubject('Invitation to join')
+            ->setTextBody("You've been invited to join as a {$model->role}. Click here to sign up: " . 
+                Yii::$app->urlManager->createAbsoluteUrl(['site/signup', 'token' => $model->token]))
+            ->send();
+
+        Yii::$app->session->setFlash('success', 'Invitation sent successfully.');
+        return $this->redirect(['index']);
     }
 
-    return $this->render('create', [
+    return $this->render('invite', [
         'model' => $model,
     ]);
 }
 
+public function actionInvitation()
+{
+    $model = new Invitation();
+
+    if ($model->load(Yii::$app->request->post()) && $model->save()) {
+        if ($model->sendInvitationEmail()) {
+            Yii::$app->session->setFlash('success', 'Invitation sent successfully.');
+        } else {
+            Yii::$app->session->setFlash('error', 'Failed to send invitation email.');
+        }
+        return $this->redirect(['index']);
+    }
+
+    return $this->render('invitation', [
+        'model' => $model,
+    ]);
+}
+
+public function actionSendInvitation()
+{
+    $model = new Invitation();
+
+    if ($model->load(Yii::$app->request->post()) && $model->save()) {
+        if ($model->sendInvitationEmail()) {
+            Yii::$app->session->setFlash('success', 'Invitation sent successfully to ' . $model->company_email);
+            return $this->redirect(['admin']); // Adjust this redirect as needed
+        } else {
+            Yii::$app->session->setFlash('error', 'Failed to send invitation email.');
+        }
+    }
+
+    return $this->render('send-invitation', [
+        'model' => $model,
+    ]);
+}
+
+public function actionDebugRbac()
+{
+    Yii::$app->response->format = Response::FORMAT_HTML;
+
+    $auth = Yii::$app->authManager;
+    $userId = Yii::$app->user->id;
+
+    $output = "<h1>RBAC Debug Information</h1>";
+    $output .= "<p>User ID: $userId</p>";
+    $output .= "<p>Is Guest: " . (Yii::$app->user->isGuest ? 'Yes' : 'No') . "</p>";
+
+    $roles = $auth->getRolesByUser($userId);
+    $roleNames = array_keys($roles);
+    $output .= "<p>User Roles: " . implode(', ', $roleNames) . "</p>";
+
+    $output .= "<h2>Permissions</h2>";
+    $permissions = ['admin', 'approveTicket', 'createTicket', 'viewTicket', 'deleteTicket'];
+    foreach ($permissions as $permission) {
+        $output .= "<p>Can $permission: " . (Yii::$app->user->can($permission) ? 'Yes' : 'No') . "</p>";
+    }
+
+    $output .= "<h2>Role Permissions</h2>";
+    foreach ($roles as $roleName => $role) {
+        $output .= "<h3>Role: $roleName</h3>";
+        $rolePermissions = $auth->getPermissionsByRole($roleName);
+        foreach ($rolePermissions as $permission) {
+            $output .= "<p>{$permission->name}</p>";
+        }
+    }
+
+    return $output;
+}
+
+public function actionDebugPermissions()
+{
+    if (Yii::$app->user->isGuest) {
+        return 'User is not logged in';
+    }
+
+    $userId = Yii::$app->user->id;
+    $isAdmin = Yii::$app->user->can('admin');
+    $canAssignTicket = Yii::$app->user->can('assignTicket');
+
+    return "User ID: $userId<br>Is Admin: " . ($isAdmin ? 'Yes' : 'No') . "<br>Can Assign Ticket: " . ($canAssignTicket ? 'Yes' : 'No');
+}
+
+public function actionDebug()
+{
+    if (Yii::$app->user->isGuest) {
+        return 'User is not logged in';
+    }
+
+    $user = Yii::$app->user->identity;
+    $isAdmin = strpos($user->company_email, 'admin') !== false;
+
+    return "User ID: {$user->id}<br>
+            Email: {$user->company_email}<br>
+            Is Admin: " . ($isAdmin ? 'Yes' : 'No');
+}
+
+public function actionGetIssues($module)
+{
+    $issues = [
+        'HR' => ['Payroll', 'Recruitment', 'Employee Relations'],
+        'IT' => ['Network Issues', 'Software Bugs', 'Hardware Failures'],
+        // Add more modules and their issues as needed
+    ];
+
+    $options = Html::tag('option', 'Select Issue', ['value' => '']);
+    foreach ($issues[$module] as $issue) {
+        $options .= Html::tag('option', $issue, ['value' => $issue]);
+    }
+
+    return $options;
+}
+
+public function actionAcceptInvitation($token)
+{
+    $invitation = Invitation::findByToken($token);
+
+    if (!$invitation) {
+        Yii::$app->session->setFlash('error', 'Invalid or expired invitation token.');
+        return $this->redirect(['site/index']);
+    }
+
+    $user = Yii::$app->user->identity;
+
+    if ($user) {
+        // Update user's company email and module if needed
+        $user->company_email = $invitation->company_email;
+        $user->module = $invitation->module;
+        if ($user->save()) {
+            // Mark the invitation as used
+            $invitation->markAsUsed();
+            Yii::$app->session->setFlash('success', 'Invitation accepted successfully.');
+        } else {
+            Yii::$app->session->setFlash('error', 'Failed to update user information.');
+        }
+    } else {
+        // Handle case where user is not logged in
+        // You might want to redirect to registration page with pre-filled email
+        return $this->redirect(['site/register', 'email' => $invitation->company_email]);
+    }
+
+    return $this->redirect(['site/index']);
+}
+
+public function beforeAction($action)
+{
+    if (!parent::beforeAction($action)) {
+        return false;
+    }
+
+    if (!Yii::$app->user->isGuest) {
+        $latestTicket = Ticket::find()
+            ->where(['user_id' => Yii::$app->user->id])
+            ->orderBy(['created_at' => SORT_DESC])
+            ->one();
+        
+        Yii::$app->view->params['companyName'] = $latestTicket ? $latestTicket->company_name : 'Unknown Company';
+    }
+
+    return true;
+}
+
+public function actionSuperAdmin()
+{
+    return $this->render('super-admin');
+}
+
+public function actionApproveTicket($id)
+{
+    Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+    
+    $ticket = Ticket::findOne($id);
+    if (!$ticket) {
+        return ['success' => false, 'message' => 'Ticket not found'];
+    }
+
+    Yii::info("Original ticket data: " . json_encode($ticket->attributes), 'ticket');
+
+    $ticket->status = Ticket::STATUS_APPROVED;
+    
+    // Ensure created_at is an integer
+    if (!is_int($ticket->created_at)) {
+        $ticket->created_at = (int)$ticket->created_at;
+        if (!is_int($ticket->created_at)) {
+            $ticket->created_at = time();
+        }
+    }
+
+    Yii::info("Modified ticket data: " . json_encode($ticket->attributes), 'ticket');
+
+    if ($ticket->save()) {
+        return ['success' => true, 'message' => 'Ticket approved successfully'];
+    } else {
+        Yii::error("Failed to approve ticket. Errors: " . json_encode($ticket->errors), 'ticket');
+        Yii::error("Failed ticket data: " . json_encode($ticket->attributes), 'ticket');
+        return [
+            'success' => false, 
+            'message' => 'Failed to approve ticket', 
+            'errors' => $ticket->errors,
+            'ticketData' => $ticket->attributes
+        ];
+    }
+}
+
  
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

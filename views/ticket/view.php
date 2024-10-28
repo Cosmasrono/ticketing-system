@@ -6,7 +6,7 @@ use yii\widgets\DetailView;
 /* @var $this yii\web\View */
 /* @var $model app\models\Ticket */
 
-$this->title = 'Ticket: ' . $model->id;
+$this->title = 'Ticket #' . $model->id;
 $this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
 ?>
@@ -30,9 +30,27 @@ $this->params['breadcrumbs'][] = $this->title;
             'issue',
             'description:ntext',
             'status',
-            'created_at',
+            'created_at:datetime',
             'company_email',
+           // Make sure this is included if you want to display the company name
+            [
+                'attribute' => 'screenshot',
+                'format' => 'raw',
+                'value' => function ($model) {
+                    if ($model->screenshot) {
+                        return Html::img('@web/uploads/' . $model->screenshot, 
+                            ['class' => 'img-responsive', 'style' => 'max-width:300px;']);
+                    } else {
+                        return '<span class="not-set">(not set)</span>';
+                    }
+                },
+            ],
         ],
     ]) ?>
+
+    <?php if ($model->screenshot): ?>
+        <h3>Screenshot</h3>
+        <img src="data:image/png;base64,<?= $model->screenshot ?>" alt="Ticket Screenshot" style="max-width: 100%; height: auto;">
+    <?php endif; ?>
 
 </div>

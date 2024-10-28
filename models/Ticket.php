@@ -13,11 +13,13 @@ class Ticket extends ActiveRecord
 
     const STATUS_PENDING = 'pending';
     const STATUS_APPROVED = 'approved';
-    const STATUS_ESCALATE = 'escalate';  // Add this line
+    const STATUS_CANCELLED = 'cancelled';
+    const STATUS_ESCALATE = 'escalated';
     const STATUS_CLOSED = 'closed';
     const STATUS_DELETED = 'deleted';
-    const STATUS_CANCELLED = 'cancelled';
     const STATUS_ESCALATED = 'escalated';  // Add this line if you need 'escalated' status
+    const STATUS_REOPENED = 'reopened';
+    const STATUS_REOPEN = 'reopen';  // Add this constant
 
     public static function tableName()
     {
@@ -49,16 +51,18 @@ class Ticket extends ActiveRecord
             ['status', 'in', 'range' => [
                 self::STATUS_PENDING,
                 self::STATUS_APPROVED,
+                self::STATUS_CANCELLED,
                 self::STATUS_ESCALATE,
                 self::STATUS_CLOSED,
-                self::STATUS_DELETED,
-                self::STATUS_CANCELLED,
+                self::STATUS_REOPEN
+                 // Add reopen to valid statuses
             ]],
             [['created_at', 'closed_at'], 'integer', 'skipOnEmpty' => true],
             [['created_at', 'closed_at'], 'default', 'value' => null],
             ['assigned_to', 'integer'],
             ['assigned_to', 'exist', 'skipOnError' => true, 'targetClass' => User::class, 'targetAttribute' => ['assigned_to' => 'id']],
             ['screenshot', 'string'],
+            [['escalated_at'], 'safe'],
         ];
     }
 
@@ -74,6 +78,7 @@ class Ticket extends ActiveRecord
             'created_by' => 'Created By',
             'created_at' => 'Created At',
             'company_email' => 'Company Email',
+            'escalated_at' => 'Escalated At',
         ];
     }
  
@@ -325,5 +330,21 @@ class Ticket extends ActiveRecord
             return null;
         }
         return $value === null || $value === '' ? time() : (int)$value;
+    }
+
+    /**
+     * Escalate the ticket
+     * @return boolean whether the ticket was escalated successfully
+     */
+    public function escalate()
+    {
+        if (in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_CLOSED, self::STATUS_ESCALATE])) {
+            return false;
+        }
+
+        $this->status = self::STATUS_ESCALATE;
+        $this->escalated_at = new Expression('NOW()');
+        
+        return $this->save();
     }
 }

@@ -442,6 +442,7 @@ public function actionAdmin()
         'notAssigned' => Ticket::find()->where(['assigned_to' => null])->count(),
         'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
         'escalated' => Ticket::find()->where(['status' => 'escalated'])->count(),
+        'reopen' => Ticket::find()->where(['status' => 'reopen'])->count(),
         'total' => Ticket::find()->count(),
     ];
 

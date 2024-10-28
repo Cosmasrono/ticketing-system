@@ -3,6 +3,7 @@
 use yii\helpers\Html;
 use yii\grid\GridView;
 use yii\widgets\Pjax;
+use app\models\Ticket; // Add this line
 
 /* @var $this yii\web\View */
 /* @var $user app\models\User */
@@ -44,6 +45,7 @@ $this->params['breadcrumbs'][] = $this->title;
             ],
             'module',
             'issue',
+            'description:ntext',
             'status',
             'created_at:datetime',
             [
@@ -51,21 +53,29 @@ $this->params['breadcrumbs'][] = $this->title;
                 'template' => '{escalate} {close}',
                 'buttons' => [
                     'escalate' => function ($url, $model, $key) {
-                        return Html::a('Escalate', ['developer/escalate-ticket', 'id' => $model->id], [
-                            'class' => 'btn btn-warning btn-sm',
-                            'data' => [
-                                'confirm' => 'Are you sure you want to escalate this ticket?',
-                                'method' => 'post',
-                            ],
+                        // Always disable escalate after reassignment
+                        $isDisabled = $model->status === Ticket::STATUS_ESCALATE || 
+                                      $model->status === 'closed' || 
+                                      $model->assigned_to !== Yii::$app->user->id;
+                        return Html::a('Escalate', '#', [
+                            'class' => 'btn btn-warning btn-sm disabled', // Always disabled after reassignment
+                            'onclick' => 'return false;',
+                            'data-id' => $model->id,
                         ]);
                     },
                     'close' => function ($url, $model, $key) {
-                        return Html::a('Close', ['developer/close-ticket', 'id' => $model->id], [
-                            'class' => 'btn btn-danger btn-sm',
-                            'data' => [
-                                'confirm' => 'Are you sure you want to close this ticket?',
-                                'method' => 'post',
-                            ],
+                        // Enable close button if ticket is assigned to current user and not closed
+                        $isDisabled = $model->status === 'closed' || 
+                                      $model->assigned_to !== Yii::$app->user->id;
+                        return Html::a('Close', '#', [
+                            'class' => 'btn btn-danger btn-sm' . ($isDisabled ? ' disabled' : ''),
+                            'onclick' => !$isDisabled ? new \yii\web\JsExpression("
+                                if(confirm('Are you sure you want to close this ticket?')) {
+                                    closeTicket({$model->id});
+                                }
+                                return false;
+                            ") : 'return false;',
+                            'data-id' => $model->id,
                         ]);
                     },
                 ],
@@ -83,3 +93,128 @@ $this->params['breadcrumbs'][] = $this->title;
     <?php Pjax::end(); ?>
 
 </div>
+
+<script>
+function escalateTicket(ticketId) {
+    $.ajax({
+        url: '<?= \yii\helpers\Url::to(['ticket/escalate']) ?>',
+        type: 'POST',
+        data: {
+            id: ticketId,
+            _csrf: '<?= Yii::$app->request->csrfToken ?>'
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                // Find the row
+                var row = $('tr[data-key="' + ticketId + '"]');
+                
+                // Update status badge
+                var statusCell = row.find('td:contains("pending")');
+                if (statusCell.length) {
+                    statusCell.html('<span class="badge bg-danger">escalated</span>');
+                }
+                
+                // Disable both escalate and close buttons
+                row.find('.btn-warning, .btn-danger')
+                   .addClass('disabled')
+                   .prop('onclick', null)
+                   .attr('onclick', 'return false;');
+                
+                alert('Ticket has been escalated successfully');
+            } else {
+                alert('Failed to escalate ticket: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error escalating ticket: ' + error);
+            console.log('Error details:', xhr.responseText);
+        }
+    });
+}
+
+function closeTicket(ticketId) {
+    $.ajax({
+        url: '<?= \yii\helpers\Url::to(['/ticket/close']) ?>',
+        type: 'POST',
+        data: {
+            id: ticketId,
+            _csrf: '<?= Yii::$app->request->csrfToken ?>'
+        },
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                // Find the row
+                var row = $('tr[data-key="' + ticketId + '"]');
+                
+                // Update status badge to closed
+                row.find('td:contains("escalated")').html('<span class="badge bg-secondary">closed</span>');
+                
+                // Disable escalate and close buttons in developer view
+                row.find('.btn-warning, .btn-danger')
+                   .addClass('disabled')
+                   .prop('onclick', null)
+                   .attr('onclick', 'return false;');
+                
+                // If in admin view, also disable approve button
+                if ($('.admin-grid').length) {
+                    var adminRow = $('.admin-grid tr[data-key="' + ticketId + '"]');
+                    adminRow.find('.btn-success')
+                           .addClass('disabled')
+                           .prop('onclick', null)
+                           .attr('onclick', 'return false;');
+                }
+                
+                alert('Ticket has been closed successfully');
+            } else {
+                alert('Failed to close ticket: ' + response.message);
+            }
+        },
+        error: function(xhr, status, error) {
+            alert('Error closing ticket: ' + error);
+        }
+    });
+}
+</script>
+
+<style>
+/* Button and badge styles */
+.btn.disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.badge {
+    padding: 0.5em 0.75em;
+    font-weight: 500;
+}
+
+.bg-danger {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+.bg-warning {
+    background-color: #ffc107;
+    color: #000;
+}
+
+.bg-secondary {
+    background-color: #6c757d !important;
+    color: #fff;
+}
+
+.btn-success.disabled {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    opacity: 0.65;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+}
+
+.badge.bg-secondary {
+    background-color: #6c757d;
+    color: #fff;
+}
+</style>

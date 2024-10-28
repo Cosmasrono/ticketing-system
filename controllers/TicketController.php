@@ -254,37 +254,41 @@ class TicketController extends Controller
     }
 
 
-    public function actionAssign($id)
+    public function actionAssign()
     {
-        $ticket = Ticket::findOne($id);
-        if (!$ticket) {
-            throw new NotFoundHttpException('The requested ticket does not exist.');
-        }
+        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        
+        try {
+            $ticketId = Yii::$app->request->post('ticketId');
+            $developerId = Yii::$app->request->post('developerId');
+            
+            if (!$ticketId || !$developerId) {
+                throw new \Exception('Missing required parameters');
+            }
 
-        $developers = User::getDevelopers();
-        $developersList = ArrayHelper::map($developers, 'id', 'username');
+            $ticket = Ticket::findOne($ticketId);
+            if (!$ticket) {
+                throw new \Exception('Ticket not found');
+            }
 
-        if (Yii::$app->request->isPost) {
-            $developerId = Yii::$app->request->post('Ticket')['assigned_to'];
+            // Keep status as escalated but update assigned developer
             $ticket->assigned_to = $developerId;
             
-            // Don't change these fields when assigning
-            $ticket->created_at = $ticket->getOldAttribute('created_at');
-            $ticket->closed_at = $ticket->getOldAttribute('closed_at');
-            
-            if ($ticket->save()) {
-                Yii::$app->session->setFlash('success', 'Developer assigned successfully.');
-                return $this->redirect(['view', 'id' => $ticket->id]);
-            } else {
-                Yii::error('Failed to assign developer. Errors: ' . json_encode($ticket->errors), 'ticket');
-                Yii::$app->session->setFlash('error', 'Failed to assign developer. Errors: ' . json_encode($ticket->errors));
+            if (!$ticket->save()) {
+                throw new \Exception('Failed to assign ticket');
             }
-        }
 
-        return $this->render('assign', [
-            'ticket' => $ticket,
-            'developers' => $developersList,
-        ]);
+            return [
+                'success' => true,
+                'message' => 'Ticket reassigned successfully'
+            ];
+
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
     }
 
     private function getDevelopers()
@@ -412,20 +416,46 @@ class TicketController extends Controller
 
     public function actionClose()
     {
-        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         
-        $id = Yii::$app->request->post('id');
-        $model = $this->findModel($id);
-        
-        if ($model->status !== 'Closed') {
-            $model->status = 'Closed';
-            $model->closed_at = new \yii\db\Expression('NOW()');
-            if ($model->save()) {
-                return ['success' => true];
+        try {
+            $id = Yii::$app->request->post('id');
+            
+            if (empty($id)) {
+                throw new \Exception('Ticket ID is required');
             }
+            
+            $ticket = Ticket::findOne($id);
+            if (!$ticket) {
+                throw new \Exception('Ticket not found');
+            }
+            
+            // Verify the ticket is assigned to the current user
+            if ($ticket->assigned_to !== Yii::$app->user->id) {
+                throw new \Exception('You are not authorized to close this ticket');
+            }
+
+            // Change status to closed
+            $ticket->status = Ticket::STATUS_CLOSED;
+            $ticket->closed_at = time(); // Set closed timestamp
+            
+            if (!$ticket->save()) {
+                Yii::error('Failed to close ticket: ' . json_encode($ticket->errors));
+                throw new \Exception('Failed to save ticket');
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Ticket closed successfully'
+            ];
+
+        } catch (\Exception $e) {
+            Yii::error('Error closing ticket: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
         }
-        
-        return ['success' => false];
     }
 
     public function actionGetTimeSpent($id)
@@ -487,36 +517,39 @@ class TicketController extends Controller
     public function actionReopen()
     {
         \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        
+        try {
+            $id = Yii::$app->request->post('id');
+            
+            if (empty($id)) {
+                throw new \Exception('Ticket ID is required');
+            }
+            
+            $ticket = Ticket::findOne($id);
+            if (!$ticket) {
+                throw new \Exception('Ticket not found');
+            }
 
-        if (!\Yii::$app->request->isAjax) {
-            return ['success' => false, 'alert' => 'Invalid request method.'];
-        }
+            // Change status to reopen using the constant
+            $ticket->status = Ticket::STATUS_REOPEN;
+            
+            if (!$ticket->save()) {
+                $errors = json_encode($ticket->errors);
+                Yii::error("Failed to reopen ticket #$id. Errors: $errors");
+                throw new \Exception("Failed to reopen ticket: $errors");
+            }
 
-        $id = \Yii::$app->request->post('id');
-        if (!$id) {
-            return ['success' => false, 'alert' => 'Ticket ID is missing.'];
-        }
+            return [
+                'success' => true,
+                'message' => 'Ticket reopened successfully'
+            ];
 
-        $ticket = $this->findModel($id);
-
-        if (!$ticket) {
-            return ['success' => false, 'alert' => 'Ticket not found.'];
-        }
-
-        if ($ticket->user_id !== \Yii::$app->user->id) {
-            return ['success' => false, 'alert' => 'You can only reopen your own tickets.'];
-        }
-
-        if ($ticket->status !== 'closed') {
-            return ['success' => false, 'alert' => 'This ticket is not closed.'];
-        }
-
-        $ticket->status = 'open';
-        if ($ticket->save()) {
-            return ['success' => true, 'alert' => 'Ticket reopened successfully.'];
-        } else {
-            \Yii::error('Failed to save ticket: ' . json_encode($ticket->errors));
-            return ['success' => false, 'alert' => 'Failed to reopen the ticket.'];
+        } catch (\Exception $e) {
+            Yii::error('Error reopening ticket: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
         }
     }
 
@@ -625,92 +658,45 @@ class TicketController extends Controller
 
         echo "\nTotal developers found: " . count($developers);
     }
+
+    public function actionEscalate()
+    {
+        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        
+        try {
+            $id = Yii::$app->request->post('id');
+            
+            if (empty($id)) {
+                throw new \Exception('Ticket ID is required');
+            }
+            
+            $ticket = Ticket::findOne($id);
+            if (!$ticket) {
+                throw new \Exception('Ticket not found');
+            }
+
+            // Change status to escalated
+            $ticket->status = Ticket::STATUS_ESCALATE;
+            
+            if (!$ticket->save()) {
+                Yii::error('Failed to escalate ticket: ' . json_encode($ticket->errors));
+                throw new \Exception('Failed to save ticket');
+            }
+
+            return [
+                'success' => true,
+                'message' => 'Ticket escalated successfully'
+            ];
+
+        } catch (\Exception $e) {
+            Yii::error('Error escalating ticket: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

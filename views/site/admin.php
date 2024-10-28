@@ -55,6 +55,7 @@ $this->params['breadcrumbs'][] = $this->title;
             ['title' => 'Assigned Tickets', 'count' => $ticketCounts['assigned'] ?? 0, 'bg' => 'info'],
             ['title' => 'Not Assigned Tickets', 'count' => $ticketCounts['notAssigned'] ?? 0, 'bg' => 'warning'],
             ['title' => 'Closed Tickets', 'count' => $ticketCounts['closed'] ?? 0, 'bg' => 'secondary'],
+            ['title' => 'Reopen Tickets', 'count' => $ticketCounts['reopen'] ?? 0, 'bg' => 'info'],
             // escalated tickets
             ['title' => 'Escalated Tickets', 'count' => $ticketCounts['escalated'] ?? 0, 'bg' => 'warning'],
         ];
@@ -123,32 +124,39 @@ $this->params['breadcrumbs'][] = $this->title;
     'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel} {reopen}</div>',
     'buttons' => [
         'approve' => function ($url, $model, $key) {
-            $isDisabled = $model->status === Ticket::STATUS_APPROVED || $model->status === Ticket::STATUS_ESCALATE || $model->status === Ticket::STATUS_CANCELLED;
+            // Disable approve button if ticket is closed
+            $isDisabled = $model->status === Ticket::STATUS_CLOSED || $model->status === Ticket::STATUS_APPROVED;
             return Html::a('Approve', '#', [
                 'class' => 'btn btn-success btn-sm' . ($isDisabled ? ' disabled' : ''),
                 'title' => 'Approve Ticket',
-                'onclick' => $isDisabled ? 'return false;' : new JsExpression("approveTicket($(this), {$model->id})"),
+                'onclick' => !$isDisabled ? new JsExpression("
+                    if(confirm('Are you sure you want to approve this ticket?')) {
+                        approveTicket({$model->id});
+                    }
+                    return false;
+                ") : 'return false;',
                 'data-id' => $model->id,
             ]);
         },
                   'assign' => function ($url, $model, $key) {
                         $isEscalated = $model->status === Ticket::STATUS_ESCALATE;
-                        $isDisabled = !$isEscalated && $model->assigned_to !== null;
-                        $buttonText = $isEscalated ? 'Reassign' : 'Assign';
+                        $isDisabled = (!$isEscalated && $model->assigned_to !== null) || ($isEscalated && $model->assigned_to !== null);
+                        $buttonText = $isDisabled ? 'Assigned' : ($isEscalated ? 'Reassign' : 'Assign');
                         $assignUrl = \yii\helpers\Url::to(['ticket/assign', 'id' => $model->id]);
                         
                         return Html::a($buttonText, $assignUrl, [
                             'class' => 'btn btn-primary assign-button' . ($isDisabled ? ' disabled' : ''),
                             'title' => $buttonText . ' to Developer',
                             'data-pjax' => '0',
-                            'onclick' => new JsExpression('
+                            'onclick' => !$isDisabled ? new JsExpression("
                                 function(event) {
                                     event.preventDefault();
-                                    $("#assignModal .modal-body").load("' . $assignUrl . '", function() {
-                                        $("#assignModal").modal("show");
+                                    $('#assignModal .modal-body').load('{$assignUrl}', function() {
+                                        $('#assignModal').modal('show');
                                     });
                                 }
-                            '),
+                            ") : 'return false;',
+                            'data-id' => $model->id,
                         ]);
                     },
                     'cancel' => function ($url, $model, $key) {
@@ -313,6 +321,49 @@ function reopenTicket(ticketId) {
         });
     }
 }
+
+$('#assign-form').on('beforeSubmit', function(e) {
+    e.preventDefault();
+    
+    var form = $(this);
+    var ticketId = form.find('input[name="ticketId"]').val();
+
+    $.ajax({
+        url: '<?= \yii\helpers\Url::to(['/ticket/assign']) ?>',
+        type: 'POST',
+        data: form.serialize(),
+        dataType: 'json',
+        success: function(response) {
+            if (response.success) {
+                // Close modal
+                $('#assignModal').modal('hide');
+                
+                // Find the row
+                var row = $('tr[data-key="' + ticketId + '"]');
+                
+                // Update status to pending
+                row.find('td:contains("escalated")').html('<span class="badge bg-warning">pending</span>');
+                
+                // Disable reassign button
+                var assignButton = row.find('.btn-primary.assign-button');
+                assignButton
+                    .addClass('disabled')
+                    .prop('onclick', null)
+                    .attr('onclick', 'return false;')
+                    .text('Assigned');
+                
+                alert('Ticket reassigned successfully');
+            } else {
+                alert(response.message);
+            }
+        },
+        error: function() {
+            alert('Error occurred while assigning ticket');
+        }
+    });
+    
+    return false;
+});
 </script>
  
 
@@ -463,47 +514,14 @@ body {
     cursor: not-allowed;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+.btn-primary.disabled {
+    opacity: 0.65;
+    pointer-events: none !important;
+    cursor: not-allowed !important;
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+}
+</style>
 
 
 

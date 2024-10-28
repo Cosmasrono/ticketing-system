@@ -124,33 +124,7 @@ class DeveloperController extends Controller
         return $this->redirect(['view']);
     }
 
-    public function actionEscalateTicket($id)
-    {
-        $user = Yii::$app->user->identity;
-        
-        if ($user->role !== 'developer') {
-            throw new ForbiddenHttpException('You must be a developer to escalate tickets.');
-        }
-
-        $ticket = Ticket::findOne($id);
-
-        if (!$ticket) {
-            throw new NotFoundHttpException('The requested ticket does not exist.');
-        }
-
-        if ($ticket->assigned_to !== $user->id) {
-            throw new ForbiddenHttpException('You can only escalate tickets assigned to you.');
-        }
-
-        $ticket->status = 'escalated';
-        if ($ticket->save()) {
-            Yii::$app->session->setFlash('success', 'Ticket escalated successfully.');
-        } else {
-            Yii::$app->session->setFlash('error', 'Failed to escalate the ticket.');
-        }
-
-        return $this->redirect(['view']);
-    }
+  
 
     // Other actions...
 }

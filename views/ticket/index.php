@@ -62,11 +62,16 @@ $this->params['breadcrumbs'][] = $this->title;
                     },
                     'reopen' => function ($url, $model, $key) {
                         if ($model->status === 'closed') {
-                            return Html::button('Reopen', [
-                                'class' => 'btn btn-primary btn-xs',
-                                'onclick' => "reopenTicket(this, $model->id)"
+                            return Html::a('Reopen', '#', [
+                                'class' => 'btn btn-primary btn-sm',
+                                'onclick' => new \yii\web\JsExpression("
+                                    reopenTicket(this, {$model->id});
+                                    return false;
+                                "),
+                                'data-id' => $model->id,
                             ]);
                         }
+                        return '';
                     },
                 ],
             ],
@@ -78,7 +83,10 @@ $this->params['breadcrumbs'][] = $this->title;
 </div>
 <script>
 function reopenTicket(button, id) {
-    console.log("Reopening ticket with ID:", id);
+    if (!confirm('Are you sure you want to reopen this ticket?')) {
+        return;
+    }
+
     $.ajax({
         url: '<?= \yii\helpers\Url::to(['/ticket/reopen']) ?>',
         type: 'POST',
@@ -88,21 +96,37 @@ function reopenTicket(button, id) {
         },
         dataType: 'json',
         success: function(response) {
-            console.log("Received response:", response);
             if (response.success) {
-                alert(response.alert);
-                $(button).closest('tr').find('td:eq(4)').text('open');
+                // Find the row
+                var row = $(button).closest('tr');
+                
+                // Update the status cell (assuming it's the 5th column, adjust index if needed)
+                row.find('td:eq(4)').text('reopen');
+                
+                // Remove the reopen button
                 $(button).remove();
+                
+                alert('Ticket reopened successfully');
             } else {
-                alert(response.alert);
+                alert(response.message || 'Failed to reopen ticket');
+                console.error('Error details:', response);
             }
         },
-        error: function(jqXHR, textStatus, errorThrown) {
-            console.error('Error:', textStatus, errorThrown);
-            console.error('Response:', jqXHR.responseText);
-            alert('An error occurred while processing your request. Please check the console for more details.');
+        error: function(xhr, status, error) {
+            console.error('Error:', error);
+            console.error('Response:', xhr.responseText);
+            alert('Error reopening ticket: ' + error);
         }
     });
 }
 </script>
 
+<style>
+.badge {
+    padding: 
+}
+.badge.bg-info {
+    background-color: #17a2b8 !important;
+    color: #fff;
+}
+</style>

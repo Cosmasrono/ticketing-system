@@ -275,6 +275,179 @@ $this->registerCss("
             font-size: 1em;
         }
     }
+
+    /* Professional Card Styling */
+    .admin-index .card {
+        border: none;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+        transition: all 0.3s ease;
+        margin-bottom: 1rem;
+    }
+
+    .admin-index .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+    }
+
+    .admin-index .card-header {
+        font-weight: 600;
+        padding: 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+    .admin-index .card-body {
+        padding: 1.25rem;
+    }
+
+    /* Status Cards Specific Styling */
+    .admin-index .bg-primary { background: linear-gradient(45deg, #4e73df, #224abe) !important; }
+    .admin-index .bg-success { background: linear-gradient(45deg, #1cc88a, #13855c) !important; }
+    .admin-index .bg-danger { background: linear-gradient(45deg, #e74a3b, #be2617) !important; }
+    .admin-index .bg-info { background: linear-gradient(45deg, #36b9cc, #258391) !important; }
+    .admin-index .bg-warning { background: linear-gradient(45deg, #f6c23e, #dda20a) !important; }
+    .admin-index .bg-secondary { background: linear-gradient(45deg, #858796, #60616f) !important; }
+    .admin-index .bg-dark { background: linear-gradient(45deg, #5a5c69, #373840) !important; }
+
+    /* GridView Styling */
+    .admin-index .grid-view {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+        padding: 1rem;
+    }
+
+    .admin-index .table {
+        margin-bottom: 0;
+    }
+
+    .admin-index .table thead th {
+        background-color: #f8f9fc;
+        border-bottom: 2px solid #e3e6f0;
+        color: #4e73df;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.85rem;
+        padding: 1rem;
+    }
+
+    .admin-index .table tbody tr {
+        transition: all 0.2s ease;
+    }
+
+    .admin-index .table tbody tr:hover {
+        background-color: #f8f9fc;
+    }
+
+    .admin-index .table td {
+        padding: 1rem;
+        vertical-align: middle;
+    }
+
+    /* Action Buttons Styling */
+    .admin-index .action-buttons {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: flex-start;
+        align-items: center;
+    }
+
+    .admin-index .btn {
+        font-weight: 500;
+        padding: 0.375rem 0.75rem;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+    }
+
+    .admin-index .btn-sm {
+        padding: 0.25rem 0.5rem;
+    }
+
+    .admin-index .btn-success {
+        background: linear-gradient(45deg, #1cc88a, #13855c);
+        border: none;
+    }
+
+    .admin-index .btn-danger {
+        background: linear-gradient(45deg, #e74a3b, #be2617);
+        border: none;
+    }
+
+    .admin-index .btn-primary {
+        background: linear-gradient(45deg, #4e73df, #224abe);
+        border: none;
+    }
+
+    .admin-index .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .admin-index .btn.disabled,
+    .admin-index .btn:disabled {
+        opacity: 0.65;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    /* Page Title */
+    .admin-index h1.text-center {
+        color: #2e384d;
+        font-weight: 700;
+        margin-bottom: 2rem;
+        position: relative;
+        padding-bottom: 1rem;
+    }
+
+    .admin-index h1.text-center::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 100px;
+        height: 4px;
+        background: linear-gradient(45deg, #4e73df, #224abe);
+        border-radius: 2px;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .admin-index .action-buttons {
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+        
+        .admin-index .btn {
+            width: 100%;
+        }
+        
+        .admin-index .table td {
+            padding: 0.75rem;
+        }
+    }
+
+    /* Alert Messages */
+    .admin-index .alert {
+        border: none;
+        border-radius: 4px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    }
+
+    .admin-index .alert-success {
+        background: linear-gradient(45deg, #1cc88a, #13855c);
+        color: white;
+    }
+
+    .admin-index .alert-danger {
+        background: linear-gradient(45deg, #e74a3b, #be2617);
+        color: white;
+    }
 ");
 
 $this->registerJs("
@@ -334,3 +507,4 @@ $this->registerJs("
     });
 ");
 ?>
+

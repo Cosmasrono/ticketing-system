@@ -254,41 +254,26 @@ class TicketController extends Controller
     }
 
 
-    public function actionAssign()
+    public function actionAssign($id)
     {
-        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        $model = $this->findModel($id);
         
-        try {
-            $ticketId = Yii::$app->request->post('ticketId');
-            $developerId = Yii::$app->request->post('developerId');
-            
-            if (!$ticketId || !$developerId) {
-                throw new \Exception('Missing required parameters');
-            }
+        // Get developers and convert to id => username array
+        $developers = \yii\helpers\ArrayHelper::map(
+            User::find()->where(['role' => 'developer'])->all(),
+            'id',  // key
+            'username'  // value
+        );
 
-            $ticket = Ticket::findOne($ticketId);
-            if (!$ticket) {
-                throw new \Exception('Ticket not found');
-            }
-
-            // Keep status as escalated but update assigned developer
-            $ticket->assigned_to = $developerId;
-            
-            if (!$ticket->save()) {
-                throw new \Exception('Failed to assign ticket');
-            }
-
-            return [
-                'success' => true,
-                'message' => 'Ticket reassigned successfully'
-            ];
-
-        } catch (\Exception $e) {
-            return [
-                'success' => false,
-                'message' => $e->getMessage()
-            ];
+        if ($model->load(Yii::$app->request->post()) && $model->save()) {
+            Yii::$app->session->setFlash('success', 'Ticket has been assigned successfully.');
+            return $this->redirect(['site/admin']);
         }
+
+        return $this->render('assign', [
+            'model' => $model,
+            'developers' => $developers  // Now this is an array of id => username
+        ]);
     }
 
     private function getDevelopers()
@@ -302,63 +287,51 @@ class TicketController extends Controller
 
     public function actionApprove()
     {
-        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         
         try {
             $id = Yii::$app->request->post('id');
-            $closed_at = Yii::$app->request->post('closed_at');
             
             if (!$id) {
-                throw new \yii\web\BadRequestHttpException('Ticket ID is required.');
-            }
-            
-            $ticket = Ticket::findOne($id);
-            if (!$ticket) {
-                throw new \yii\web\NotFoundHttpException('Ticket not found.');
-            }
-            
-            if ($ticket->status === Ticket::STATUS_CANCELLED) {
                 return [
                     'success' => false,
-                    'message' => 'Cannot approve a cancelled ticket.',
-                    'alert' => 'This ticket has been cancelled and cannot be approved.'
+                    'message' => 'Ticket ID is required.'
                 ];
             }
+
+            $model = Ticket::findOne($id);
             
-            $ticket->status = Ticket::STATUS_APPROVED;
-            
-            // Handle closed_at
-            if ($closed_at) {
-                $ticket->closed_at = strtotime($closed_at); // Convert to Unix timestamp
+            if (!$model) {
+                return [
+                    'success' => false,
+                    'message' => 'Ticket not found.'
+                ];
+            }
+
+            // Just update the status
+            $model->status = 'approved';
+
+            if ($model->save()) {
+                return [
+                    'success' => true,
+                    'message' => 'Ticket approved successfully'
+                ];
             } else {
-                $ticket->closed_at = time(); // Set to current time if not provided
+                return [
+                    'success' => false,
+                    'message' => 'Failed to save ticket: ' . json_encode($model->errors)
+                ];
             }
-            
-            // Ensure created_at is set and is an integer
-            if (!$ticket->created_at || !is_int($ticket->created_at)) {
-                $ticket->created_at = time();
-            }
-            
-            if (!$ticket->save()) {
-                Yii::error('Failed to approve ticket. Errors: ' . json_encode($ticket->errors));
-                Yii::error('Ticket data: ' . json_encode($ticket->attributes));
-                throw new \yii\web\ServerErrorHttpException('Failed to approve ticket: ' . json_encode($ticket->errors));
-            }
-            
-            return [
-                'success' => true,
-                'message' => 'Ticket approved successfully.',
-                'alert' => 'The ticket has been approved.'
-            ];
+
         } catch (\Exception $e) {
-            \Yii::error('Error in actionApprove: ' . $e->getMessage());
             return [
                 'success' => false,
-                'message' => $e->getMessage(),
-                'alert' => 'An error occurred while processing your request.'
+                'message' => 'System error: ' . $e->getMessage()
             ];
         }
     }
+    
+    
     
     
        
@@ -393,16 +366,11 @@ class TicketController extends Controller
    
     protected function findModel($id)
     {
-        $model = Ticket::findOne([
-            'id' => $id,
-            'company_email' => Yii::$app->user->identity->company_email
-        ]);
-
-        if ($model !== null) {
+        if (($model = Ticket::findOne($id)) !== null) {
             return $model;
         }
 
-        throw new \yii\web\NotFoundHttpException('The requested ticket does not exist or you do not have permission to view it.');
+        throw new NotFoundHttpException('The requested ticket does not exist.');
     }
 
     public function actionGetElapsedTime($id)

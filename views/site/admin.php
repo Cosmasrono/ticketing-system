@@ -124,17 +124,10 @@ $this->params['breadcrumbs'][] = $this->title;
     'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel} {reopen}</div>',
     'buttons' => [
         'approve' => function ($url, $model, $key) {
-            // Disable approve button if ticket is closed
             $isDisabled = $model->status === Ticket::STATUS_CLOSED || $model->status === Ticket::STATUS_APPROVED;
-            return Html::a('Approve', '#', [
+            return Html::button('Approve', [
                 'class' => 'btn btn-success btn-sm' . ($isDisabled ? ' disabled' : ''),
-                'title' => 'Approve Ticket',
-                'onclick' => !$isDisabled ? new JsExpression("
-                    if(confirm('Are you sure you want to approve this ticket?')) {
-                        approveTicket({$model->id});
-                    }
-                    return false;
-                ") : 'return false;',
+                'onclick' => !$isDisabled ? "approveTicket({$model->id})" : 'return false;',
                 'data-id' => $model->id,
             ]);
         },
@@ -192,37 +185,51 @@ function showLoading() {
 function hideLoading() {
     $('#loading').hide();
 }
-function approveTicket(button, ticketId) {
-    showLoading();
-    $.ajax({
-        url: '<?= \yii\helpers\Url::to(['/ticket/approve']) ?>',
-        type: 'POST',
-        data: {
-            id: ticketId,
-            _csrf: '<?= Yii::$app->request->csrfToken ?>',
-            closed_at: new Date().toISOString()
-        },
-        success: function(response) {
-            hideLoading();
-            if (response.success) {
-                location.reload(); // Reload the page to show updated data
-            } else {
-                alert('Failed to approve the ticket: ' + (response.message || 'Unknown error'));
+function approveTicket(ticketId) {
+    if (!ticketId) {
+        alert('Ticket ID is missing!');
+        return;
+    }
+
+    if (confirm('Are you sure you want to approve this ticket?')) {
+        $.ajax({
+            url: '<?= \yii\helpers\Url::to(['/ticket/approve']) ?>',
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                id: ticketId,
+                _csrf: '<?= Yii::$app->request->csrfToken ?>'
+            },
+            beforeSend: function() {
+                showLoading();
+            },
+            success: function(response) {
+                hideLoading();
+                if (response.success) {
+                    location.reload();
+                } else {
+                    console.error('Server response:', response);
+                    alert('Failed to approve ticket: ' + response.message);
+                }
+            },
+            error: function(xhr, status, error) {
+                hideLoading();
+                console.error('Ajax error:', {
+                    status: status,
+                    error: error,
+                    response: xhr.responseText
+                });
+                alert('An error occurred while processing your request. Check console for details.');
             }
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-            hideLoading();
-            console.error('Error approving ticket:', textStatus, errorThrown);
-            alert('Error approving ticket: ' + errorThrown);
-        }
-    });
+        });
+    }
 }
 
 
 function assignTicket(button) {
     var id = $(button).data('id');
     if (!id) {
-        window.location.href = '<?= \yii\helpers\Url::to(['/site/admin']) ?>';
+        alert('Ticket ID is required');
         return;
     }
 
@@ -243,17 +250,14 @@ function assignTicket(button) {
         dataType: 'json',
         success: function(response) {
             if (response.success) {
-                $(button).closest('tr').find('td:contains("status")').next().text('assigned');
-                $(button).prop('disabled', true).addClass('disabled');
+                alert('Ticket has been assigned successfully.');
+                location.reload(); // Reload to show updated data
             } else {
-                // Redirect to admin page on error
-                window.location.href = '<?= \yii\helpers\Url::to(['/site/admin']) ?>';
+                alert('An error occurred while assigning the ticket: ' + (response.message || 'Unknown error'));
             }
         },
-        error: function(jqXHR, textStatus, errorThrown) {
-            console.error('Error assigning ticket:', textStatus, errorThrown);
-            // Redirect to admin page on error
-            window.location.href = '<?= \yii\helpers\Url::to(['/site/admin']) ?>';
+        error: function() {
+            alert('An error occurred while assigning the ticket. Please try again.');
         }
     });
 }
@@ -522,6 +526,5 @@ body {
     border-color: #6c757d !important;
 }
 </style>
-
 
 

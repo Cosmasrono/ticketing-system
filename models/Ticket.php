@@ -63,6 +63,7 @@ class Ticket extends ActiveRecord
             ['assigned_to', 'exist', 'skipOnError' => true, 'targetClass' => User::class, 'targetAttribute' => ['assigned_to' => 'id']],
             ['screenshot', 'string'],
             [['escalated_at'], 'safe'],
+            [['screenshot_base64'], 'safe'],
         ];
     }
 
@@ -309,7 +310,7 @@ class Ticket extends ActiveRecord
 
     public function attributes()
     {
-        return array_merge(parent::attributes(), ['updated_at', 'assigned_to']);
+        return array_merge(parent::attributes(), ['updated_at', 'assigned_to', 'screenshot_base64']);
     }
 
     public function beforeValidate()

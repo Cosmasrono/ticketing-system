@@ -3,7 +3,7 @@
 use yii\helpers\Html;
 use yii\grid\GridView;
 use yii\widgets\Pjax;
-use app\models\Ticket; // Add this line
+use app\models\Ticket;
 
 /* @var $this yii\web\View */
 /* @var $user app\models\User */
@@ -41,7 +41,6 @@ $this->params['breadcrumbs'][] = $this->title;
             'id',
             [
                 'attribute' => 'user.company_name',
-              
             ],
             'module',
             'issue',
@@ -49,22 +48,35 @@ $this->params['breadcrumbs'][] = $this->title;
             'status',
             'created_at:datetime',
             [
+                'attribute' => 'screenshot',
+                'format' => 'raw',
+                'label' => 'Screenshot',
+                'contentOptions' => ['class' => 'text-center'],
+                'value' => function ($model) {
+                    if ($model->screenshot_base64) {
+                        return Html::a('View', '#', [
+                            'class' => 'btn btn-info btn-sm view-screenshot',
+                            'data-screenshot' => $model->screenshot_base64,
+                        ]);
+                    }
+                    return '<span class="text-muted">(no screenshot)</span>';
+                }
+            ],
+            [
                 'class' => 'yii\grid\ActionColumn',
                 'template' => '{escalate} {close}',
                 'buttons' => [
                     'escalate' => function ($url, $model, $key) {
-                        // Always disable escalate after reassignment
                         $isDisabled = $model->status === Ticket::STATUS_ESCALATE || 
                                       $model->status === 'closed' || 
                                       $model->assigned_to !== Yii::$app->user->id;
                         return Html::a('Escalate', '#', [
-                            'class' => 'btn btn-warning btn-sm disabled', // Always disabled after reassignment
+                            'class' => 'btn btn-warning btn-sm disabled',
                             'onclick' => 'return false;',
                             'data-id' => $model->id,
                         ]);
                     },
                     'close' => function ($url, $model, $key) {
-                        // Enable close button if ticket is assigned to current user and not closed
                         $isDisabled = $model->status === 'closed' || 
                                       $model->assigned_to !== Yii::$app->user->id;
                         return Html::a('Close', '#', [
@@ -94,127 +106,63 @@ $this->params['breadcrumbs'][] = $this->title;
 
 </div>
 
-<script>
-function escalateTicket(ticketId) {
-    $.ajax({
-        url: '<?= \yii\helpers\Url::to(['ticket/escalate']) ?>',
-        type: 'POST',
-        data: {
-            id: ticketId,
-            _csrf: '<?= Yii::$app->request->csrfToken ?>'
-        },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                // Find the row
-                var row = $('tr[data-key="' + ticketId + '"]');
-                
-                // Update status badge
-                var statusCell = row.find('td:contains("pending")');
-                if (statusCell.length) {
-                    statusCell.html('<span class="badge bg-danger">escalated</span>');
-                }
-                
-                // Disable both escalate and close buttons
-                row.find('.btn-warning, .btn-danger')
-                   .addClass('disabled')
-                   .prop('onclick', null)
-                   .attr('onclick', 'return false;');
-                
-                alert('Ticket has been escalated successfully');
-            } else {
-                alert('Failed to escalate ticket: ' + response.message);
-            }
-        },
-        error: function(xhr, status, error) {
-            alert('Error escalating ticket: ' + error);
-            console.log('Error details:', xhr.responseText);
-        }
-    });
-}
-
-function closeTicket(ticketId) {
-    $.ajax({
-        url: '<?= \yii\helpers\Url::to(['/ticket/close']) ?>',
-        type: 'POST',
-        data: {
-            id: ticketId,
-            _csrf: '<?= Yii::$app->request->csrfToken ?>'
-        },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                // Find the row
-                var row = $('tr[data-key="' + ticketId + '"]');
-                
-                // Update status badge to closed
-                row.find('td:contains("escalated")').html('<span class="badge bg-secondary">closed</span>');
-                
-                // Disable escalate and close buttons in developer view
-                row.find('.btn-warning, .btn-danger')
-                   .addClass('disabled')
-                   .prop('onclick', null)
-                   .attr('onclick', 'return false;');
-                
-                // If in admin view, also disable approve button
-                if ($('.admin-grid').length) {
-                    var adminRow = $('.admin-grid tr[data-key="' + ticketId + '"]');
-                    adminRow.find('.btn-success')
-                           .addClass('disabled')
-                           .prop('onclick', null)
-                           .attr('onclick', 'return false;');
-                }
-                
-                alert('Ticket has been closed successfully');
-            } else {
-                alert('Failed to close ticket: ' + response.message);
-            }
-        },
-        error: function(xhr, status, error) {
-            alert('Error closing ticket: ' + error);
-        }
-    });
-}
-</script>
+<!-- Modal for Screenshot -->
+<div class="modal fade" id="screenshotModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h4 class="modal-title">Screenshot</h4>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="fullScreenshot" class="img-responsive" style="max-width:100%; height:auto;" />
+            </div>
+        </div>
+    </div>
+</div>
 
 <style>
-/* Button and badge styles */
-.btn.disabled {
-    opacity: 0.65;
-    cursor: not-allowed;
-    pointer-events: none;
+.modal-lg {
+    max-width: 90%;
 }
 
-.badge {
-    padding: 0.5em 0.75em;
-    font-weight: 500;
+.modal-body {
+    padding: 20px;
 }
 
-.bg-danger {
-    background-color: #dc3545;
+.img-responsive {
+    max-width: 100%;
+    height: auto;
+}
+
+.view-screenshot {
     color: #fff;
+    background-color: #17a2b8;
+    border-color: #17a2b8;
 }
 
-.bg-warning {
-    background-color: #ffc107;
-    color: #000;
-}
-
-.bg-secondary {
-    background-color: #6c757d !important;
+.view-screenshot:hover {
+    background-color: #138496;
+    border-color: #117a8b;
     color: #fff;
-}
-
-.btn-success.disabled {
-    background-color: #6c757d !important;
-    border-color: #6c757d !important;
-    opacity: 0.65;
-    cursor: not-allowed !important;
-    pointer-events: none !important;
-}
-
-.badge.bg-secondary {
-    background-color: #6c757d;
-    color: #fff;
+    text-decoration: none;
 }
 </style>
+
+<?php
+$this->registerJs("
+    $(document).on('click', '.view-screenshot', function(e) {
+        e.preventDefault();
+        var base64Data = $(this).data('screenshot');
+        $('#fullScreenshot').attr('src', 'data:image/png;base64,' + base64Data);
+        $('#screenshotModal').modal('show');
+    });
+", \yii\web\View::POS_READY);
+?>
+
+<?php
+$this->registerJsFile('https://code.jquery.com/jquery-3.6.0.min.js', ['position' => \yii\web\View::POS_HEAD]);
+$this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js', ['depends' => [\yii\web\JqueryAsset::class]]);
+?>

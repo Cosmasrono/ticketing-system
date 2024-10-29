@@ -44,6 +44,7 @@ $this->params['breadcrumbs'][] = $this->title;
     <?= $form->field($model, 'description')->textarea(['rows' => 6]) ?>
 
     <?= $form->field($model, 'screenshot')->fileInput(['accept' => 'image/*']) ?>
+    <?= $form->field($model, 'screenshot_base64')->hiddenInput()->label(false) ?>
 
     <div class="form-group">
         <?= Html::submitButton('Submit Ticket', ['class' => 'btn btn-success']) ?>
@@ -58,7 +59,7 @@ $this->registerJs("
         var file = this.files[0];
         var reader = new FileReader();
         reader.onloadend = function() {
-            document.getElementById('ticket-screenshot').value = reader.result.split(',')[1];
+            document.getElementById('ticket-screenshot_base64').value = reader.result.split(',')[1];
         }
         reader.readAsDataURL(file);
     });

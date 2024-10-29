@@ -32,25 +32,23 @@ $this->params['breadcrumbs'][] = $this->title;
             'status',
             'created_at:datetime',
             'company_email',
-           // Make sure this is included if you want to display the company name
             [
                 'attribute' => 'screenshot',
                 'format' => 'raw',
                 'value' => function ($model) {
                     if ($model->screenshot) {
-                        return Html::img('@web/uploads/' . $model->screenshot, 
-                            ['class' => 'img-responsive', 'style' => 'max-width:300px;']);
+                        return Html::img('data:image/png;base64,' . $model->screenshot, [
+                            'class' => 'img-responsive',
+                            'style' => 'max-width:800px; margin:10px 0; border:1px solid #ddd; box-shadow: 0 0 10px rgba(0,0,0,0.1);'
+                        ]);
                     } else {
                         return '<span class="not-set">(not set)</span>';
                     }
                 },
+                'labelOptions' => ['class' => 'h4'], // Makes the label bigger
+                'contentOptions' => ['class' => 'text-center'], // Centers the image
             ],
         ],
     ]) ?>
-
-    <?php if ($model->screenshot): ?>
-        <h3>Screenshot</h3>
-        <img src="data:image/png;base64,<?= $model->screenshot ?>" alt="Ticket Screenshot" style="max-width: 100%; height: auto;">
-    <?php endif; ?>
 
 </div>

@@ -612,12 +612,13 @@ public function verify($token, $companyEmail)
 
     public static function getDevelopers()
     {
-        $developers = static::find()->where(['role' => 'developer'])->all();
-        Yii::info('Developers found: ' . count($developers), 'developer');
-        foreach ($developers as $dev) {
-            Yii::info('Developer: ' . $dev->username . ' (ID: ' . $dev->id . ')', 'developer');
-        }
-        return $developers;
+        $developers = self::find()
+            ->select(['id', 'name']) // Make sure to select the fields you need
+            ->where(['role' => 'developer'])
+            ->all();
+        
+        // Convert to id => name array format for dropdown
+        return \yii\helpers\ArrayHelper::map($developers, 'id', 'name');
     }
 
   }

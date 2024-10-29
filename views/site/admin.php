@@ -17,13 +17,7 @@ $this->params['breadcrumbs'][] = $this->title;
 
 
 
-<?php if (Yii::$app->session->hasFlash('error')): ?>
-    <div class="alert alert-danger">
-        <?= Yii::$app->session->getFlash('error') ?>
-    </div>
-<?php endif; ?>
-
-<!-- Rest of your admin view -->
+ 
 
 
 <div class="row mb-2">
@@ -133,7 +127,7 @@ $this->params['breadcrumbs'][] = $this->title;
         },
                   'assign' => function ($url, $model, $key) {
                         $isEscalated = $model->status === Ticket::STATUS_ESCALATE;
-                        $isDisabled = (!$isEscalated && $model->assigned_to !== null) || ($isEscalated && $model->assigned_to !== null);
+                        $isDisabled = !$isEscalated && $model->assigned_to !== null;
                         $buttonText = $isDisabled ? 'Assigned' : ($isEscalated ? 'Reassign' : 'Assign');
                         $assignUrl = \yii\helpers\Url::to(['ticket/assign', 'id' => $model->id]);
                         
@@ -227,38 +221,43 @@ function approveTicket(ticketId) {
 
 
 function assignTicket(button) {
-    var id = $(button).data('id');
-    if (!id) {
+    var ticketId = $(button).data('id');
+    if (!ticketId) {
         alert('Ticket ID is required');
         return;
     }
 
-    var assignedTo = prompt("Enter the ID of the user to assign this ticket to:");
-
-    if (assignedTo === null || assignedTo.trim() === "") {
-        return;
-    }
-
-    $.ajax({
-        url: '<?= \yii\helpers\Url::to(['/ticket/assign']) ?>',
-        type: 'POST',
-        data: {
-            id: id,
-            assigned_to: assignedTo,
-            _csrf: '<?= Yii::$app->request->csrfToken ?>'
-        },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                alert('Ticket has been assigned successfully.');
-                location.reload(); // Reload to show updated data
-            } else {
-                alert('An error occurred while assigning the ticket: ' + (response.message || 'Unknown error'));
-            }
-        },
-        error: function() {
-            alert('An error occurred while assigning the ticket. Please try again.');
-        }
+    // Load the assignment form in a modal
+    $.get('<?= \yii\helpers\Url::to(['/ticket/assign', 'id' => '']) ?>' + ticketId, function(html) {
+        $('#assignModal .modal-body').html(html);
+        $('#assignModal').modal('show');
+        
+        // Remove any existing event handlers
+        $('#assign-form').off('submit').on('submit', function(e) {
+            e.preventDefault();
+            
+            var form = $(this);
+            $.ajax({
+                url: '<?= \yii\helpers\Url::to(['/ticket/assign']) ?>?id=' + ticketId,
+                type: 'POST',
+                data: form.serialize(),
+                dataType: 'json',
+                success: function(response) {
+                    $('#assignModal').modal('hide');
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.message || 'Failed to assign ticket');
+                    }
+                },
+                error: function() {
+                    $('#assignModal').modal('hide');
+                    alert('An error occurred while assigning the ticket. Please try again.');
+                }
+            });
+            
+            return false;
+        });
     });
 }
 
@@ -330,42 +329,26 @@ $('#assign-form').on('beforeSubmit', function(e) {
     e.preventDefault();
     
     var form = $(this);
-    var ticketId = form.find('input[name="ticketId"]').val();
 
     $.ajax({
-        url: '<?= \yii\helpers\Url::to(['/ticket/assign']) ?>',
+        url: form.attr('action'),
         type: 'POST',
         data: form.serialize(),
         dataType: 'json',
         success: function(response) {
-            if (response.success) {
-                // Close modal
-                $('#assignModal').modal('hide');
-                
-                // Find the row
-                var row = $('tr[data-key="' + ticketId + '"]');
-                
-                // Update status to pending
-                row.find('td:contains("escalated")').html('<span class="badge bg-warning">pending</span>');
-                
-                // Disable reassign button
-                var assignButton = row.find('.btn-primary.assign-button');
-                assignButton
-                    .addClass('disabled')
-                    .prop('onclick', null)
-                    .attr('onclick', 'return false;')
-                    .text('Assigned');
-                
-                alert('Ticket reassigned successfully');
-            } else {
-                alert(response.message);
-            }
+            // Close modal first
+            $('#assignModal').modal('hide');
+            
+            // Redirect to admin page
+            window.location.href = '<?= \yii\helpers\Url::to(['/site/admin']) ?>';
         },
-        error: function() {
-            alert('Error occurred while assigning ticket');
+        complete: function() {
+            // Prevent the form from submitting normally
+            return false;
         }
     });
     
+    // Prevent default form submission
     return false;
 });
 </script>

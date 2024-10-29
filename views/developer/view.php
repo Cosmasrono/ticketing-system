@@ -71,8 +71,8 @@ $this->params['breadcrumbs'][] = $this->title;
                                       $model->status === 'closed' || 
                                       $model->assigned_to !== Yii::$app->user->id;
                         return Html::a('Escalate', '#', [
-                            'class' => 'btn btn-warning btn-sm disabled',
-                            'onclick' => 'return false;',
+                            'class' => 'btn btn-warning btn-sm' . ($isDisabled ? ' disabled' : ''),
+                            'onclick' => !$isDisabled ? "escalateTicket({$model->id}); return false;" : 'return false;',
                             'data-id' => $model->id,
                         ]);
                     },
@@ -166,3 +166,28 @@ $this->registerJs("
 $this->registerJsFile('https://code.jquery.com/jquery-3.6.0.min.js', ['position' => \yii\web\View::POS_HEAD]);
 $this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js', ['depends' => [\yii\web\JqueryAsset::class]]);
 ?>
+
+<script>
+function escalateTicket(ticketId) {
+    if (confirm('Are you sure you want to escalate this ticket?')) {
+        $.ajax({
+            url: '<?= \yii\helpers\Url::to(['/ticket/escalate']) ?>',
+            type: 'POST',
+            data: {
+                id: ticketId,
+                _csrf: '<?= Yii::$app->request->csrfToken ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    location.reload(); // This will refresh the page to show updated status
+                } else {
+                    alert('Failed to escalate ticket: ' + (response.message || 'Unknown error'));
+                }
+            },
+            error: function() {
+                alert('An error occurred while escalating the ticket.');
+            }
+        });
+    }
+}
+</script>

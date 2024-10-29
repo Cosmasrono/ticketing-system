@@ -283,12 +283,8 @@ class TicketController extends Controller
     }
 
 
-
-
     public function actionApprove()
     {
-        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-        
         try {
             $id = Yii::$app->request->post('id');
             
@@ -308,8 +304,8 @@ class TicketController extends Controller
                 ];
             }
 
-            // Just update the status
-            $model->status = 'approved';
+            // Just update the status to approved
+            $model->status = Ticket::STATUS_APPROVED;
 
             if ($model->save()) {
                 return [
@@ -319,14 +315,15 @@ class TicketController extends Controller
             } else {
                 return [
                     'success' => false,
-                    'message' => 'Failed to save ticket: ' . json_encode($model->errors)
+                    'message' => 'Failed to approve ticket'
                 ];
             }
 
         } catch (\Exception $e) {
+            Yii::error('Error in actionApprove: ' . $e->getMessage());
             return [
                 'success' => false,
-                'message' => 'System error: ' . $e->getMessage()
+                'message' => 'Failed to approve ticket'
             ];
         }
     }

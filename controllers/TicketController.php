@@ -24,15 +24,29 @@ use yii\db\Query;
 
 class TicketController extends Controller
 {
+    private $_moduleIssues = [
+        'HR' => ['Employee Onboarding', 'Leave Management', 'Payroll', 'Other'],
+        'IT' => ['Hardware', 'Software', 'Network', 'Other'],
+        'Finance' => ['Invoicing', 'Payments', 'Expenses', 'Other'],
+    ];
+
     public function behaviors()
     {
         return [
             'access' => [
                 'class' => AccessControl::class,
+                'only' => ['index', 'create', 'view', 'update', 'delete'], // specify which actions to check
                 'rules' => [
                     [
                         'allow' => true,
                         'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            // Deny access if user has admin role
+                            return !Yii::$app->user->can('admin');
+                        },
+                        'denyCallback' => function ($rule, $action) {
+                            throw new ForbiddenHttpException('Administrators do not have access to tickets.');
+                        }
                     ],
                 ],
             ],
@@ -56,8 +70,8 @@ class TicketController extends Controller
             return false;
         }
 
-        if (Yii::$app->user->identity->isSuperAdmin() && $action->id === 'create') {
-            throw new ForbiddenHttpException('Super admins are not allowed to create tickets.');
+        if (Yii::$app->user->can('admin')) {
+            throw new ForbiddenHttpException('Administrators do not have access to tickets.');
         }
 
         return true;
@@ -94,36 +108,28 @@ class TicketController extends Controller
     }
     
 
-    public function actionCreate($invitationId = null)
+    public function actionCreate()
     {
         $model = new Ticket();
         $user = Yii::$app->user->identity;
 
-        if ($invitationId === null) {
-            $invitation = Invitation::find()
-                ->where(['company_email' => $user->company_email])
-                ->orderBy(['created_at' => SORT_DESC])
-                ->one();
+        // Get the invitation for the current user
+        $invitation = Invitation::findOne([
+            'company_email' => $user->company_email
+        ]);
 
-            if (!$invitation) {
-                throw new \yii\web\ForbiddenHttpException('You do not have any valid invitations to create a ticket.');
-            }
-        } else {
-            $invitation = Invitation::findOne($invitationId);
-            if (!$invitation) {
-                throw new \yii\web\NotFoundHttpException('The invitation was not found.');
-            }
-
-            if ($invitation->company_email !== $user->company_email) {
-                throw new \yii\web\ForbiddenHttpException('You are not authorized to use this invitation.');
-            }
+        if (!$invitation) {
+            Yii::$app->session->setFlash('error', 'No invitation found. Please contact support.');
+            return $this->redirect(['site/index']);
         }
+
+        // Set the module from invitation
+        $model->module = $invitation->module;
 
         if ($model->load(Yii::$app->request->post())) {
             $model->created_by = $user->id;
             $model->company_email = $user->company_email;
             $model->status = Ticket::STATUS_PENDING;
-            // Remove this line: $model->created_at = time();
 
             if ($model->save()) {
                 Yii::$app->session->setFlash('success', 'Ticket created successfully.');
@@ -132,12 +138,12 @@ class TicketController extends Controller
                 Yii::error('Failed to save ticket: ' . json_encode($model->errors), 'ticket');
                 Yii::$app->session->setFlash('error', 'There was an error creating the ticket: ' . print_r($model->errors, true));
             }
-        } else {
-            // Set the initial module value from the invitation
-            $model->module = $invitation->module;
         }
 
-        $moduleIssues = $this->getModuleIssues($invitation->module);
+        // Get module-specific issues
+        $currentIssues = isset($this->_moduleIssues[$model->module]) ? 
+            $this->_moduleIssues[$model->module] : [];
+
         $recentTickets = Ticket::find()
             ->where(['created_by' => $user->id])
             ->orderBy(['created_at' => SORT_DESC])
@@ -146,10 +152,23 @@ class TicketController extends Controller
 
         return $this->render('create', [
             'model' => $model,
-            'invitation' => $invitation,
+            'moduleIssues' => $this->_moduleIssues,
+            'currentIssues' => $currentIssues,
             'recentTickets' => $recentTickets,
-            'moduleIssues' => $moduleIssues,
         ]);
+    }
+
+    /**
+     * Gets issues for a specific module or all modules
+     * @param string|null $module
+     * @return array
+     */
+    private function getModuleIssues($module = null)
+    {
+        if ($module !== null && isset($this->_moduleIssues[$module])) {
+            return $this->_moduleIssues[$module];
+        }
+        return $this->_moduleIssues;
     }
 
     private function getUserRole($user)
@@ -161,50 +180,6 @@ class TicketController extends Controller
         } else {
             return 'user';
         }
-    }
-
-    private function getModuleIssues($module)
-    {
-        $issues = [
-            'HR' => [
-                'Payroll Discrepancy',
-                'Leave Request',
-                'Employee Onboarding',
-                'Performance Review',
-                'Benefits Inquiry',
-            ],
-            'IT' => [
-                'Network Connectivity',
-                'Software Installation',
-                'Hardware Malfunction',
-                'Account Access',
-                'Email Issues',
-            ],
-            'Finance' => [
-                'Invoice Query',
-                'Budget Request',
-                'Expense Report',
-                'Financial Report',
-                'Audit Support',
-            ],
-            'Customer Service' => [
-                'Customer Complaint',
-                'Refund Request',
-                'Product Information',
-                'Order Status',
-                'Shipping Inquiry',
-            ],
-            'Marketing' => [
-                'Campaign Approval',
-                'Content Creation',
-                'Social Media Management',
-                'Analytics Report',
-                'Brand Guidelines',
-            ],
-            // Add more modules and their issues as needed
-        ];
-
-        return $issues[$module] ?? [];
     }
 
     public function actionUpdate($id)
@@ -256,23 +231,41 @@ class TicketController extends Controller
 
     public function actionAssign($id)
     {
-        $model = $this->findModel($id);
-        
-        // Get developers and convert to id => username array
-        $developers = \yii\helpers\ArrayHelper::map(
-            User::find()->where(['role' => 'developer'])->all(),
-            'id',  // key
-            'username'  // value
-        );
+        $ticket = Ticket::findOne($id);
+        if (!$ticket) {
+            throw new NotFoundHttpException('The requested ticket does not exist.');
+        }
 
-        if ($model->load(Yii::$app->request->post()) && $model->save()) {
-            Yii::$app->session->setFlash('success', 'Ticket has been assigned successfully.');
-            return $this->redirect(['site/admin']);
+        $developers = User::find()
+            ->where(['role' => User::ROLE_DEVELOPER]);
+        
+        // Handle form submission
+        if ($ticket->load(Yii::$app->request->post())) {
+            // Set scenario to only validate required fields
+            $ticket->scenario = 'assign';
+            $ticket->status = 'assigned';
+            
+            // Save only specific attributes
+            if ($ticket->save(true, ['assigned_to', 'status'])) {
+                Yii::$app->session->setFlash('success', 'Developer assigned successfully.');
+                return $this->redirect(['view', 'id' => $ticket->id]);
+            } else {
+                Yii::$app->session->setFlash('error', 'Failed to assign developer: ' . json_encode($ticket->errors));
+            }
+        }
+
+        $developers = $developers->all();
+
+        if (Yii::$app->request->isAjax) {
+            return $this->renderAjax('_assign_form', [
+                'ticket' => $ticket,
+                'developers' => $developers,
+            ]);
         }
 
         return $this->render('assign', [
-            'model' => $model,
-            'developers' => $developers  // Now this is an array of id => username
+            'ticket' => $ticket,
+            'developers' => $developers,
         ]);
     }
 
@@ -630,6 +623,7 @@ class TicketController extends Controller
         
         try {
             $id = Yii::$app->request->post('id');
+            $currentUserId = Yii::$app->user->id;
             
             if (empty($id)) {
                 throw new \Exception('Ticket ID is required');
@@ -640,10 +634,15 @@ class TicketController extends Controller
                 throw new \Exception('Ticket not found');
             }
 
-            // Change status to escalated
-            $ticket->status = Ticket::STATUS_ESCALATE;
+            // Verify the ticket is assigned to the current user
+            if ($ticket->assigned_to !== $currentUserId) {
+                throw new \Exception('You are not authorized to escalate this ticket');
+            }
+
+            // Only update the status
+            $ticket->status = 'escalated';
             
-            if (!$ticket->save()) {
+            if (!$ticket->save(false, ['status'])) {  // Only save the status field
                 Yii::error('Failed to escalate ticket: ' . json_encode($ticket->errors));
                 throw new \Exception('Failed to save ticket');
             }
@@ -661,6 +660,24 @@ class TicketController extends Controller
             ];
         }
     }
+
+    public function actionCheckAccess()
+    {
+        if (Yii::$app->user->isGuest) {
+            return 'Guest user';
+        }
+
+        $roles = Yii::$app->authManager->getRolesByUser(Yii::$app->user->id);
+        $result = [
+            'userId' => Yii::$app->user->id,
+            'roles' => array_keys($roles),
+            'can_access_tickets' => !Yii::$app->user->can('admin') && !Yii::$app->user->can('superadmin'),
+        ];
+
+        return $this->asJson($result);
+    }
+
+   
 }
 
 

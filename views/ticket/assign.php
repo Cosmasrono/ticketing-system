@@ -1,39 +1,40 @@
 <?php
 use yii\helpers\Html;
 use yii\widgets\ActiveForm;
+use yii\helpers\ArrayHelper;
 
 /* @var $this yii\web\View */
-/* @var $model app\models\Ticket */
+/* @var $ticket app\models\Ticket */
 /* @var $developers array */
 
-$this->title = 'Assign Developer to Ticket: ' . $model->id;
+$this->title = 'Assign Developer to Ticket: ' . $ticket->id;
 ?>
 
-<!-- message -->
-<?php if (Yii::$app->session->hasFlash('success')): ?>
-        <div class="alert alert-success">
-            <?= Yii::$app->session->getFlash('success') ?>
-        </div>
-    <?php endif; ?>
+<div class="ticket-assign">
+    <h1><?= Html::encode($this->title) ?></h1>
 
     <?php if (Yii::$app->session->hasFlash('error')): ?>
         <div class="alert alert-danger">
             <?= Yii::$app->session->getFlash('error') ?>
         </div>
-    <?php endif; ?> 
-<div class="ticket-assign">
+    <?php endif; ?>
 
-    <h1><?= Html::encode($this->title) ?></h1>
+    <div class="ticket-form">
+        <?php $form = ActiveForm::begin([
+            'id' => 'assign-form',
+            'options' => ['class' => 'form-horizontal'],
+        ]); ?>
 
-    <?php $form = ActiveForm::begin(['id' => 'assign-form']); ?>
+        <?= $form->field($ticket, 'assigned_to')->dropDownList(
+            ArrayHelper::map($developers, 'id', 'name'),
+            ['prompt' => 'Select Developer']
+        ) ?>
 
-    <?= $form->field($model, 'assigned_to')->dropDownList($developers, [
-        'prompt' => 'Select Developer'
-    ]) ?>
+        <div class="form-group">
+            <?= Html::submitButton('Assign', ['class' => 'btn btn-success']) ?>
+            <?= Html::a('Cancel', ['index'], ['class' => 'btn btn-default']) ?>
+        </div>
 
-    <div class="form-group">
-        <?= Html::submitButton('Assign', ['class' => 'btn btn-primary']) ?>
+        <?php ActiveForm::end(); ?>
     </div>
-
-    <?php ActiveForm::end(); ?>
 </div>

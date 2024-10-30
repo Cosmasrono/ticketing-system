@@ -621,6 +621,22 @@ public function verify($token, $companyEmail)
         return \yii\helpers\ArrayHelper::map($developers, 'id', 'name');
     }
 
+    // /**
+    //  * Check if user is a developer
+    //  */
+    // public function getIsDeveloper()
+    // {
+    //     return $this->role === self::ROLE_DEVELOPER;
+    // }
+
+    // /**
+    //  * Check if user is an admin
+    //  */
+    // public function getIsAdmin()
+    // {
+    //     return $this->role === self::ROLE_ADMIN;
+    // }
+
   }
 
 

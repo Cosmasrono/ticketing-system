@@ -67,7 +67,7 @@ $this->params['breadcrumbs'][] = $this->title;
                 'template' => '{escalate} {close}',
                 'buttons' => [
                     'escalate' => function ($url, $model, $key) {
-                        $isDisabled = $model->status === Ticket::STATUS_ESCALATE || 
+                        $isDisabled = $model->status === Ticket::STATUS_ESCALATED || 
                                       $model->status === 'closed' || 
                                       $model->assigned_to !== Yii::$app->user->id;
                         return Html::a('Escalate', '#', [

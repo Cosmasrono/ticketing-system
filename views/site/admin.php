@@ -115,44 +115,74 @@ $this->params['breadcrumbs'][] = $this->title;
             ],
             [
                 'class' => 'yii\grid\ActionColumn',
-    'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel} {reopen}</div>',
+    'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel}</div>',
     'buttons' => [
         'approve' => function ($url, $model, $key) {
-            $isDisabled = $model->status === Ticket::STATUS_CLOSED || $model->status === Ticket::STATUS_APPROVED;
+            $isDisabled = $model->status === Ticket::STATUS_APPROVED ||
+                         $model->status === Ticket::STATUS_CANCELLED ||
+                         $model->status === Ticket::STATUS_ESCALATED;
+            
+            $tooltipText = '';
+            if ($model->status === Ticket::STATUS_CANCELLED) {
+                $tooltipText = 'Cannot approve cancelled ticket';
+            } elseif ($model->status === Ticket::STATUS_APPROVED) {
+                $tooltipText = 'Ticket already approved';
+            } elseif ($model->status === Ticket::STATUS_ESCALATED) {
+                $tooltipText = 'Cannot approve escalated ticket';
+            }
+
             return Html::button('Approve', [
                 'class' => 'btn btn-success btn-sm' . ($isDisabled ? ' disabled' : ''),
                 'onclick' => !$isDisabled ? "approveTicket({$model->id})" : 'return false;',
                 'data-id' => $model->id,
+                'title' => $tooltipText ?: 'Approve ticket',
             ]);
         },
                   'assign' => function ($url, $model, $key) {
-                        $isEscalated = $model->status === Ticket::STATUS_ESCALATE;
-                        $isDisabled = !$isEscalated && $model->assigned_to !== null;
-                        $buttonText = $isDisabled ? 'Assigned' : ($isEscalated ? 'Reassign' : 'Assign');
+                        $isEscalated = $model->status === Ticket::STATUS_ESCALATED;
+                        $isAlreadyAssigned = $model->assigned_to !== null && !$isEscalated;
+                        $isCancelled = $model->status === Ticket::STATUS_CANCELLED;
+                        
+                        // Determine button text
+                        $buttonText = $isAlreadyAssigned ? 'Reassigned' : ($isEscalated ? 'Reassign' : 'Assign');
+                        
+                        // Check if button should be disabled
+                        $isDisabled = $isAlreadyAssigned || $isCancelled;
+                        
+                        // Determine tooltip text
+                        $tooltipText = '';
+                        if ($isCancelled) {
+                            $tooltipText = 'Cannot assign cancelled ticket';
+                        } elseif ($isAlreadyAssigned) {
+                            $tooltipText = 'Ticket already assigned';
+                        } else {
+                            $tooltipText = $buttonText . ' to Developer';
+                        }
+
                         $assignUrl = \yii\helpers\Url::to(['ticket/assign', 'id' => $model->id]);
                         
                         return Html::a($buttonText, $assignUrl, [
-                            'class' => 'btn btn-primary assign-button' . ($isDisabled ? ' disabled' : ''),
-                            'title' => $buttonText . ' to Developer',
+                            'class' => 'btn btn-primary btn-sm assign-button' . ($isDisabled ? ' disabled' : ''),
+                            'title' => $tooltipText,
                             'data-pjax' => '0',
-                            'onclick' => !$isDisabled ? new JsExpression("
+                            'onclick' => (!$isDisabled) ? new JsExpression("
                                 function(event) {
                                     event.preventDefault();
-                                    $('#assignModal .modal-body').load('{$assignUrl}', function() {
-                                        $('#assignModal').modal('show');
-                                    });
+                                    assignTicket({$model->id});
                                 }
                             ") : 'return false;',
                             'data-id' => $model->id,
                         ]);
                     },
                     'cancel' => function ($url, $model, $key) {
-                        $isDisabled = $model->status === Ticket::STATUS_CANCELLED || $model->status === Ticket::STATUS_APPROVED;
+                        $isDisabled = $model->status === Ticket::STATUS_CANCELLED || 
+                                     $model->status === Ticket::STATUS_APPROVED;
                         return Html::button('Cancel', [
                             'class' => 'btn btn-danger btn-sm' . ($isDisabled ? ' disabled' : ''),
                             'onclick' => $isDisabled ? 'return false;' : "cancelTicket(this)",
                             'data-id' => $model->id,
-                    ]);
+                            'title' => $isDisabled ? 'Cannot cancel ' . strtolower($model->status) . ' ticket' : 'Cancel ticket',
+                        ]);
                     // },
                     // 'reopen' => function ($url, $model, $key) {
                     //     if ($model->status === Ticket::STATUS_CLOSED) {

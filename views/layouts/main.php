@@ -47,9 +47,27 @@ JqueryAsset::register($this);
                 ];
 
                 if (!Yii::$app->user->isGuest) {
-                    if (!Yii::$app->user->identity->isAdmin()) {
-                        $menuItems[] = ['label' => 'Tickets', 'url' => ['/ticket/index']];
+                    // Show tickets only for non-admin users
+                    if (!Yii::$app->user->can('admin')) {
+                        $menuItems[] = ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 
+                                       'url' => ['/ticket/create'],
+                                       'encode' => false];
+                        
+                        $menuItems[] = ['label' => '<i class="fas fa-list"></i> View Tickets', 
+                                       'url' => ['/ticket/index'],
+                                       'encode' => false];
                     }
+                    
+                    // Show these items for everyone
+                    $menuItems[] = ['label' => '<i class="fas fa-cog"></i> Admin Panel', 
+                                   'url' => ['/site/admin'],
+                                   'encode' => false];
+                    
+                    $menuItems[] = ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
+                                   'url' => ['/developer/view'],
+                                   'encode' => false];
+                    
+                    // Logout button
                     $menuItems[] = '<li>'
                         . Html::beginForm(['/site/logout'], 'post')
                         . Html::submitButton(

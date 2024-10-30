@@ -14,12 +14,10 @@ class Ticket extends ActiveRecord
     const STATUS_PENDING = 'pending';
     const STATUS_APPROVED = 'approved';
     const STATUS_CANCELLED = 'cancelled';
-    const STATUS_ESCALATE = 'escalated';
+    const STATUS_ASSIGNED = 'assigned';
     const STATUS_CLOSED = 'closed';
-    const STATUS_DELETED = 'deleted';
-    const STATUS_ESCALATED = 'escalated';  // Add this line if you need 'escalated' status
-    const STATUS_REOPENED = 'reopened';
-    const STATUS_REOPEN = 'reopen';  // Add this constant
+    const STATUS_ESCALATED = 'escalated';
+    const STATUS_REOPEN = 'reopen';
 
     public static function tableName()
     {
@@ -52,17 +50,16 @@ class Ticket extends ActiveRecord
                 self::STATUS_PENDING,
                 self::STATUS_APPROVED,
                 self::STATUS_CANCELLED,
-                self::STATUS_ESCALATE,
+                self::STATUS_ASSIGNED,
                 self::STATUS_CLOSED,
+                self::STATUS_ESCALATED,
                 self::STATUS_REOPEN
-                 // Add reopen to valid statuses
             ]],
             [['created_at', 'closed_at'], 'integer', 'skipOnEmpty' => true],
             [['created_at', 'closed_at'], 'default', 'value' => null],
             ['assigned_to', 'integer'],
             ['assigned_to', 'exist', 'skipOnError' => true, 'targetClass' => User::class, 'targetAttribute' => ['assigned_to' => 'id']],
             ['screenshot', 'string'],
-            [['escalated_at'], 'safe'],
             [['screenshot_base64'], 'safe'],
         ];
     }
@@ -79,7 +76,6 @@ class Ticket extends ActiveRecord
             'created_by' => 'Created By',
             'created_at' => 'Created At',
             'company_email' => 'Company Email',
-            'escalated_at' => 'Escalated At',
         ];
     }
  
@@ -151,7 +147,7 @@ class Ticket extends ActiveRecord
     public function scenarios()
     {
         $scenarios = parent::scenarios();
-        $scenarios['assign'] = ['assigned_to', 'assigned_at'];
+        $scenarios['assign'] = ['assigned_to', 'status'];
         return $scenarios;
     }
 
@@ -271,7 +267,7 @@ class Ticket extends ActiveRecord
 
     public function getAssignButtonText()
     {
-        return $this->status === self::STATUS_ESCALATE ? 'Reassign' : 'Assign';
+        return $this->status === self::STATUS_ESCALATED ? 'Reassign' : 'Assign';
     }
 
     public function getCompanyName()
@@ -300,7 +296,7 @@ class Ticket extends ActiveRecord
         return [
             self::STATUS_PENDING => 'Pending',
             self::STATUS_APPROVED => 'Approved',
-            self::STATUS_ESCALATE => 'Escalate',
+            self::STATUS_ESCALATED => 'Escalated',
             self::STATUS_CLOSED => 'Closed',
             self::STATUS_DELETED => 'Deleted',
             self::STATUS_CANCELLED => 'Cancelled',
@@ -339,11 +335,11 @@ class Ticket extends ActiveRecord
      */
     public function escalate()
     {
-        if (in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_CLOSED, self::STATUS_ESCALATE])) {
+        if (in_array($this->status, [self::STATUS_CANCELLED, self::STATUS_CLOSED, self::STATUS_ESCALATED])) {
             return false;
         }
 
-        $this->status = self::STATUS_ESCALATE;
+        $this->status = self::STATUS_ESCALATED;
         $this->escalated_at = new Expression('NOW()');
         
         return $this->save();

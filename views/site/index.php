@@ -39,15 +39,11 @@ $this->title = 'Iansoft Dashboard';
         </div>
     </div>
 
+
     <!-- Quick Access Section -->
     <div class="quick-access-section">
         <h2 class="section-title">Quick Access</h2>
-        <div class="button-group">
-            <?= Html::a('<i class="fas fa-plus-circle"></i> Create Ticket', ['ticket/create'], ['class' => 'btn btn-primary btn-lg animated-button']) ?>
-            <?= Html::a('<i class="fas fa-list"></i> View Tickets', ['ticket/index'], ['class' => 'btn btn-secondary btn-lg animated-button']) ?>
-            <?= Html::a('<i class="fas fa-cog"></i> Admin Panel', ['site/admin '], ['class' => 'btn btn-info btn-lg animated-button']) ?>
-            <?= Html::a('<i class="fas fa-code"></i> Developer Dashboard', ['developer/view'], ['class' => 'btn btn-success btn-lg animated-button']) ?>
-        </div>
+         -->
     </div>
 
     <!-- About Section -->

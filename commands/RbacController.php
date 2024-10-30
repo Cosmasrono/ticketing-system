@@ -12,46 +12,27 @@ class RbacController extends Controller
         $auth = Yii::$app->authManager;
 
         // Create roles
-        $roles = [
-            'user' => 'Basic user role',
-            'developer' => 'Developer role',
-            'admin' => 'Administrator role',
-        ];
+        $admin = $auth->createRole('admin');
+        $superadmin = $auth->createRole('superadmin');
+        $user = $auth->createRole('user');
+        $developer = $auth->createRole('developer');
 
-        foreach ($roles as $roleName => $description) {
-            $role = $auth->getRole($roleName);
-            if ($role === null) {
-                $role = $auth->createRole($roleName);
-                $role->description = $description;
-                $auth->add($role);
-                echo "Created role: $roleName\n";
-            } else {
-                echo "Role already exists: $roleName\n";
-            }
-        }
+        // Add roles to auth manager
+        $auth->add($admin);
+        $auth->add($superadmin);
+        $auth->add($user);
+        $auth->add($developer);
 
         // Create permissions
-        $createTicket = $auth->createPermission('createTicket');
-        $createTicket->description = 'Create a ticket';
-        $auth->add($createTicket);
-
-        $viewTicket = $auth->createPermission('viewTicket');
-        $viewTicket->description = 'View a ticket';
-        $auth->add($viewTicket);
+        $manageTickets = $auth->createPermission('manageTickets');
+        $manageTickets->description = 'Manage tickets';
+        $auth->add($manageTickets);
 
         // Assign permissions to roles
-        $userRole = $auth->getRole('user');
-        $developerRole = $auth->getRole('developer');
-        $adminRole = $auth->getRole('admin');
+        $auth->addChild($user, $manageTickets);
+        $auth->addChild($developer, $manageTickets);
 
-        $auth->addChild($userRole, $createTicket);
-        $auth->addChild($userRole, $viewTicket);
-        $auth->addChild($developerRole, $userRole);
-        $auth->addChild($adminRole, $developerRole);
-
-        // Remove ticket permissions from admin role
-        $auth->removeChild($adminRole, $createTicket);
-        $auth->removeChild($adminRole, $viewTicket);
+        // Note: admin and superadmin deliberately not given ticket permissions
 
         echo "RBAC initialization completed.\n";
     }

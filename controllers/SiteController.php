@@ -26,6 +26,7 @@ use yii\web\ServerErrorHttpException;
 use app\models\Client;
 use app\models\Invitation;
 use yii\helpers\ArrayHelper;
+use yii\db\Expression;
 
  
 
@@ -287,6 +288,9 @@ public function actionSignup($token = null)
              if (Yii::$app->user->identity->isSuperAdmin()) {
                  Yii::$app->session->setFlash('success', 'Welcome, Super Admin!');
              }
+             if (Yii::$app->user->can('viewDeveloperDashboard')) {
+                 return $this->redirect(['developer/view']);
+             }
              return $this->goBack();
          }
 
@@ -443,6 +447,7 @@ public function actionAdmin()
         'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
         'escalated' => Ticket::find()->where(['status' => 'escalated'])->count(),
         'reopen' => Ticket::find()->where(['status' => 'reopen'])->count(),
+        'deleted' => Ticket::find()->where(['status' => 'deleted'])->count(),
         'total' => Ticket::find()->count(),
     ];
 
@@ -484,18 +489,25 @@ public function actionRequestPasswordReset()
 
 public function actionResetPassword($token)
 {
-    Yii::info("Attempting to reset password with token: $token");
+    Yii::info("Reset password action called with token: " . $token);
 
     try {
         $model = new ResetPasswordForm($token);
     } catch (InvalidArgumentException $e) {
-        Yii::error("Invalid password reset attempt: " . $e->getMessage());
+        Yii::error("Reset password form creation failed: " . $e->getMessage());
         throw new BadRequestHttpException($e->getMessage());
     }
 
-    if ($model->load(Yii::$app->request->post()) && $model->validate() && $model->resetPassword()) {
-        Yii::$app->session->setFlash('success', 'New password saved.');
-        return $this->goHome();
+    if ($model->load(Yii::$app->request->post())) {
+        Yii::info("Form loaded with POST data");
+        
+        if ($model->validate() && $model->resetPassword()) {
+            Yii::info("Password reset successful");
+            Yii::$app->session->setFlash('success', 'New password saved.');
+            return $this->goHome();
+        } else {
+            Yii::error("Password reset failed. Validation errors: " . json_encode($model->errors));
+        }
     }
 
     return $this->render('resetPassword', [
@@ -567,13 +579,38 @@ public function actionInvitation()
 {
     $model = new Invitation();
 
-    if ($model->load(Yii::$app->request->post()) && $model->save()) {
-        if ($model->sendInvitationEmail()) {
-            Yii::$app->session->setFlash('success', 'Invitation sent successfully.');
-        } else {
-            Yii::$app->session->setFlash('error', 'Failed to send invitation email.');
+    if ($model->load(Yii::$app->request->post())) {
+        $model->token = Yii::$app->security->generateRandomString();
+        $model->created_at = new Expression('NOW()');
+        
+        if ($model->save()) {
+            // Create a new user with the invitation details
+            $user = new User();
+            $user->company_name = $model->company_name;
+            $user->company_email = $model->company_email;
+            $user->role = $model->role;
+            $user->status = User::STATUS_INACTIVE; // Or whatever default status you want
+            $user->created_at = new Expression('NOW()');
+            
+            if ($user->save()) {
+                // Send invitation email
+                $sent = Yii::$app->mailer->compose('invitation', ['model' => $model])
+                    ->setFrom([Yii::$app->params['adminEmail'] => Yii::$app->name])
+                    ->setTo($model->company_email)
+                    ->setSubject('Invitation to join ' . Yii::$app->name)
+                    ->send();
+
+                if ($sent) {
+                    Yii::$app->session->setFlash('success', 'Invitation sent successfully.');
+                } else {
+                    Yii::$app->session->setFlash('error', 'Failed to send invitation email.');
+                }
+            } else {
+                Yii::$app->session->setFlash('error', 'Failed to create user account: ' . json_encode($user->errors));
+            }
+            
+            return $this->redirect(['index']);
         }
-        return $this->redirect(['index']);
     }
 
     return $this->render('invitation', [
@@ -762,6 +799,32 @@ public function actionApproveTicket($id)
             'message' => 'Failed to approve ticket', 
             'errors' => $ticket->errors,
             'ticketData' => $ticket->attributes
+        ];
+    }
+}
+
+public function actionDeleteTicket($id)
+{
+    Yii::$app->response->format = Response::FORMAT_JSON;
+    
+    $ticket = Ticket::findOne($id);
+    if (!$ticket) {
+        return ['success' => false, 'message' => 'Ticket not found'];
+    }
+
+    $ticket->status = 'deleted';
+    
+    if ($ticket->save()) {
+        return [
+            'success' => true, 
+            'message' => 'Ticket deleted successfully',
+            'deletedCount' => Ticket::find()->where(['status' => 'deleted'])->count()
+        ];
+    } else {
+        return [
+            'success' => false, 
+            'message' => 'Failed to delete ticket',
+            'errors' => $ticket->errors
         ];
     }
 }

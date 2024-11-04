@@ -52,7 +52,10 @@ $this->params['breadcrumbs'][] = $this->title;
             ['title' => 'Reopen Tickets', 'count' => $ticketCounts['reopen'] ?? 0, 'bg' => 'info'],
             // escalated tickets
             ['title' => 'Escalated Tickets', 'count' => $ticketCounts['escalated'] ?? 0, 'bg' => 'warning'],
+            // deleted tickets
+            // ['title' => 'Deleted Tickets', 'count' => $ticketCounts['deleted'] ?? 0, 'bg' => 'danger'],
         ];
+        
         foreach ($statuses as $status): ?>
             <div class="col-lg-2 col-md-4 col-sm-6 mb-3">
                 <div class="card text-white bg-<?= $status['bg'] ?> h-100">
@@ -89,13 +92,20 @@ $this->params['breadcrumbs'][] = $this->title;
             'issue',
             'description',
             'status',
-            // [
-            //     'attribute' => 'company_name',
-            //     'label' => 'Company Name',
-            //     'value' => function ($model) {
-            //         return $model->company_name ?? 'N/A';
-            //     },
-            // ],             
+            [
+                'attribute' => 'company_name',
+                'value' => function ($model) {
+                    // First try to get company_name directly from ticket
+                    if (!empty($model->company_name)) {
+                        return $model->company_name;
+                    }
+                    // If not found, try to get it from the user who created the ticket
+                    if ($model->createdBy && $model->createdBy->company_name) {
+                        return $model->createdBy->company_name;
+                    }
+                    return 'Not Assigned';
+                }
+            ],
             'company_email',
             'created_at:datetime',
             [

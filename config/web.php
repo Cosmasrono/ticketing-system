@@ -68,6 +68,7 @@ $config = [
                 'ticket/index' => 'ticket/index',
                 'ticket/reopen/<id:\d+>' => 'ticket/reopen',
                 'ticket/reopen' => 'ticket/reopen',
+                'ticket/close' => 'ticket/close',
             ],
         ],
         'session' => [

@@ -39,13 +39,26 @@ $this->params['breadcrumbs'][] = $this->title;
         'columns' => [
             ['class' => 'yii\grid\SerialColumn'],
             'id',
-            [
-                'attribute' => 'user.company_name',
-            ],
+           
             'module',
             'issue',
             'description:ntext',
             'status',
+            // company name
+            [
+                'attribute' => 'company_name',
+                'value' => function ($model) {
+                    // First try to get company_name directly from ticket
+                    if (!empty($model->company_name)) {
+                        return $model->company_name;
+                    }
+                    // If not found, try to get it from the user who created the ticket
+                    if ($model->createdBy && $model->createdBy->company_name) {
+                        return $model->createdBy->company_name;
+                    }
+                    return 'Not Assigned';
+                }
+            ],
             'created_at:datetime',
             [
                 'attribute' => 'screenshot',
@@ -70,24 +83,20 @@ $this->params['breadcrumbs'][] = $this->title;
                         $isDisabled = $model->status === Ticket::STATUS_ESCALATED || 
                                       $model->status === 'closed' || 
                                       $model->assigned_to !== Yii::$app->user->id;
-                        return Html::a('Escalate', '#', [
+                        return Html::button('Escalate', [
                             'class' => 'btn btn-warning btn-sm' . ($isDisabled ? ' disabled' : ''),
-                            'onclick' => !$isDisabled ? "escalateTicket({$model->id}); return false;" : 'return false;',
+                            'onclick' => !$isDisabled ? "escalateTicket({$model->id})" : 'return false;',
                             'data-id' => $model->id,
                         ]);
                     },
                     'close' => function ($url, $model, $key) {
                         $isDisabled = $model->status === 'closed' || 
                                       $model->assigned_to !== Yii::$app->user->id;
-                        return Html::a('Close', '#', [
-                            'class' => 'btn btn-danger btn-sm' . ($isDisabled ? ' disabled' : ''),
-                            'onclick' => !$isDisabled ? new \yii\web\JsExpression("
-                                if(confirm('Are you sure you want to close this ticket?')) {
-                                    closeTicket({$model->id});
-                                }
-                                return false;
-                            ") : 'return false;',
+                        return Html::button('Close', [
+                            'class' => 'btn btn-danger btn-sm close-ticket' . ($isDisabled ? ' disabled' : ''),
+                            'onclick' => !$isDisabled ? "closeTicket({$model->id})" : 'return false;',
                             'data-id' => $model->id,
+                            'type' => 'button'
                         ]);
                     },
                 ],
@@ -105,7 +114,6 @@ $this->params['breadcrumbs'][] = $this->title;
     <?php Pjax::end(); ?>
 
 </div>
-
 <!-- Modal for Screenshot -->
 <div class="modal fade" id="screenshotModal" tabindex="-1" role="dialog">
     <div class="modal-dialog modal-lg" role="document">
@@ -149,6 +157,16 @@ $this->params['breadcrumbs'][] = $this->title;
     color: #fff;
     text-decoration: none;
 }
+
+.close-ticket {
+    cursor: pointer;
+}
+
+.close-ticket.disabled {
+    opacity: 0.65;
+    cursor: not-allowed !important;
+    pointer-events: none !important;
+}
 </style>
 
 <?php
@@ -190,4 +208,68 @@ function escalateTicket(ticketId) {
         });
     }
 }
+
+function closeTicket(ticketId) {
+    Swal.fire({
+        title: 'Close Ticket',
+        text: 'Are you sure you want to close this ticket?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, close it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '/ticket/close',
+                type: 'POST',
+                data: {
+                    id: ticketId,
+                    _csrf: $('meta[name="csrf-token"]').attr('content')
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success!',
+                            text: 'Ticket has been closed successfully',
+                            showConfirmButton: false,
+                            timer: 1500
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.message || 'Failed to close ticket'
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error:', error);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'An error occurred while closing the ticket'
+                    });
+                }
+            });
+        }
+    });
+}
+
+// Add event listener for close buttons
+$(document).ready(function() {
+    // For debugging
+    console.log('JavaScript loaded');
+    
+    $(document).on('click', '.close-ticket', function(e) {
+        e.preventDefault();
+        console.log('Close button clicked');
+        const ticketId = $(this).data('id');
+        closeTicket(ticketId);
+    });
+});
 </script>

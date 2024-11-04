@@ -28,46 +28,158 @@ JqueryAsset::register($this);
 <head>
     <title><?= Html::encode($this->title) ?></title>
     <?php $this->head() ?>
+    <style>
+    /* Navbar styling */
+    .navbar {
+        background: linear-gradient(to right, #FF8C00, #FF4500) !important; /* Orange gradient */
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        padding: 0.5rem 1rem;
+    }
+
+    /* Brand/Logo styling */
+    .navbar-brand {
+        color: #fff !important;
+        font-weight: bold;
+        font-size: 1.5rem;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    }
+
+    /* Navigation links */
+    .navbar-nav .nav-link {
+        color: rgba(255,255,255,0.9) !important;
+        padding: 0.5rem 1rem !important;
+        transition: all 0.3s ease;
+    }
+
+    .navbar-nav .nav-link:hover {
+        color: #fff !important;
+        background-color: rgba(255,255,255,0.1);
+        border-radius: 4px;
+    }
+
+    /* Active link */
+    .navbar-nav .nav-item.active .nav-link {
+        color: #fff !important;
+        background-color: rgba(255,255,255,0.2);
+        border-radius: 4px;
+    }
+
+    /* Logout button */
+    .btn-link.logout {
+        color: rgba(255,255,255,0.9) !important;
+        text-decoration: none;
+        padding: 0.5rem 1rem;
+        transition: all 0.3s ease;
+    }
+
+    .btn-link.logout:hover {
+        color: #fff !important;
+        background-color: rgba(255,255,255,0.1);
+        border-radius: 4px;
+    }
+
+    /* Icons styling */
+    .fas {
+        margin-right: 5px;
+    }
+
+    /* Mobile menu button */
+    .navbar-toggler {
+        border-color: rgba(255,255,255,0.5);
+    }
+
+    .navbar-toggler:focus {
+        box-shadow: 0 0 0 0.2rem rgba(255,255,255,0.25);
+    }
+
+    /* Dropdown menu styling */
+    .dropdown-menu {
+        background-color: #FF8C00;
+        border: none;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+
+    .dropdown-item {
+        color: rgba(255,255,255,0.9);
+    }
+
+    .dropdown-item:hover {
+        background-color: rgba(255,255,255,0.1);
+        color: #fff;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .navbar-nav {
+            padding: 0.5rem 0;
+        }
+        
+        .nav-item {
+            margin: 0.25rem 0;
+        }
+        
+        .navbar-collapse {
+            background-color: #FF8C00;
+            padding: 1rem;
+            border-radius: 0 0 4px 4px;
+        }
+    }
+
+    /* Add some spacing for fixed navbar */
+    body {
+        padding-top: 60px;
+    }
+
+    main {
+        margin-top: 20px;
+    }
+    </style>
 </head>
-<body class="d-flex flex-column h-100">
+ 
 <?php $this->beginBody() ?>
 
 <div class="wrap">
     <div class="container">
-        <nav id="w0" class="navbar-inverse navbar-fixed-top navbar" role="navigation">
+        <nav id="w0" role="navigation">
             <div class="container">
                 <?php
                 NavBar::begin([
                     'brandUrl' => Yii::$app->homeUrl,
-                    'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
+                    'options' => ['class' => 'navbar-expand-md navbar-dark fixed-top', 'style' => 'background-color: #FF8C00;']
                 ]);
 
-                $menuItems = [
-                    ['label' => 'Home', 'url' => ['/site/index']],
-                ];
+                // Initialize menuItems as an empty array
+                $menuItems = [];
 
                 if (!Yii::$app->user->isGuest) {
-                    // Show tickets only for non-admin users
-                    if (!Yii::$app->user->can('admin')) {
-                        $menuItems[] = ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 
-                                       'url' => ['/ticket/create'],
-                                       'encode' => false];
-                        
-                        $menuItems[] = ['label' => '<i class="fas fa-list"></i> View Tickets', 
-                                       'url' => ['/ticket/index'],
-                                       'encode' => false];
+                    if (Yii::$app->user->identity->role === 'developer') {
+                        // Show only these items for developers
+                        $menuItems = [
+                            ['label' => 'Home', 'url' => ['/site/index']],
+                            ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
+                             'url' => ['/developer/view'],
+                             'encode' => false],
+                        ];
+                    } else {
+                        // Show all menu items for other roles
+                        $menuItems = [
+                            ['label' => 'Home', 'url' => ['/site/index']],
+                            ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 
+                             'url' => ['/ticket/create'],
+                             'encode' => false],
+                            ['label' => '<i class="fas fa-list"></i> View Tickets', 
+                             'url' => ['/ticket/index'],
+                             'encode' => false],
+                            ['label' => '<i class="fas fa-cog"></i> Admin Panel', 
+                             'url' => ['/site/admin'],
+                             'encode' => false],
+                            ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
+                             'url' => ['/developer/view'],
+                             'encode' => false],
+                        ];
                     }
-                    
-                    // Show these items for everyone
-                    $menuItems[] = ['label' => '<i class="fas fa-cog"></i> Admin Panel', 
-                                   'url' => ['/site/admin'],
-                                   'encode' => false];
-                    
-                    $menuItems[] = ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
-                                   'url' => ['/developer/view'],
-                                   'encode' => false];
-                    
-                    // Logout button
+
+                    // Add logout button for all logged-in users
                     $menuItems[] = '<li>'
                         . Html::beginForm(['/site/logout'], 'post')
                         . Html::submitButton(
@@ -76,6 +188,9 @@ JqueryAsset::register($this);
                         )
                         . Html::endForm()
                         . '</li>';
+                } else {
+                    // Add login item for guests
+                    $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
                 }
 
                 echo Nav::widget([

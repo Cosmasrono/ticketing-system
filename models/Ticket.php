@@ -18,6 +18,7 @@ class Ticket extends ActiveRecord
     const STATUS_CLOSED = 'closed';
     const STATUS_ESCALATED = 'escalated';
     const STATUS_REOPEN = 'reopen';
+    const STATUS_DELETED = 'deleted';
 
     public static function tableName()
     {
@@ -42,7 +43,10 @@ class Ticket extends ActiveRecord
     public function rules()
     {
         return [
-            [['module', 'issue', 'description', 'created_by', 'status'], 'required'],
+            [['module', 'issue', 'description'], 'required'],
+            [['company_name', 'company_email'], 'string'],
+            [['created_by'], 'integer'],
+            [['status'], 'string'],
             [['description'], 'string'],
             [['created_by', 'created_at'], 'integer'],
             [['module', 'issue', 'status'], 'string', 'max' => 255],
@@ -53,7 +57,8 @@ class Ticket extends ActiveRecord
                 self::STATUS_ASSIGNED,
                 self::STATUS_CLOSED,
                 self::STATUS_ESCALATED,
-                self::STATUS_REOPEN
+                self::STATUS_REOPEN,
+                self::STATUS_DELETED
             ]],
             [['created_at', 'closed_at'], 'integer', 'skipOnEmpty' => true],
             [['created_at', 'closed_at'], 'default', 'value' => null],
@@ -61,6 +66,8 @@ class Ticket extends ActiveRecord
             ['assigned_to', 'exist', 'skipOnError' => true, 'targetClass' => User::class, 'targetAttribute' => ['assigned_to' => 'id']],
             ['screenshot', 'string'],
             [['screenshot_base64'], 'safe'],
+            // Make company_name safe for mass assignment
+            [['company_name'], 'safe'],
         ];
     }
 
@@ -76,12 +83,13 @@ class Ticket extends ActiveRecord
             'created_by' => 'Created By',
             'created_at' => 'Created At',
             'company_email' => 'Company Email',
+            'company_name' => 'Company Name',
         ];
     }
  
     public function getUser()
     {
-        return $this->hasOne(User::class, ['id' => 'user_id']);
+        return $this->hasOne(User::class, ['id' => 'created_by']);
     }
 
 
@@ -153,23 +161,17 @@ class Ticket extends ActiveRecord
 
     public function beforeSave($insert)
     {
-        if (!parent::beforeSave($insert)) {
-            return false;
+        if (parent::beforeSave($insert)) {
+            if ($this->isNewRecord) {
+                $user = User::findOne($this->created_by);
+                if ($user) {
+                    $this->company_name = $user->company_name;
+                    $this->company_email = $user->company_email;
+                }
+            }
+            return true;
         }
-
-        if ($this->created_at === null || $this->created_at === '') {
-            $this->created_at = time();
-        } else {
-            $this->created_at = (int)$this->created_at;
-        }
-
-        if ($this->closed_at === '') {
-            $this->closed_at = null;
-        } elseif ($this->closed_at !== null) {
-            $this->closed_at = (int)$this->closed_at;
-        }
-
-        return true;
+        return false;
     }
 
     public function afterSave($insert, $changedAttributes)
@@ -343,5 +345,10 @@ class Ticket extends ActiveRecord
         $this->escalated_at = new Expression('NOW()');
         
         return $this->save();
+    }
+
+    public function getCreatedBy()
+    {
+        return $this->hasOne(User::class, ['id' => 'created_by']);
     }
 }

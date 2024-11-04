@@ -7,7 +7,7 @@ use yii\helpers\Html;
 
 ?>
 <div class="password-reset">
-    <p>Hello <?= Html::encode($user->username) ?>,</p>
+    <p>Hello <?= Html::encode($user->name) ?>,</p>
 
     <p>Follow the link below to reset your password:</p>
 

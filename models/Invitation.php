@@ -16,6 +16,7 @@ class Invitation extends ActiveRecord
     public function rules()
     {
         return [
+            ['company_name', 'string'],
             [['company_email', 'role'], 'required'],
             ['company_email', 'email'],
             ['role', 'in', 'range' => ['developer', 'admin', 'user']],
@@ -27,6 +28,7 @@ class Invitation extends ActiveRecord
             ['module', 'in', 'range' => ['HR', 'IT', 'All']], // Add more modules as needed
             ['token', 'string'],
             ['module', 'string'],
+         
         ];
     }
 
@@ -43,7 +45,8 @@ class Invitation extends ActiveRecord
             'company_email' => 'Company Email',
             'module' => 'Module',
             'token' => 'Invitation Token',
-        ];
+            'company_name' => 'Company Name',
+                ];
     }
 
     public function generateToken()

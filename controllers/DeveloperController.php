@@ -22,16 +22,13 @@ class DeveloperController extends Controller
                 'rules' => [
                     [
                         'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            $user = Yii::$app->user->identity;
-                            if ($user->role !== 'developer') {
-                                throw new ForbiddenHttpException('You must be a developer to access this page.');
-                            }
-                            return true;
-                        }
+                        'actions' => ['view'],
+                        'roles' => ['viewDashboard'],
                     ],
                 ],
+                'denyCallback' => function ($rule, $action) {
+                    throw new ForbiddenHttpException('Access denied.');
+                }
             ],
         ];
     }
@@ -40,8 +37,10 @@ class DeveloperController extends Controller
     {
         $user = Yii::$app->user->identity;
         
-        $dataProvider = new ActiveDataProvider([
-            'query' => $user->getAssignedTickets(),
+        // Add this dataProvider for the GridView
+        $dataProvider = new \yii\data\ActiveDataProvider([
+            'query' => \app\models\Ticket::find()
+                ->where(['assigned_to' => $user->id]),
             'pagination' => [
                 'pageSize' => 10,
             ],
@@ -54,77 +53,9 @@ class DeveloperController extends Controller
 
         return $this->render('view', [
             'user' => $user,
-            'dataProvider' => $dataProvider,
+            'dataProvider' => $dataProvider,  // Pass dataProvider to the view
         ]);
     }
 
-    public function actionApproveTicket($id)
-    {
-        $user = Yii::$app->user->identity;
-        
-        if ($user->role !== 'developer') {
-            throw new ForbiddenHttpException('You must be a developer to approve tickets.');
-        }
-
-        $ticket = Ticket::findOne($id);
-
-        if (!$ticket) {
-            throw new NotFoundHttpException('The requested ticket does not exist.');
-        }
-
-        if ($ticket->assigned_to !== $user->id) {
-            throw new ForbiddenHttpException('You can only approve tickets assigned to you.');
-        }
-
-        if ($ticket->status === 'closed') {
-            Yii::$app->session->setFlash('error', 'Cannot approve a closed ticket.');
-            return $this->redirect(['view']);
-        }
-
-        $ticket->status = 'approved';
-        if ($ticket->save()) {
-            Yii::$app->session->setFlash('success', 'Ticket approved successfully.');
-        } else {
-            Yii::$app->session->setFlash('error', 'Failed to approve the ticket.');
-        }
-
-        return $this->redirect(['view']);
-    }
-
-    public function actionCloseTicket($id)
-    {
-        $user = Yii::$app->user->identity;
-        
-        if ($user->role !== 'developer') {
-            throw new ForbiddenHttpException('You must be a developer to close tickets.');
-        }
-
-        $ticket = Ticket::findOne($id);
-
-        if (!$ticket) {
-            throw new NotFoundHttpException('The requested ticket does not exist.');
-        }
-
-        if ($ticket->assigned_to !== $user->id) {
-            throw new ForbiddenHttpException('You can only close tickets assigned to you.');
-        }
-
-        if ($ticket->status === 'closed') {
-            Yii::$app->session->setFlash('error', 'This ticket is already closed.');
-            return $this->redirect(['view']);
-        }
-
-        $ticket->status = 'closed';
-        if ($ticket->save()) {
-            Yii::$app->session->setFlash('success', 'Ticket closed successfully.');
-        } else {
-            Yii::$app->session->setFlash('error', 'Failed to close the ticket.');
-        }
-
-        return $this->redirect(['view']);
-    }
-
-  
-
-    // Other actions...
+    // Remove or comment out all other actions (approve-ticket, close-ticket, etc.)
 }

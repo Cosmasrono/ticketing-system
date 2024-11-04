@@ -19,6 +19,7 @@ use yii\web\Response;
 use yii\db\Expression;
 use yii\web\BadRequestHttpException;
 use yii\db\Query;
+use yii\filters\Cors;
  
  
 
@@ -58,8 +59,12 @@ class TicketController extends Controller
         'approve-ticket' => ['POST'],
         'cancel-ticket' => ['POST'],
         'get-elapsed-time' => ['GET'],
+        'close' => ['post'],
     ],
 
+            ],
+            'corsFilter' => [
+                'class' => Cors::className(),
             ],
         ];
     }
@@ -127,15 +132,37 @@ class TicketController extends Controller
         $model->module = $invitation->module;
 
         if ($model->load(Yii::$app->request->post())) {
-            $model->created_by = $user->id;
-            $model->company_email = $user->company_email;
+            // Get current user's details
+            $currentUser = User::findOne($user->id);
+            
+            // Explicitly set all required fields
+            $model->created_by = $currentUser->id;
+            $model->company_name = $currentUser->company_name;  // Set company name directly
+            $model->company_email = $currentUser->company_email;
             $model->status = Ticket::STATUS_PENDING;
+            $model->created_at = time();
+
+            // Debug log before save
+            Yii::debug([
+                'Setting company name' => $model->company_name,
+                'User company name' => $currentUser->company_name,
+            ]);
 
             if ($model->save()) {
+                // Debug log after successful save
+                Yii::debug([
+                    'Ticket saved' => $model->id,
+                    'Company name saved' => $model->company_name,
+                ]);
+                
                 Yii::$app->session->setFlash('success', 'Ticket created successfully.');
                 return $this->redirect(['view', 'id' => $model->id]);
             } else {
-                Yii::error('Failed to save ticket: ' . json_encode($model->errors), 'ticket');
+                Yii::error([
+                    'Failed to save ticket' => $model->errors,
+                    'Attempted company name' => $model->company_name,
+                ], 'ticket');
+                
                 Yii::$app->session->setFlash('error', 'There was an error creating the ticket: ' . print_r($model->errors, true));
             }
         }
@@ -241,12 +268,8 @@ class TicketController extends Controller
         
         // Handle form submission
         if ($ticket->load(Yii::$app->request->post())) {
-            // Set scenario to only validate required fields
-            $ticket->scenario = 'assign';
-            $ticket->status = 'assigned';
-            
-            // Save only specific attributes
-            if ($ticket->save(true, ['assigned_to', 'status'])) {
+            // Save only the assigned_to field, don't change the status
+            if ($ticket->save(true, ['assigned_to'])) {  // Only save assigned_to
                 Yii::$app->session->setFlash('success', 'Developer assigned successfully.');
                 return $this->redirect(['view', 'id' => $ticket->id]);
             } else {
@@ -269,6 +292,7 @@ class TicketController extends Controller
         ]);
     }
 
+
     private function getDevelopers()
     {
         $developers = User::find()->where(['role' => 'developer'])->all();
@@ -278,37 +302,40 @@ class TicketController extends Controller
 
     public function actionApprove()
     {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
         try {
             $id = Yii::$app->request->post('id');
             
             if (!$id) {
                 return [
                     'success' => false,
-                    'message' => 'Ticket ID is required.'
+                    'message' => 'Ticket ID is required'
                 ];
             }
 
-            $model = Ticket::findOne($id);
+            $ticket = Ticket::findOne($id);
             
-            if (!$model) {
+            if (!$ticket) {
                 return [
                     'success' => false,
-                    'message' => 'Ticket not found.'
+                    'message' => 'Ticket not found'
                 ];
             }
 
-            // Just update the status to approved
-            $model->status = Ticket::STATUS_APPROVED;
-
-            if ($model->save()) {
+            // Update the status to approved
+            $ticket->status = Ticket::STATUS_APPROVED;
+            
+            if ($ticket->save()) {
                 return [
                     'success' => true,
                     'message' => 'Ticket approved successfully'
                 ];
             } else {
+                Yii::error('Failed to approve ticket: ' . json_encode($ticket->errors));
                 return [
                     'success' => false,
-                    'message' => 'Failed to approve ticket'
+                    'message' => 'Failed to approve ticket: ' . json_encode($ticket->errors)
                 ];
             }
 
@@ -316,7 +343,7 @@ class TicketController extends Controller
             Yii::error('Error in actionApprove: ' . $e->getMessage());
             return [
                 'success' => false,
-                'message' => 'Failed to approve ticket'
+                'message' => 'An error occurred while approving the ticket'
             ];
         }
     }
@@ -373,48 +400,23 @@ class TicketController extends Controller
     }
 
     public function actionClose()
-    {
-        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+{
+    $request = Yii::$app->request;
+    if ($request->isAjax && $request->isPost) {
+        $ticketId = $request->post('id');
+        $ticket = Ticket::findOne($ticketId);
         
-        try {
-            $id = Yii::$app->request->post('id');
-            
-            if (empty($id)) {
-                throw new \Exception('Ticket ID is required');
+        if ($ticket && $ticket->assigned_to == Yii::$app->user->id) {
+            $ticket->status = Ticket::STATUS_CLOSED; // Update status
+            if ($ticket->save()) {
+                return $this->asJson(['success' => true]);
+            } else {
+                return $this->asJson(['success' => false, 'message' => 'Could not save ticket.']);
             }
-            
-            $ticket = Ticket::findOne($id);
-            if (!$ticket) {
-                throw new \Exception('Ticket not found');
-            }
-            
-            // Verify the ticket is assigned to the current user
-            if ($ticket->assigned_to !== Yii::$app->user->id) {
-                throw new \Exception('You are not authorized to close this ticket');
-            }
-
-            // Change status to closed
-            $ticket->status = Ticket::STATUS_CLOSED;
-            $ticket->closed_at = time(); // Set closed timestamp
-            
-            if (!$ticket->save()) {
-                Yii::error('Failed to close ticket: ' . json_encode($ticket->errors));
-                throw new \Exception('Failed to save ticket');
-            }
-
-            return [
-                'success' => true,
-                'message' => 'Ticket closed successfully'
-            ];
-
-        } catch (\Exception $e) {
-            Yii::error('Error closing ticket: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => $e->getMessage()
-            ];
         }
     }
+    return $this->asJson(['success' => false, 'message' => 'Invalid request.']);
+}
 
     public function actionGetTimeSpent($id)
     {

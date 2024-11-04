@@ -28,7 +28,8 @@ $modules = [
     <h1><?= Html::encode($this->title) ?></h1>
 
     <?php $form = ActiveForm::begin(); ?>
-
+    <!-- company name -->
+    <?= $form->field($model, 'company_name')->textInput(['maxlength' => true]) ?>
     <?= $form->field($model, 'company_email')->textInput(['maxlength' => true]) ?>
 
     <?= $form->field($model, 'role')->dropDownList([

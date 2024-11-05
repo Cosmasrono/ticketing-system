@@ -107,7 +107,17 @@ $this->params['breadcrumbs'][] = $this->title;
                 }
             ],
             'company_email',
-            'created_at:datetime',
+            [
+                'attribute' => 'created_at',
+                'format' => 'raw',
+                'value' => function ($model) {
+                    // Convert to Kenyan time
+                    $date = new DateTime($model->created_at, new DateTimeZone('UTC'));
+                    $date->setTimezone(new DateTimeZone('Africa/Nairobi'));
+                    return $date->format('Y-m-d H:i:s');
+                },
+                'label' => 'Created At (EAT)',
+            ],
             [
                 'attribute' => 'assigned_to',
                 'label' => 'Assigned Developer',

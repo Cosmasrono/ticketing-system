@@ -451,17 +451,25 @@ public function actionAdmin()
         'total' => Ticket::find()->count(),
     ];
 
+    // Changed to SORT_ASC for ascending order
+    $query = Ticket::find()
+        ->with('user')
+        ->orderBy(['id' => SORT_ASC]);  // Changed to ASC
+
     $dataProvider = new ActiveDataProvider([
-        'query' => Ticket::find()->with('user'), // Add this to eager load the user relation
+        'query' => $query,
         'pagination' => [
             'pageSize' => 10,
         ],
         'sort' => [
             'defaultOrder' => [
-                'created_at' => SORT_DESC,
-            ]
+                'id' => SORT_ASC,  // Changed to ASC
+            ],
         ],
     ]);
+
+    // Set timezone to Nairobi/Kenya
+    date_default_timezone_set('Africa/Nairobi');
 
     return $this->render('admin', [
         'dataProvider' => $dataProvider,
@@ -580,36 +588,30 @@ public function actionInvitation()
     $model = new Invitation();
 
     if ($model->load(Yii::$app->request->post())) {
-        $model->token = Yii::$app->security->generateRandomString();
-        $model->created_at = new Expression('NOW()');
-        
         if ($model->save()) {
-            // Create a new user with the invitation details
-            $user = new User();
-            $user->company_name = $model->company_name;
-            $user->company_email = $model->company_email;
-            $user->role = $model->role;
-            $user->status = User::STATUS_INACTIVE; // Or whatever default status you want
-            $user->created_at = new Expression('NOW()');
-            
-            if ($user->save()) {
-                // Send invitation email
-                $sent = Yii::$app->mailer->compose('invitation', ['model' => $model])
-                    ->setFrom([Yii::$app->params['adminEmail'] => Yii::$app->name])
-                    ->setTo($model->company_email)
-                    ->setSubject('Invitation to join ' . Yii::$app->name)
-                    ->send();
-
-                if ($sent) {
-                    Yii::$app->session->setFlash('success', 'Invitation sent successfully.');
+            try {
+                if ($model->sendInvitationEmail()) {
+                    Yii::$app->session->setFlash('success', 
+                        'Invitation sent successfully to ' . $model->company_email);
+                    
+                    // Debug information
+                    Yii::debug('Invitation URL: ' . Yii::$app->urlManager->createAbsoluteUrl([
+                        'site/signup',
+                        'token' => $model->token
+                    ]));
+                    
+                    return $this->redirect(['index']);
                 } else {
-                    Yii::$app->session->setFlash('error', 'Failed to send invitation email.');
+                    throw new \Exception('Failed to send email');
                 }
-            } else {
-                Yii::$app->session->setFlash('error', 'Failed to create user account: ' . json_encode($user->errors));
+            } catch (\Exception $e) {
+                Yii::error('Email sending failed: ' . $e->getMessage());
+                Yii::$app->session->setFlash('error', 
+                    'Failed to send invitation email. Please try again later.');
             }
-            
-            return $this->redirect(['index']);
+        } else {
+            Yii::$app->session->setFlash('error', 
+                'Failed to save invitation: ' . json_encode($model->errors));
         }
     }
 
@@ -617,6 +619,7 @@ public function actionInvitation()
         'model' => $model,
     ]);
 }
+
 
 public function actionSendInvitation()
 {
@@ -635,6 +638,7 @@ public function actionSendInvitation()
         'model' => $model,
     ]);
 }
+
 
 public function actionDebugRbac()
 {
@@ -829,7 +833,61 @@ public function actionDeleteTicket($id)
     }
 }
 
- 
+// public function actionSendInvitation()
+// {
+//     // Generate unique token
+//     $token = Yii::$app->security->generateRandomString(32);
+    
+//     // Save invitation to database
+//     $invitation = new Invitation();
+//     $invitation->email = 'recipient@email.com'; // Get this from form or parameter
+//     $invitation->token = $token;
+//     $invitation->created_at = time();
+//     $invitation->expires_at = time() + 3600; // Expires in 1 hour
+    
+//     if ($invitation->save()) {
+//         // Send email
+//         $sent = Yii::$app->mailer->compose(['html' => 'invitation-html', 'text' => 'invitation'],
+//             ['token' => $token])
+//             ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->name])
+//             ->setTo($invitation->email)
+//             ->setSubject('Invitation to join ' . Yii::$app->name)
+//             ->send();
+
+//         if ($sent) {
+//             Yii::$app->session->setFlash('success', 'Invitation sent successfully.');
+//         }
+//     }
+    
+//     return $this->redirect(['index']);
+// }
+
+// Add action for handling the signup from invitation
+public function actionSignupFromInvitation($token)
+{
+    $invitation = Invitation::findOne(['token' => $token, 'used' => false]);
+    
+    if (!$invitation || $invitation->expires_at < time()) {
+        throw new NotFoundHttpException('Invalid or expired invitation.');
+    }
+
+    $model = new SignupForm();
+
+    if ($model->load(Yii::$app->request->post()) && $model->signup()) {
+        // Mark invitation as used
+        $invitation->used = true;
+        $invitation->save();
+        
+        Yii::$app->session->setFlash('success', 'Thank you for registration.');
+        return $this->redirect(['site/login']);
+    }
+
+    return $this->render('signup', [
+        'model' => $model,
+        'email' => $invitation->email
+    ]);
+}
+
 }
 
 

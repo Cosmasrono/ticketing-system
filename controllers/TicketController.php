@@ -29,6 +29,7 @@ class TicketController extends Controller
         'HR' => ['Employee Onboarding', 'Leave Management', 'Payroll', 'Other'],
         'IT' => ['Hardware', 'Software', 'Network', 'Other'],
         'Finance' => ['Invoicing', 'Payments', 'Expenses', 'Other'],
+        
     ];
 
     public function behaviors()
@@ -400,23 +401,39 @@ class TicketController extends Controller
     }
 
     public function actionClose()
-{
-    $request = Yii::$app->request;
-    if ($request->isAjax && $request->isPost) {
-        $ticketId = $request->post('id');
-        $ticket = Ticket::findOne($ticketId);
+    {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         
-        if ($ticket && $ticket->assigned_to == Yii::$app->user->id) {
-            $ticket->status = Ticket::STATUS_CLOSED; // Update status
+        $id = Yii::$app->request->post('id');
+        $ticket = Ticket::findOne($id);
+        
+        if (!$ticket) {
+            return [
+                'success' => false,
+                'message' => 'Ticket not found'
+            ];
+        }
+
+        try {
+            $ticket->status = 'closed';
             if ($ticket->save()) {
-                return $this->asJson(['success' => true]);
+                return [
+                    'success' => true,
+                    'message' => 'Ticket closed successfully'
+                ];
             } else {
-                return $this->asJson(['success' => false, 'message' => 'Could not save ticket.']);
+                return [
+                    'success' => false,
+                    'message' => 'Failed to close ticket: ' . json_encode($ticket->errors)
+                ];
             }
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'message' => 'An error occurred: ' . $e->getMessage()
+            ];
         }
     }
-    return $this->asJson(['success' => false, 'message' => 'Invalid request.']);
-}
 
     public function actionGetTimeSpent($id)
     {

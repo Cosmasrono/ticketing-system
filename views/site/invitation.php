@@ -1,7 +1,7 @@
 <?php
 
 use yii\helpers\Html;
-use yii\widgets\ActiveForm;
+use yii\bootstrap5\ActiveForm;
 
 /* @var $this yii\web\View */
 /* @var $model app\models\Invitation */
@@ -39,9 +39,17 @@ $modules = [
     ], ['prompt' => 'Select Role', 'id' => 'role-dropdown']) ?>
 
     <div id="module-wrapper">
-        <?= $form->field($model, 'module')->dropDownList($modules, [
+        <?= $form->field($model, 'module')->dropDownList([
+            'HR' => 'HR',
+            'IT' => 'IT',
+            'All' => 'All',
+            'Finance' => 'Finance',
+            'Credit' => 'Credit',
+            'SSD' => 'SSD',
+            'Audit and security' => 'Audit and security'
+        ], [
             'prompt' => 'Select Module',
-            'id' => 'module-dropdown',
+            'disabled' => ($model->role === 'admin' || $model->role === 'developer')
         ]) ?>
     </div>
 

@@ -7,6 +7,8 @@ use Yii; // Make sure this line is included
 use yii\db\ActiveRecord;
 use yii\db\Expression;
 use yii\behaviors\TimestampBehavior;
+use \DateTime;  // Add this import
+use \DateTimeZone;  // Add this import too
 
 class Ticket extends ActiveRecord
 {
@@ -168,6 +170,9 @@ class Ticket extends ActiveRecord
                     $this->company_name = $user->company_name;
                     $this->company_email = $user->company_email;
                 }
+                // Set the created_at time in Kenyan timezone
+                $date = new DateTime('now', new DateTimeZone('Africa/Nairobi'));
+                $this->created_at = $date->format('Y-m-d H:i:s');
             }
             return true;
         }
@@ -350,5 +355,15 @@ class Ticket extends ActiveRecord
     public function getCreatedBy()
     {
         return $this->hasOne(User::class, ['id' => 'created_by']);
+    }
+
+    public function getCreatedAtKenyan()
+    {
+        if ($this->created_at) {
+            $date = new DateTime($this->created_at, new DateTimeZone('UTC'));
+            $date->setTimezone(new DateTimeZone('Africa/Nairobi'));
+            return $date->format('Y-m-d H:i:s');
+        }
+        return null;
     }
 }

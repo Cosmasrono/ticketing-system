@@ -60,8 +60,13 @@ class User extends ActiveRecord implements IdentityInterface
             ['password', 'required', 'on' => 'create'],
             ['password', 'string', 'min' => 6],
             ['company_name', 'string'],
-            ['status', 'default', 'value' => self::STATUS_ACTIVE],
-            ['status', 'in', 'range' => [self::STATUS_ACTIVE, self::STATUS_INACTIVE]],
+            ['status', 'default', 'value' => self::STATUS_INACTIVE],
+            ['status', 'in', 'range' => [
+                self::STATUS_INACTIVE,
+                self::STATUS_ACTIVE,
+                self::STATUS_DELETED,
+                self::STATUS_UNVERIFIED
+            ]],
             ['password_reset_token', 'string', 'max' => 255],
         ];
     }
@@ -272,7 +277,7 @@ class User extends ActiveRecord implements IdentityInterface
 
     public function attributes()
     {
-        return [
+        return array_merge(parent::attributes(), [
             'id',
             'name',
             'company_email',
@@ -282,8 +287,9 @@ class User extends ActiveRecord implements IdentityInterface
             'role',
             'status',
             'password_reset_token',
-            // Add any other fields your user table has
-        ];
+            'verification_token',
+            'created_at',
+        ]);
     }
 
     public static function findByEmail($email)
@@ -353,9 +359,13 @@ class User extends ActiveRecord implements IdentityInterface
     }
     public function generatePasswordResetToken()
     {
-        $token = Yii::$app->security->generateRandomString() . '_' . time();
-        $this->password_reset_token = $token;
-        return $this->save(false);
+        $this->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
+        if (!$this->save(false)) {
+            Yii::error("Failed to save user with new password reset token: " . json_encode($this->errors));
+            return false;
+        }
+        Yii::info("Generated password reset token for user {$this->id}: {$this->password_reset_token}");
+        return true;
     }
     
     public function removePasswordResetToken()
@@ -639,54 +649,4 @@ public function verify($token, $companyEmail)
     // }
 
   }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

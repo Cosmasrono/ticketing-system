@@ -134,6 +134,8 @@ JqueryAsset::register($this);
         margin-top: 20px;
     }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 </head>
  
 <?php $this->beginBody() ?>

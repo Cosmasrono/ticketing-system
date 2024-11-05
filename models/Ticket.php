@@ -21,6 +21,7 @@ class Ticket extends ActiveRecord
     const STATUS_ESCALATED = 'escalated';
     const STATUS_REOPEN = 'reopen';
     const STATUS_DELETED = 'deleted';
+    const STATUS_REASSIGNED = 'reassigned';
 
     public static function tableName()
     {
@@ -60,7 +61,8 @@ class Ticket extends ActiveRecord
                 self::STATUS_CLOSED,
                 self::STATUS_ESCALATED,
                 self::STATUS_REOPEN,
-                self::STATUS_DELETED
+                self::STATUS_DELETED,
+                self::STATUS_REASSIGNED
             ]],
             [['created_at', 'closed_at'], 'integer', 'skipOnEmpty' => true],
             [['created_at', 'closed_at'], 'default', 'value' => null],
@@ -70,6 +72,17 @@ class Ticket extends ActiveRecord
             [['screenshot_base64'], 'safe'],
             // Make company_name safe for mass assignment
             [['company_name'], 'safe'],
+            ['closed_at', 'safe'],
+            ['closed_by', 'integer'],
+            ['status', 'string'],
+            ['status', 'default', 'value' => self::STATUS_REASSIGNED],
+            ['status', 'in', 'range' => [
+                self::STATUS_ESCALATED,
+                self::STATUS_REASSIGNED,
+                self::STATUS_ASSIGNED,
+                self::STATUS_CANCELLED,
+                self::STATUS_CLOSED,
+            ]],
         ];
     }
 
@@ -365,5 +378,22 @@ class Ticket extends ActiveRecord
             return $date->format('Y-m-d H:i:s');
         }
         return null;
+    }
+
+    public function isClosed()
+    {
+        return $this->status === 'closed';
+    }
+
+    public function getStatusLabel()
+    {
+        $labels = [
+            'open' => 'Open',
+            'closed' => 'Closed',
+            'pending' => 'Pending',
+            // Add other statuses as needed
+        ];
+        
+        return $labels[$this->status] ?? ucfirst($this->status);
     }
 }

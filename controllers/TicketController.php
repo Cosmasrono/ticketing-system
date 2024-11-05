@@ -269,12 +269,60 @@ class TicketController extends Controller
         
         // Handle form submission
         if ($ticket->load(Yii::$app->request->post())) {
-            // Save only the assigned_to field, don't change the status
-            if ($ticket->save(true, ['assigned_to'])) {  // Only save assigned_to
-                Yii::$app->session->setFlash('success', 'Developer assigned successfully.');
-                return $this->redirect(['view', 'id' => $ticket->id]);
-            } else {
-                Yii::$app->session->setFlash('error', 'Failed to assign developer: ' . json_encode($ticket->errors));
+            // Start transaction
+            $transaction = Yii::$app->db->beginTransaction();
+            try {
+                // Store the original status
+                $originalStatus = $ticket->status;
+                
+                // First save the assigned_to field
+                if ($ticket->save(true, ['assigned_to'])) {
+                    // Check if it's an escalated ticket
+                    if ($originalStatus === Ticket::STATUS_ESCALATED) {
+                        // Direct database update to ensure status change
+                        $success = Yii::$app->db->createCommand()
+                            ->update('ticket', // replace with your actual table name
+                                ['status' => 'reassigned'],
+                                ['id' => $ticket->id]
+                            )->execute();
+
+                        if (!$success) {
+                            throw new \Exception('Failed to update ticket status');
+                        }
+
+                        // Refresh the ticket model to get the new status
+                        $ticket->refresh();
+                    }
+                    
+                    $transaction->commit();
+                    
+                    if (Yii::$app->request->isAjax) {
+                        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+                        return [
+                            'success' => true,
+                            'message' => 'Developer reassigned successfully',
+                            'newStatus' => $ticket->status,
+                            'ticketId' => $ticket->id
+                        ];
+                    }
+
+                    Yii::$app->session->setFlash('success', 'Developer reassigned successfully.');
+                    return $this->redirect(['view', 'id' => $ticket->id]);
+                } else {
+                    throw new \Exception('Failed to save assigned_to: ' . json_encode($ticket->errors));
+                }
+            } catch (\Exception $e) {
+                $transaction->rollBack();
+                Yii::error('Assignment error: ' . $e->getMessage());
+                
+                if (Yii::$app->request->isAjax) {
+                    return [
+                        'success' => false,
+                        'message' => 'Failed to reassign developer: ' . $e->getMessage()
+                    ];
+                }
+                
+                Yii::$app->session->setFlash('error', 'Failed to reassign developer: ' . $e->getMessage());
             }
         }
 
@@ -414,8 +462,18 @@ class TicketController extends Controller
             ];
         }
 
+        if ($ticket->status === 'closed') {
+            return [
+                'success' => false,
+                'message' => 'Ticket is already closed'
+            ];
+        }
+
         try {
             $ticket->status = 'closed';
+            $ticket->closed_at = time(); // Use current Unix timestamp instead of Expression
+            $ticket->closed_by = Yii::$app->user->id;
+            
             if ($ticket->save()) {
                 return [
                     'success' => true,
@@ -428,9 +486,10 @@ class TicketController extends Controller
                 ];
             }
         } catch (\Exception $e) {
+            Yii::error($e->getMessage()); // Log the error
             return [
                 'success' => false,
-                'message' => 'An error occurred: ' . $e->getMessage()
+                'message' => 'An error occurred while closing the ticket'
             ];
         }
     }

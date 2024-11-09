@@ -28,7 +28,8 @@
         "symfony/mailer": "^6.0",
         "symfony/http-client": "^6.0",
         "nyholm/psr7": "^1.8",
-        "symfony/sendinblue-mailer": "^6.0"
+        "symfony/sendinblue-mailer": "^6.0",
+        "yiisoft/yii2-queue": "^2.3"
     },
     "require-dev": {
         "yiisoft/yii2-debug": "^2.1",

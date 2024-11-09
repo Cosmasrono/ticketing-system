@@ -9,27 +9,30 @@ use yii\helpers\Html;
 <head>
     <meta charset="UTF-8">
     <style>
-        .email-container {
-            max-width: 600px;
-            margin: 0 auto;
+        .ticket-assigned {
             font-family: Arial, sans-serif;
             line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
             padding: 20px;
         }
-        .button {
-            display: inline-block;
-            padding: 10px 20px;
-            background-color: #337ab7;
-            color: white;
-            text-decoration: none;
+        .ticket-details {
+            background: #f5f5f5;
+            padding: 15px;
             border-radius: 5px;
-            margin: 15px 0;
+            margin: 20px 0;
+        }
+        .ticket-details ul {
+            list-style: none;
+            padding: 0;
+        }
+        .ticket-details li {
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
-    <div class="email-container">
-        <?= $content ?>
-    </div>
+    <?= $content ?>
 </body>
 </html>

@@ -448,6 +448,7 @@ public function actionAdmin()
         'escalated' => Ticket::find()->where(['status' => 'escalated'])->count(),
         'reopen' => Ticket::find()->where(['status' => 'reopen'])->count(),
         'deleted' => Ticket::find()->where(['status' => 'deleted'])->count(),
+        'reassigned' => Ticket::find()->where(['status' => 'reassigned'])->count(),
         'total' => Ticket::find()->count(),
     ];
 
@@ -887,6 +888,7 @@ public function actionSignupFromInvitation($token)
         'email' => $invitation->email
     ]);
 }
+   
 
 }
 

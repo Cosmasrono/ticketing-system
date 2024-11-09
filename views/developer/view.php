@@ -96,7 +96,8 @@ $this->params['breadcrumbs'][] = $this->title;
                             'class' => 'btn btn-danger btn-sm close-ticket' . ($isDisabled ? ' disabled' : ''),
                             'onclick' => !$isDisabled ? "closeTicket({$model->id})" : 'return false;',
                             'data-id' => $model->id,
-                            'type' => 'button'
+                            'type' => 'button',
+                            'title' => $isDisabled ? ($model->status === 'closed' ? 'Ticket is already closed' : 'You can only close your assigned tickets') : 'Close this ticket'
                         ]);
                     },
                 ],
@@ -185,6 +186,9 @@ $this->registerJsFile('https://code.jquery.com/jquery-3.6.0.min.js', ['position'
 $this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js', ['depends' => [\yii\web\JqueryAsset::class]]);
 ?>
 
+<!-- Add this right after your other JS includes -->
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
 function escalateTicket(ticketId) {
     if (confirm('Are you sure you want to escalate this ticket?')) {
@@ -221,23 +225,36 @@ function closeTicket(ticketId) {
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({
-                url: '/ticket/close',
+                url: '<?= \yii\helpers\Url::to(['/ticket/close']) ?>',
                 type: 'POST',
                 data: {
                     id: ticketId,
-                    _csrf: $('meta[name="csrf-token"]').attr('content')
+                    _csrf: '<?= Yii::$app->request->csrfToken ?>'
                 },
                 dataType: 'json',
+                beforeSend: function() {
+                    // Show loading state
+                    Swal.fire({
+                        title: 'Processing...',
+                        text: 'Please wait while we close the ticket',
+                        allowOutsideClick: false,
+                        showConfirmButton: false,
+                        willOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                },
                 success: function(response) {
                     if (response.success) {
                         Swal.fire({
                             icon: 'success',
                             title: 'Success!',
-                            text: 'Ticket has been closed successfully',
+                            text: response.message || 'Ticket has been closed successfully',
                             showConfirmButton: false,
                             timer: 1500
                         }).then(() => {
-                            location.reload();
+                            // Reload the page to show updated status
+                            window.location.reload();
                         });
                     } else {
                         Swal.fire({
@@ -248,11 +265,15 @@ function closeTicket(ticketId) {
                     }
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error:', error);
+                    console.error('Error details:', {
+                        status: status,
+                        error: error,
+                        response: xhr.responseText
+                    });
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
-                        text: 'An error occurred while closing the ticket'
+                        text: 'An error occurred while closing the ticket. Please try again.'
                     });
                 }
             });

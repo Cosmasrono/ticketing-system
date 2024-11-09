@@ -30,6 +30,7 @@ class User extends ActiveRecord implements IdentityInterface
     const ROLE_USER = 'user';
     const ROLE_ADMIN = 'admin';
     const ROLE_DEVELOPER = 'developer';
+    const ROLE_SUPER_ADMIN = 'superadmin';
  
 
     // Status constants
@@ -304,7 +305,7 @@ class User extends ActiveRecord implements IdentityInterface
 
     public function isAdmin()
     {
-        return $this->role === 'admin';
+        return in_array($this->role, [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN]);
     }
 
     public function getCompanyEmail()
@@ -613,7 +614,7 @@ public function verify($token, $companyEmail)
 
     public function isSuperAdmin()
     {
-        return $this->role === 'super_admin' || $this->company_email === 'ccosmas001@gmail.com';
+        return $this->role === self::ROLE_SUPER_ADMIN;
     }
 
     public static function isAllowedEmail($email)
@@ -647,6 +648,16 @@ public function verify($token, $companyEmail)
     // {
     //     return $this->role === self::ROLE_ADMIN;
     // }
+
+    public function isAdministrator()
+    {
+        return in_array($this->role, [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN]);
+    }
+
+    public function canAccessTickets()
+    {
+        return !$this->isAdministrator();
+    }
 
   }
 

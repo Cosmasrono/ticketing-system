@@ -3,6 +3,7 @@ use yii\helpers\Html;
 use yii\grid\GridView;
 use yii\web\JsExpression;
 use app\models\Ticket; // Add this line to import the Ticket model
+use yii\helpers\Url;
 
 /* @var $this yii\web\View */
 /* @var $dataProvider yii\data\ActiveDataProvider */
@@ -50,6 +51,8 @@ $this->params['breadcrumbs'][] = $this->title;
             ['title' => 'Not Assigned Tickets', 'count' => $ticketCounts['notAssigned'] ?? 0, 'bg' => 'warning'],
             ['title' => 'Closed Tickets', 'count' => $ticketCounts['closed'] ?? 0, 'bg' => 'secondary'],
             ['title' => 'Reopen Tickets', 'count' => $ticketCounts['reopen'] ?? 0, 'bg' => 'info'],
+            //  reassigned tickets
+            ['title' => 'Reassigned Tickets', 'count' => $ticketCounts['reassigned'] ?? 0, 'bg' => 'warning'],
             // escalated tickets
             ['title' => 'Escalated Tickets', 'count' => $ticketCounts['escalated'] ?? 0, 'bg' => 'warning'],
             // deleted tickets
@@ -140,24 +143,27 @@ $this->params['breadcrumbs'][] = $this->title;
         'approve' => function ($url, $model, $key) {
             $isDisabled = $model->status === Ticket::STATUS_APPROVED ||
                          $model->status === Ticket::STATUS_CANCELLED ||
+                         $model->status === Ticket::STATUS_ESCALATED ||
                          $model->status === Ticket::STATUS_CLOSED ||
                          $model->status === Ticket::STATUS_REASSIGNED;
+                        //  disable assign button if the ticket is already assigned to the current user
             
             $tooltipText = '';
             if ($model->status === Ticket::STATUS_CANCELLED) {
                 $tooltipText = 'Cannot approve cancelled ticket';
+            } elseif ($model->status === Ticket::STATUS_APPROVED) {
+                $tooltipText = 'Ticket already approved';
+            } elseif ($model->status === Ticket::STATUS_ESCALATED) {
+                $tooltipText = 'Cannot approve escalated ticket';
             } elseif ($model->status === Ticket::STATUS_CLOSED) {
                 $tooltipText = 'Cannot approve closed ticket';
-            } elseif ($model->status === Ticket::STATUS_REASSIGNED) {
-                $tooltipText = 'Cannot approve reassigned ticket';
             }
 
             return Html::button('Approve', [
                 'class' => 'btn btn-success btn-sm' . ($isDisabled ? ' disabled' : ''),
-                'onclick' => $isDisabled ? 'return false;' : "approveTicket(this)",
+                'onclick' => !$isDisabled ? "approveTicket({$model->id})" : 'return false;',
                 'data-id' => $model->id,
                 'title' => $tooltipText ?: 'Approve ticket',
-                'style' => $isDisabled ? 'opacity: 0.65; cursor: not-allowed;' : '',
             ]);
         },
                   'assign' => function ($url, $model, $key) {
@@ -166,23 +172,24 @@ $this->params['breadcrumbs'][] = $this->title;
                         $isCancelled = $model->status === Ticket::STATUS_CANCELLED;
                         $isClosed = $model->status === Ticket::STATUS_CLOSED;
                         
-                        // Determine button text
-                        $buttonText = $isAlreadyAssigned ? 'Assigned' : ($isEscalated ? 'Reassign' : 'Assign');
+                        // Only allow reassignment if status is escalated
+                        $canReassign = $isEscalated;
                         
                         // Check if button should be disabled
-                        $isDisabled = $isAlreadyAssigned || $isCancelled || $isClosed;
+                        $isDisabled = (!$canReassign && $isAlreadyAssigned) || $isCancelled || $isClosed;
                         
                         // Determine tooltip text
                         $tooltipText = '';
                         if ($isCancelled) {
                             $tooltipText = 'Cannot assign cancelled ticket';
-                        } elseif ($isAlreadyAssigned) {
-                            $tooltipText = 'Ticket already assigned';
+                        } elseif ($isAlreadyAssigned && !$canReassign) {
+                            $tooltipText = 'Can only reassign escalated tickets';
                         } elseif ($isClosed) {
                             $tooltipText = 'Cannot assign closed ticket';
                         }
 
-                        $buttonText = $isAlreadyAssigned ? 'Reassigned' : ($isEscalated ? 'Reassign' : 'Assign');
+                        // Set button text based on status
+                        $buttonText = $canReassign ? 'Reassign' : ($isAlreadyAssigned ? 'Assigned' : 'Assign');
                         
                         return Html::a($buttonText, ['ticket/assign', 'id' => $model->id], [
                             'class' => 'btn btn-primary btn-sm assign-button' . ($isDisabled ? ' disabled' : ''),
@@ -195,21 +202,20 @@ $this->params['breadcrumbs'][] = $this->title;
                                 }
                             ") : 'return false;',
                             'data-id' => $model->id,
-                            'style' => $isDisabled ? 'background-color: #6c757d; border-color: #6c757d;' : '',
                         ]);
                     },
                     'cancel' => function ($url, $model, $key) {
-                        $isDisabled = $model->status === Ticket::STATUS_CANCELLED ||
-                                     $model->status === Ticket::STATUS_CLOSED ||
-                                     $model->status === Ticket::STATUS_REASSIGNED;
+                        $isDisabled = $model->status === Ticket::STATUS_CANCELLED || 
+                                     $model->status === Ticket::STATUS_APPROVED ||
+                                     $model->status === Ticket::STATUS_CLOSED;
                         
                         $tooltipText = '';
                         if ($model->status === Ticket::STATUS_CANCELLED) {
                             $tooltipText = 'Ticket already cancelled';
+                        } elseif ($model->status === Ticket::STATUS_APPROVED) {
+                            $tooltipText = 'Cannot cancel approved ticket';
                         } elseif ($model->status === Ticket::STATUS_CLOSED) {
                             $tooltipText = 'Cannot cancel closed ticket';
-                        } elseif ($model->status === Ticket::STATUS_REASSIGNED) {
-                            $tooltipText = 'Cannot cancel reassigned ticket';
                         }
 
                         return Html::button('Cancel', [
@@ -217,7 +223,6 @@ $this->params['breadcrumbs'][] = $this->title;
                             'onclick' => $isDisabled ? 'return false;' : "cancelTicket(this)",
                             'data-id' => $model->id,
                             'title' => $tooltipText ?: 'Cancel ticket',
-                            'style' => $isDisabled ? 'opacity: 0.65; cursor: not-allowed;' : '',
                         ]);
                     },
                 ],
@@ -357,25 +362,27 @@ function assignTicket(ticketId) {
 
 function cancelTicket(button) {
     var id = $(button).data('id');
-    var isDisabled = $(button).hasClass('disabled');
-    if (!isDisabled) {
+    
+    if (confirm('Are you sure you want to cancel this ticket?')) {
         $.ajax({
-            url: '<?= \yii\helpers\Url::to(['/ticket/cancel']) ?>',
+            url: '<?= Url::to(["/ticket/cancel"]) ?>',  // Fixed URL to point to TicketController
             type: 'POST',
             data: {
                 id: id,
-                _csrf: '<?= Yii::$app->request->csrfToken ?>',
+                _csrf: yii.getCsrfToken()
             },
+            dataType: 'json',
             success: function(response) {
                 if (response.success) {
-                    location.reload(); // Reload the page to show updated data
+                    alert(response.message);
+                    window.location.reload();
                 } else {
-                    alert('Failed to cancel the ticket: ' + (response.message || 'Unknown error'));
+                    alert(response.message || 'Failed to cancel ticket');
                 }
             },
-            error: function(jqXHR, textStatus, errorThrown) {
-                console.error('Error canceling ticket:', textStatus, errorThrown);
-                alert('Error canceling ticket: ' + errorThrown);
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                alert('An error occurred while cancelling the ticket.');
             }
         });
     }

@@ -47,42 +47,24 @@ class Ticket extends ActiveRecord
     {
         return [
             [['module', 'issue', 'description'], 'required'],
-            [['company_name', 'company_email'], 'string'],
-            [['created_by'], 'integer'],
-            [['status'], 'string'],
-            [['description'], 'string'],
-            [['created_by', 'created_at'], 'integer'],
-            [['module', 'issue', 'status'], 'string', 'max' => 255],
+            [['module', 'issue', 'description', 'screenshot'], 'string'],
+            ['status', 'default', 'value' => self::STATUS_PENDING],
             ['status', 'in', 'range' => [
                 self::STATUS_PENDING,
                 self::STATUS_APPROVED,
                 self::STATUS_CANCELLED,
                 self::STATUS_ASSIGNED,
-                self::STATUS_CLOSED,
                 self::STATUS_ESCALATED,
+                self::STATUS_CLOSED,
                 self::STATUS_REOPEN,
-                self::STATUS_DELETED,
                 self::STATUS_REASSIGNED
             ]],
-            [['created_at', 'closed_at'], 'integer', 'skipOnEmpty' => true],
-            [['created_at', 'closed_at'], 'default', 'value' => null],
-            ['assigned_to', 'integer'],
-            ['assigned_to', 'exist', 'skipOnError' => true, 'targetClass' => User::class, 'targetAttribute' => ['assigned_to' => 'id']],
-            ['screenshot', 'string'],
-            [['screenshot_base64'], 'safe'],
-            // Make company_name safe for mass assignment
-            [['company_name'], 'safe'],
-            ['closed_at', 'safe'],
-            ['closed_by', 'integer'],
-            ['status', 'string'],
-            ['status', 'default', 'value' => self::STATUS_REASSIGNED],
-            ['status', 'in', 'range' => [
-                self::STATUS_ESCALATED,
-                self::STATUS_REASSIGNED,
-                self::STATUS_ASSIGNED,
-                self::STATUS_CANCELLED,
-                self::STATUS_CLOSED,
-            ]],
+            ['screenshot_base64', 'safe'],
+            [['assigned_to'], 'integer'],
+            [['status'], 'string'],
+            [['closed_at'], 'safe'],
+            [['closed_by', 'assigned_to'], 'integer'],
+            [['time_taken'], 'string'],
         ];
     }
 
@@ -95,10 +77,10 @@ class Ticket extends ActiveRecord
             'issue' => 'Issue',
             'description' => 'Description',
             'status' => 'Status',
-            'created_by' => 'Created By',
+            'screenshot' => 'Screenshot',
             'created_at' => 'Created At',
-            'company_email' => 'Company Email',
-            'company_name' => 'Company Name',
+            'updated_at' => 'Updated At',
+            'assigned_to' => 'Reassign To',
         ];
     }
  
@@ -316,11 +298,12 @@ class Ticket extends ActiveRecord
         return [
             self::STATUS_PENDING => 'Pending',
             self::STATUS_APPROVED => 'Approved',
+            self::STATUS_CANCELLED => 'Cancelled',
+            self::STATUS_ASSIGNED => 'Assigned',
             self::STATUS_ESCALATED => 'Escalated',
             self::STATUS_CLOSED => 'Closed',
-            self::STATUS_DELETED => 'Deleted',
-            self::STATUS_CANCELLED => 'Cancelled',
-            self::STATUS_ESCALATED => 'Escalated',  // Add this line if you added the constant
+            self::STATUS_REOPEN => 'Reopen',
+            self::STATUS_REASSIGNED => 'Reassigned',
         ];
     }
 
@@ -395,5 +378,28 @@ class Ticket extends ActiveRecord
         ];
         
         return $labels[$this->status] ?? ucfirst($this->status);
+    }
+
+    public function calculateTimeTaken()
+    {
+        if ($this->assigned_at && $this->closed_at) {
+            $assigned = new \DateTime($this->assigned_at);
+            $closed = new \DateTime($this->closed_at);
+            $interval = $assigned->diff($closed);
+            
+            $timeTaken = '';
+            if ($interval->d > 0) {
+                $timeTaken .= $interval->d . ' days ';
+            }
+            if ($interval->h > 0) {
+                $timeTaken .= $interval->h . ' hours ';
+            }
+            if ($interval->i > 0) {
+                $timeTaken .= $interval->i . ' minutes';
+            }
+            
+            return trim($timeTaken) ?: '1 minute'; // Return at least 1 minute
+        }
+        return null;
     }
 }

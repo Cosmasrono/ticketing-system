@@ -23,6 +23,7 @@ $this->params['breadcrumbs'][] = $this->title;
 
 <div class="row mb-2">
     <div class="col text-end">
+        <?= Html::a('View Dashboard', ['site/dashboard'], ['class' => 'btn btn-info me-2']) ?>
         <?= Html::a('New Client', ['/site/invitation'], [
             'class' => 'btn btn-sm btn-success',
             'style' => 'font-size: 0.8rem; padding: 0.25rem 0.5rem;'
@@ -114,7 +115,6 @@ $this->params['breadcrumbs'][] = $this->title;
                 'attribute' => 'created_at',
                 'format' => 'raw',
                 'value' => function ($model) {
-                    // Convert to Kenyan time
                     $date = new DateTime($model->created_at, new DateTimeZone('UTC'));
                     $date->setTimezone(new DateTimeZone('Africa/Nairobi'));
                     return $date->format('Y-m-d H:i:s');
@@ -131,7 +131,20 @@ $this->params['breadcrumbs'][] = $this->title;
             [
                 'label' => 'Time Taken',
                 'value' => function ($model) {
-                    return $model->timeTaken;
+                    if ($model->status === 'closed' && $model->created_at && $model->closed_at) {
+                        $created = new DateTime($model->created_at);
+                        $closed = new DateTime($model->closed_at);
+                        $interval = $created->diff($closed);
+                        
+                        if ($interval->d > 0) {
+                            return $interval->format('%d days, %h hrs');
+                        } elseif ($interval->h > 0) {
+                            return $interval->format('%h hrs, %i mins');
+                        } else {
+                            return $interval->format('%i minutes');
+                        }
+                    }
+                    return 'Still Open';
                 },
                 'format' => 'raw',
                 'contentOptions' => ['style' => 'white-space: normal; word-wrap: break-word;'],

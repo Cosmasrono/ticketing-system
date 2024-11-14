@@ -1,0 +1,343 @@
+<?php
+use yii\helpers\Html;
+use yii\helpers\Url;
+
+$this->title = 'Help Desk Analytics Dashboard';
+
+// Add this helper function at the top of your view file
+function getStatusColor($status) {
+    $colors = [
+        'assigned' => 'bg-primary',
+        'closed' => 'bg-success',
+        'pending' => 'bg-warning',
+        'urgent' => 'bg-danger',
+        'reassigned' => 'bg-info',
+        'approved' => 'bg-success',
+        'cancelled' => 'bg-secondary'
+    ];
+    return $colors[strtolower($status)] ?? 'bg-secondary';
+}
+?>
+
+<div class="dashboard-container">
+    <!-- Summary Cards Row -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-primary shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Active Tickets</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $totalActiveTickets ?? 0 ?></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-ticket-alt fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-success shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Resolution Rate</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $resolutionRate ?? '0%' ?></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-info shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Avg Response Time</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $avgResponseTime ?? '0h' ?></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-clock fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-warning shadow h-100">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending Tickets</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $pendingTickets ?? 0 ?></div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-pause-circle fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Developer Performance Section -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+            <h6 class="m-0 font-weight-bold text-primary">Developer Performance Metrics</h6>
+            <div class="dropdown no-arrow">
+                <a class="dropdown-toggle" href="#" role="button" id="devMetricsDropdown" data-toggle="dropdown">
+                    <i class="fas fa-ellipsis-v fa-sm fa-fw text-gray-400"></i>
+                </a>
+                <div class="dropdown-menu dropdown-menu-right shadow">
+                    <a class="dropdown-item" href="#">View Details</a>
+                    <a class="dropdown-item" href="#">Download Report</a>
+                </div>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <?php foreach ($developerStats as $dev): ?>
+                    <div class="col-lg-3 col-md-6 mb-4">
+                        <div class="card border-left-info h-100 shadow-sm">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h6 class="card-title mb-0"><?= Html::encode($dev['name']) ?></h6>
+                                    <span class="badge <?= $dev['active_tickets'] > 5 ? 'bg-danger' : 'bg-success' ?>">
+                                        <?= $dev['active_tickets'] ?> Active
+                                    </span>
+                                </div>
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <?php
+                                    $totalTickets = $dev['completed_tickets'] + $dev['active_tickets'];
+                                    $completionPercentage = $totalTickets > 0 
+                                        ? ($dev['completed_tickets'] / $totalTickets) * 100 
+                                        : 0;
+                                    ?>
+                                    <div class="progress-bar" role="progressbar" 
+                                         style="width: <?= $completionPercentage ?>%"
+                                         aria-valuenow="<?= $completionPercentage ?>" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                    </div>
+                                </div>
+                                <div class="small">
+                                    <span class="text-success">
+                                        <i class="fas fa-check-circle"></i> <?= $dev['completed_tickets'] ?> Resolved
+                                    </span>
+                                    <span class="float-end text-muted">
+                                        <?= $dev['avg_resolution_time'] ?? 'N/A' ?> avg. time
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analytics Row -->
+    <div class="row">
+        <!-- Ticket Status Chart -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Ticket Status Distribution</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="ticketStatusChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Companies -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-success">Client Support Volume</h6>
+                    <small class="text-muted">Total Active Clients: <?= isset($totalCompanies) ? $totalCompanies : 'N/A' ?></small>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Client</th>
+                                    <th class="text-center">Tickets</th>
+                                    <th class="text-center">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (!empty($topCompanies)): ?>
+                                    <?php foreach ($topCompanies as $company): ?>
+                                        <tr>
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <div class="avatar avatar-sm">
+                                                        <?= substr($company['name'], 0, 2) ?>
+                                                    </div>
+                                                    <div class="ms-2"><?= Html::encode($company['name']) ?></div>
+                                                </div>
+                                            </td>
+                                            <td class="text-center">
+                                                <span class="badge bg-primary">
+                                                    <?= number_format($company['ticket_count']) ?>
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                <?php
+                                                $status = $company['status'] ?? 'active';
+                                                $statusClass = [
+                                                    'active' => 'success',
+                                                    'pending' => 'warning',
+                                                    'inactive' => 'danger'
+                                                ][$status] ?? 'secondary';
+                                                ?>
+                                                <span class="badge bg-<?= $statusClass ?>">
+                                                    <?= ucfirst($status) ?>
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="3" class="text-center text-muted">
+                                            <i class="fas fa-info-circle"></i> No client data available
+                                        </td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity Timeline -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Recent Support Activity</h6>
+        </div>
+        <div class="card-body">
+            <div class="timeline">
+                <?php foreach ($recentActivity as $activity): ?>
+                    <div class="timeline-item">
+                        <div class="timeline-marker <?= getStatusColor($activity['status']) ?>"></div>
+                        <div class="timeline-content">
+                            <div class="d-flex justify-content-between">
+                                <h6 class="mb-1">Ticket #<?= Html::encode($activity['ticket_id']) ?></h6>
+                                <small class="text-muted">
+                                    <?= Yii::$app->formatter->asRelativeTime($activity['timestamp']) ?>
+                                </small>
+                            </div>
+                            <p class="mb-0">
+                                <span class="badge <?= getStatusColor($activity['status']) ?>">
+                                    <?= Html::encode(ucfirst($activity['status'])) ?>
+                                </span>
+                                by <?= Html::encode($activity['developer']) ?>
+                            </p>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php
+// Register required assets
+$this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
+$this->registerJsFile('https://cdn.jsdelivr.net/npm/chart.js', ['position' => \yii\web\View::POS_HEAD]);
+
+// Chart configuration
+$chartConfig = [
+    'type' => 'doughnut',
+    'data' => [
+        'labels' => array_keys($ticketStatusData),
+        'datasets' => [[
+            'data' => array_values($ticketStatusData),
+            'backgroundColor' => [
+                '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b'
+            ],
+            'hoverBackgroundColor' => [
+                '#2e59d9', '#17a673', '#2c9faf', '#dda20a', '#be2617'
+            ],
+            'hoverBorderColor' => "rgba(234, 236, 244, 1)",
+        ]]
+    ],
+    'options' => [
+        'maintainAspectRatio' => false,
+        'tooltips' => [
+            'backgroundColor' => "rgb(255,255,255)",
+            'bodyFontColor' => "#858796",
+            'borderColor' => '#dddfeb',
+            'borderWidth' => 1,
+            'xPadding' => 15,
+            'yPadding' => 15,
+            'displayColors' => false,
+            'caretPadding' => 10,
+        ],
+        'legend' => [
+            'display' => true,
+            'position' => 'bottom'
+        ],
+        'cutoutPercentage' => 80,
+    ],
+];
+
+$this->registerJs("
+    // Initialize Ticket Status Chart
+    new Chart(document.getElementById('ticketStatusChart'), " . json_encode($chartConfig) . ");
+");
+?>
+
+<style>
+.timeline {
+    position: relative;
+    padding: 20px 0;
+}
+
+.timeline-item {
+    position: relative;
+    padding-left: 40px;
+    margin-bottom: 20px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #e3e6f0;
+    border: 2px solid #fff;
+}
+
+.avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #e3e6f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.border-left-primary { border-left: 4px solid #4e73df; }
+.border-left-success { border-left: 4px solid #1cc88a; }
+.border-left-info { border-left: 4px solid #36b9cc; }
+.border-left-warning { border-left: 4px solid #f6c23e; }
+</style> 

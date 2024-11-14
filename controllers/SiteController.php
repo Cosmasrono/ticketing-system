@@ -472,9 +472,22 @@ public function actionAdmin()
     // Set timezone to Nairobi/Kenya
     date_default_timezone_set('Africa/Nairobi');
 
+    // Add this query to get developer ticket counts
+    $developerTicketCounts = (new \yii\db\Query())
+        ->select([
+            'name' => 'user.name',
+            'ticket_count' => 'COUNT(ticket.id)'
+        ])
+        ->from('user')
+        ->leftJoin('ticket', 'ticket.assigned_to = user.id')
+        ->where(['user.role' => 'developer']) // Adjust this based on how you identify developers
+        ->groupBy('user.id, user.name')
+        ->all();
+
     return $this->render('admin', [
         'dataProvider' => $dataProvider,
         'ticketCounts' => $ticketCounts,
+        'developerTicketCounts' => $developerTicketCounts,
     ]);
 }
 
@@ -888,7 +901,138 @@ public function actionSignupFromInvitation($token)
         'email' => $invitation->email
     ]);
 }
-   
+
+public function actionDeveloperTickets()
+{
+    if (!Yii::$app->user->identity->isAdmin()) {
+        throw new ForbiddenHttpException('You are not authorized to view this page.');
+    }
+
+    $developerTicketCounts = (new \yii\db\Query())
+        ->select([
+            'name' => 'user.name',
+            'ticket_count' => 'COUNT(ticket.id)'
+        ])
+        ->from('user')
+        ->leftJoin('ticket', 'ticket.assigned_to = user.id')
+        ->where(['user.role' => 'developer'])
+        ->groupBy('user.id, user.name')
+        ->all();
+
+    return $this->render('developer-tickets', [
+        'developerTicketCounts' => $developerTicketCounts,
+    ]);
+}
+
+public function actionDashboard()
+{
+    if (!Yii::$app->user->identity->isAdmin()) {
+        throw new ForbiddenHttpException('Access denied.');
+    }
+
+    // Get developer statistics
+    $developerStats = (new \yii\db\Query())
+        ->select([
+            'name' => 'user.name',
+            'active_tickets' => 'COUNT(CASE WHEN ticket.status IN ("pending", "assigned") THEN 1 END)',
+            'completed_tickets' => 'COUNT(CASE WHEN ticket.status = "closed" THEN 1 END)'
+        ])
+        ->from('user')
+        ->leftJoin('ticket', 'ticket.assigned_to = user.id')
+        ->where(['user.role' => 'developer'])
+        ->groupBy('user.id, user.name')
+        ->all();
+
+    // Get ticket status data
+    $ticketStatusData = (new \yii\db\Query())
+        ->select(['status'])
+        ->from('ticket')
+        ->groupBy('status')
+        ->indexBy('status')
+        ->column();
+
+    // Get recent activity (simplified without CASE statement)
+    $recentActivity = (new \yii\db\Query())
+        ->select([
+            'timestamp' => 'ticket.created_at',
+            'ticket_id' => 'ticket.id',
+            'developer' => 'user.name',
+            'status' => 'ticket.status'
+        ])
+        ->from('ticket')
+        ->leftJoin('user', 'ticket.assigned_to = user.id')
+        ->orderBy(['ticket.created_at' => SORT_DESC])
+        ->limit(10)
+        ->all();
+
+    // Get companies with their ticket counts
+    $topCompanies = (new \yii\db\Query())
+        ->select([
+            'name' => 'company_name',  // Assuming the column is named company_name
+            'ticket_count' => 'COUNT(id)'  // Count tickets directly from ticket table
+        ])
+        ->from('ticket')  // Start from ticket table
+        ->groupBy('company_name')  // Group by company name
+        ->orderBy(['ticket_count' => SORT_DESC])  // Most tickets first
+        ->limit(5)  // Top 5 companies
+        ->all();
+
+    // Get total number of companies
+    $totalCompanies = (new \yii\db\Query())
+        ->from('ticket')
+        ->select('DISTINCT company_name')
+        ->count();
+
+    // Add these new metrics
+    $totalActiveTickets = (new \yii\db\Query())
+        ->from('ticket')
+        ->where(['status' => ['pending', 'assigned']])
+        ->count();
+        
+    $resolutionRate = (new \yii\db\Query())
+        ->from('ticket')
+        ->where(['status' => 'closed'])
+        ->count() / (new \yii\db\Query())->from('ticket')->count() * 100;
+        
+    $avgResponseTime = // ... calculate average response time ...
+    
+    $pendingTickets = (new \yii\db\Query())
+        ->from('ticket')
+        ->where(['status' => 'pending'])
+        ->count();
+
+    return $this->render('dashboard', [
+        'developerStats' => $developerStats,
+        'ticketStatusData' => $ticketStatusData,
+        'recentActivity' => $recentActivity,
+        'totalCompanies' => $totalCompanies,
+        'topCompanies' => $topCompanies,
+        'totalActiveTickets' => $totalActiveTickets,
+        'resolutionRate' => number_format($resolutionRate, 1) . '%',
+        'avgResponseTime' => $avgResponseTime,
+        'pendingTickets' => $pendingTickets,
+    ]);
+}
+
+private function getStatusColor($status)
+{
+    return [
+        'assigned' => 'primary',
+        'closed' => 'success',
+        'pending' => 'warning',
+        'urgent' => 'danger',
+    ][$status] ?? 'secondary';
+}
+
+private function getStatusLabel($status)
+{
+    return [
+        'assigned' => 'Assigned',
+        'closed' => 'Resolved',
+        'pending' => 'Pending',
+        'urgent' => 'Urgent',
+    ][$status] ?? ucfirst($status);
+}
 
 }
 

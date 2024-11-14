@@ -1,16 +1,11 @@
 <?php
 
-// Temporarily enable debugging
+// Set default timezone
+date_default_timezone_set('Africa/Nairobi');
+
+// Define the environment
 defined('YII_DEBUG') or define('YII_DEBUG', true);
 defined('YII_ENV') or define('YII_ENV', 'dev');
-
-
-//production
-// Revert to production settings
-// defined('YII_DEBUG') or define('YII_DEBUG', false);
-// defined('YII_ENV') or define('YII_ENV', 'prod');
-
-// ... rest of the file remains unchanged ...
 
 require __DIR__ . '/../vendor/autoload.php';
 require __DIR__ . '/../vendor/yiisoft/yii2/Yii.php';

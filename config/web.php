@@ -85,8 +85,15 @@ $config = [
             'channel' => 'default', // Queue channel key
             'mutex' => \yii\mutex\MysqlMutex::class, // Mutex used to sync queries
         ],
-     
-     
+        'timeZone' => 'Africa/Nairobi', // Set your timezone
+        'formatter' => [
+            'class' => 'yii\i18n\Formatter',
+            'defaultTimeZone' => 'Africa/Nairobi',
+            'timeZone' => 'Africa/Nairobi',
+            'dateFormat' => 'php:Y-m-d',
+            'datetimeFormat' => 'php:Y-m-d H:i:s',
+            'timeFormat' => 'php:H:i:s',
+        ],
     ],
     'params' => $params,
     'modules' => [

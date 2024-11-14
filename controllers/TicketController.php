@@ -193,6 +193,9 @@ class TicketController extends Controller
         $model->module = $invitation->module;
 
         if ($model->load(Yii::$app->request->post())) {
+            // Explicitly set the current timestamp
+            $model->created_at = date('Y-m-d H:i:s');
+            
             // Get current user's details
             $currentUser = User::findOne($user->id);
             
@@ -201,7 +204,6 @@ class TicketController extends Controller
             $model->company_name = $currentUser->company_name;  // Set company name directly
             $model->company_email = $currentUser->company_email;
             $model->status = Ticket::STATUS_PENDING;
-            $model->created_at = time();
 
             // Debug log before save
             Yii::debug([
@@ -697,69 +699,47 @@ class TicketController extends Controller
     {
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         
+        $id = Yii::$app->request->post('id');
+        
+        if (!$id) {
+            return [
+                'success' => false,
+                'message' => 'Ticket ID is required'
+            ];
+        }
+
         try {
-            $id = Yii::$app->request->post('id');
-            $ticket = Ticket::findOne($id);
+            $model = $this->findModel($id);
             
-            if (!$ticket) {
-                return [
-                    'success' => false,
-                    'message' => 'Ticket not found'
-                ];
-            }
-
-            // Verify the developer is assigned to this ticket
-            if ($ticket->assigned_to !== Yii::$app->user->id) {
-                return [
-                    'success' => false,
-                    'message' => 'You can only close tickets assigned to you'
-                ];
-            }
-
-            // Check if ticket is already closed
-            if ($ticket->status === 'closed') {
-                return [
-                    'success' => false,
-                    'message' => 'Ticket is already closed'
-                ];
-            }
-
             // Start transaction
             $transaction = Yii::$app->db->beginTransaction();
-            try {
-                // Update ticket status and closing details
-                $ticket->status = 'closed';
-                $ticket->closed_at = date('Y-m-d H:i:s');
-                $ticket->closed_by = Yii::$app->user->id;
-                
-                // Calculate and store time taken
-                $timeTaken = $ticket->calculateTimeTaken();
-                $ticket->time_taken = $timeTaken;
-                
-                if ($ticket->save()) {
-                    $transaction->commit();
-                    return [
-                        'success' => true,
-                        'message' => 'Ticket closed successfully. Time taken: ' . $timeTaken,
-                        'timeTaken' => $timeTaken
-                    ];
-                } else {
-                    $transaction->rollBack();
-                    Yii::error('Failed to close ticket: ' . json_encode($ticket->errors));
-                    return [
-                        'success' => false,
-                        'message' => 'Failed to close ticket'
-                    ];
-                }
-            } catch (\Exception $e) {
+            
+            $model->status = 'closed';
+            $model->closed_at = date('Y-m-d H:i:s');
+            
+            if ($model->save()) {
+                $transaction->commit();
+                return [
+                    'success' => true,
+                    'message' => 'Ticket closed successfully'
+                ];
+            } else {
                 $transaction->rollBack();
-                throw $e;
+                return [
+                    'success' => false,
+                    'message' => 'Failed to close ticket: ' . implode(', ', $model->getErrorSummary(true))
+                ];
             }
+            
         } catch (\Exception $e) {
+            if (isset($transaction)) {
+                $transaction->rollBack();
+            }
+            
             Yii::error('Error closing ticket: ' . $e->getMessage());
             return [
                 'success' => false,
-                'message' => 'An error occurred while closing the ticket'
+                'message' => 'An error occurred while closing the ticket: ' . $e->getMessage()
             ];
         }
     }

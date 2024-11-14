@@ -62,9 +62,7 @@ class Ticket extends ActiveRecord
             ['screenshot_base64', 'safe'],
             [['assigned_to'], 'integer'],
             [['status'], 'string'],
-            [['closed_at'], 'safe'],
-            [['closed_by', 'assigned_to'], 'integer'],
-            [['time_taken'], 'string'],
+            [['created_at', 'assigned_at', 'closed_at'], 'safe'],
         ];
     }
 
@@ -156,23 +154,8 @@ class Ticket extends ActiveRecord
         return $scenarios;
     }
 
-    public function beforeSave($insert)
-    {
-        if (parent::beforeSave($insert)) {
-            if ($this->isNewRecord) {
-                $user = User::findOne($this->created_by);
-                if ($user) {
-                    $this->company_name = $user->company_name;
-                    $this->company_email = $user->company_email;
-                }
-                // Set the created_at time in Kenyan timezone
-                $date = new DateTime('now', new DateTimeZone('Africa/Nairobi'));
-                $this->created_at = $date->format('Y-m-d H:i:s');
-            }
-            return true;
-        }
-        return false;
-    }
+   
+    
 
     public function afterSave($insert, $changedAttributes)
     {
@@ -387,6 +370,7 @@ class Ticket extends ActiveRecord
             $closed = new \DateTime($this->closed_at);
             $interval = $assigned->diff($closed);
             
+            // Format the time taken
             $timeTaken = '';
             if ($interval->d > 0) {
                 $timeTaken .= $interval->d . ' days ';
@@ -398,8 +382,82 @@ class Ticket extends ActiveRecord
                 $timeTaken .= $interval->i . ' minutes';
             }
             
-            return trim($timeTaken) ?: '1 minute'; // Return at least 1 minute
+            return trim($timeTaken);
         }
         return null;
+    }
+
+    // Helper method to get resolution time
+    public function getResolutionTime()
+    {
+        if ($this->closed_at && $this->created_at) {
+            $created = new \DateTime($this->created_at);
+            $closed = new \DateTime($this->closed_at);
+            return $closed->diff($created)->format('%d days, %h hours, %i minutes');
+        }
+        return null;
+    }
+
+    // Helper method to get response time
+    public function getResponseTime()
+    {
+        if ($this->assigned_at && $this->created_at) {
+            $created = new \DateTime($this->created_at);
+            $assigned = new \DateTime($this->assigned_at);
+            return $assigned->diff($created)->format('%d days, %h hours, %i minutes');
+        }
+        return null;
+    }
+
+    public function beforeSave($insert)
+    {
+        if (parent::beforeSave($insert)) {
+            // For new records
+            if ($this->isNewRecord) {
+                $this->created_at = date('Y-m-d H:i:s');
+            }
+            
+            // When status changes to assigned
+            if ($this->isAttributeChanged('assigned_to') && !empty($this->assigned_to)) {
+                $this->assigned_at = date('Y-m-d H:i:s');
+            }
+            
+            // When status changes to closed
+            if ($this->isAttributeChanged('status') && $this->status === 'closed') {
+                $this->closed_at = date('Y-m-d H:i:s');
+            }
+            
+            return true;
+        }
+        return false;
+    }
+
+    public function getLocalCreatedAt()
+    {
+        if ($this->created_at) {
+            $timestamp = strtotime($this->created_at);
+            return Yii::$app->formatter->asDatetime($timestamp, 'php:Y-m-d H:i:s');
+        }
+        return null;
+    }
+
+    // Add getter methods for formatted dates
+    public function getFormattedCreatedAt()
+    {
+        return Yii::$app->formatter->asDatetime($this->created_at, 'php:Y-m-d H:i:s');
+    }
+
+    public function getFormattedAssignedAt()
+    {
+        return $this->assigned_at ? 
+            Yii::$app->formatter->asDatetime($this->assigned_at, 'php:Y-m-d H:i:s') : 
+            'Not Assigned';
+    }
+
+    public function getFormattedClosedAt()
+    {
+        return $this->closed_at ? 
+            Yii::$app->formatter->asDatetime($this->closed_at, 'php:Y-m-d H:i:s') : 
+            'Not Closed';
     }
 }

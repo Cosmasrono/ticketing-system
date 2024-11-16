@@ -9,8 +9,8 @@ use yii\helpers\Url;
 /* @var $dataProvider yii\data\ActiveDataProvider */
 /* @var $ticketCounts array */
 
-$dataProvider->query->orderBy(['created_at' => SORT_DESC]);
-$dataProvider->sort->defaultOrder = ['created_at' => SORT_DESC];
+$dataProvider->query->orderBy(['id' => SORT_DESC]);
+$dataProvider->sort->defaultOrder = ['id' => SORT_DESC];
 
 $this->title = 'Iansoft Ticket Management System';
 $this->params['breadcrumbs'][] = $this->title;
@@ -220,7 +220,8 @@ $this->params['breadcrumbs'][] = $this->title;
                     'cancel' => function ($url, $model, $key) {
                         $isDisabled = $model->status === Ticket::STATUS_CANCELLED || 
                                      $model->status === Ticket::STATUS_APPROVED ||
-                                     $model->status === Ticket::STATUS_CLOSED;
+                                     $model->status === Ticket::STATUS_CLOSED ||
+                                     $model->status === Ticket::STATUS_REASSIGNED;
                         
                         $tooltipText = '';
                         if ($model->status === Ticket::STATUS_CANCELLED) {
@@ -229,6 +230,8 @@ $this->params['breadcrumbs'][] = $this->title;
                             $tooltipText = 'Cannot cancel approved ticket';
                         } elseif ($model->status === Ticket::STATUS_CLOSED) {
                             $tooltipText = 'Cannot cancel closed ticket';
+                        } elseif ($model->status === Ticket::STATUS_REASSIGNED) {
+                            $tooltipText = 'Cannot cancel reassigned ticket';
                         }
 
                         return Html::button('Cancel', [

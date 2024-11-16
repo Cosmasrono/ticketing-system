@@ -83,50 +83,120 @@ $this->params['breadcrumbs'][] = $this->title;
 </div>
 <script>
 function reopenTicket(button, id) {
-    if (!confirm('Are you sure you want to reopen this ticket?')) {
-        return;
-    }
-
-    $.ajax({
-        url: '<?= \yii\helpers\Url::to(['/ticket/reopen']) ?>',
-        type: 'POST',
-        data: {
-            id: id,
-            _csrf: '<?= Yii::$app->request->csrfToken ?>'
-        },
-        dataType: 'json',
-        success: function(response) {
-            if (response.success) {
-                // Find the row
-                var row = $(button).closest('tr');
-                
-                // Update the status cell (assuming it's the 5th column, adjust index if needed)
-                row.find('td:eq(4)').text('reopen');
-                
-                // Remove the reopen button
-                $(button).remove();
-                
-                alert('Ticket reopened successfully');
-            } else {
-                alert(response.message || 'Failed to reopen ticket');
-                console.error('Error details:', response);
+    Swal.fire({
+        title: 'Reopen Ticket',
+        input: 'textarea',
+        inputLabel: 'Please provide a reason for reopening',
+        inputPlaceholder: 'Enter your reason here...',
+        showCancelButton: true,
+        confirmButtonText: 'Submit',
+        showLoaderOnConfirm: true,
+        preConfirm: (reason) => {
+            if (!reason) {
+                Swal.showValidationMessage('Please enter a reason');
+                return false;
             }
+            
+            console.log('Sending reopen request:', { id, reason });
+            
+            return $.ajax({
+                url: '<?= Yii::$app->urlManager->createUrl(['ticket/reopen']) ?>',
+                type: 'POST',
+                data: {
+                    id: id,
+                    reason: reason,
+                    _csrf: '<?= Yii::$app->request->csrfToken ?>'
+                },
+                dataType: 'json'
+            })
+            .then(response => {
+                console.log('Server response:', response);
+                if (!response.success) {
+                    throw new Error(response.message || 'Failed to reopen ticket');
+                }
+                return response;
+            })
+            .catch(error => {
+                console.error('Ajax error:', error);
+                throw new Error(error.message || 'Failed to reopen ticket');
+            });
         },
-        error: function(xhr, status, error) {
-            console.error('Error:', error);
-            console.error('Response:', xhr.responseText);
-            alert('Error reopening ticket: ' + error);
+        allowOutsideClick: () => !Swal.isLoading()
+    }).then((result) => {
+        if (result.isConfirmed && result.value.success) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Success!',
+                text: result.value.message,
+                showConfirmButton: false,
+                timer: 1500
+            }).then(() => {
+                location.reload();
+            });
         }
+    }).catch(error => {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: error.message || 'Failed to reopen ticket'
+        });
     });
 }
 </script>
 
 <style>
-.badge {
-    padding: 
+#reopenTicketModal .modal-dialog {
+    max-width: 500px;
 }
-.badge.bg-info {
-    background-color: #17a2b8 !important;
-    color: #fff;
+
+#reopenTicketModal textarea {
+    resize: vertical;
+    min-height: 120px;
+}
+
+.modal-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.modal-footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+#reopenTicketForm .form-label {
+    font-weight: bold;
 }
 </style>
+
+<!-- Add this modal form -->
+<div class="modal fade" id="reopenTicketModal" tabindex="-1" aria-labelledby="reopenTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="reopenTicketModalLabel">Add Reopen Reason</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="reopenTicketForm">
+                    <input type="hidden" name="ticket_id" id="reopen_ticket_id">
+                    <div class="mb-3">
+                        <label for="reopen_reason" class="form-label">Reason:</label>
+                        <textarea 
+                            class="form-control" 
+                            id="reopen_reason" 
+                            name="reopen_reason" 
+                            rows="4" 
+                            required 
+                            placeholder="Enter your reason..."
+                        ></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitReopenReason()">Submit</button>
+            </div>
+        </div>
+    </div>
+</div>

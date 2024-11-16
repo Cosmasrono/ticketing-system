@@ -2,6 +2,13 @@
 
 namespace app\controllers;
 
+use yii\helpers\Html;
+use yii\helpers\Url;
+
+/* @var $ticket app\models\Ticket */
+/* @var $reason string */
+
+
 use Yii;
 use app\models\Developer;
 use app\models\Ticket;
@@ -46,6 +53,12 @@ class TicketController extends Controller
                         'allow' => true,
                         'roles' => ['@'],  // Allow authenticated users
                     ],
+
+                    [
+                        'actions' => ['close'],
+                        'allow' => true,
+                        'roles' => ['developer'],
+                    ],
                     [
                         'actions' => ['escalate'],
                         'allow' => true,
@@ -54,13 +67,21 @@ class TicketController extends Controller
                             return true; // Allow all developers to access this action
                         }
                     ],
-                    // Rule for regular users
+                    // Rule for regular users - Added delete action
                     [
-                        'actions' => ['create', 'view', 'index'],
+                        'actions' => ['create', 'view', 'index', 'delete', 'reopen'],
                         'allow' => true,
                         'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->role === 'user';
+                            if (Yii::$app->user->identity->role === 'user') {
+                                if (in_array($action->id, ['delete', 'reopen'])) {
+                                    $ticketId = Yii::$app->request->get('id') ?? Yii::$app->request->post('id');
+                                    $ticket = Ticket::findOne($ticketId);
+                                    return $ticket && $ticket->created_by === Yii::$app->user->id;
+                                }
+                                return true;
+                            }
+                            return false;
                         }
                     ],
                     // Rule for admin and superadmin
@@ -92,6 +113,11 @@ class TicketController extends Controller
                             return $ticket && $ticket->assigned_to === Yii::$app->user->id;
                         }
                     ],
+                    [
+                        'actions' => ['reopen'],
+                        'allow' => true,
+                        'roles' => ['@'], // Allow authenticated users
+                    ],
                 ],
                 'denyCallback' => function ($rule, $action) {
                     Yii::$app->session->setFlash('error', 'You are not authorized to perform this action.');
@@ -107,6 +133,7 @@ class TicketController extends Controller
                     'close' => ['POST'],
                     'escalate' => ['POST'],
                     'cancel' => ['POST'],
+                    'reopen' => ['POST'],
                 ],
             ],
             'corsFilter' => [
@@ -827,49 +854,47 @@ class TicketController extends Controller
 
     public function actionClose()
     {
-        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        Yii::$app->response->format = Response::FORMAT_JSON;
         
-        $id = Yii::$app->request->post('id');
-        
-        if (!$id) {
-            return [
-                'success' => false,
-                'message' => 'Ticket ID is required'
-            ];
-        }
-
         try {
-            $model = $this->findModel($id);
+            $id = Yii::$app->request->post('id');
             
-            // Start transaction
-            $transaction = Yii::$app->db->beginTransaction();
+            if (!$id) {
+                return [
+                    'success' => false,
+                    'message' => 'Ticket ID is required'
+                ];
+            }
+
+            $ticket = Ticket::findOne($id);
             
-            $model->status = 'closed';
-            $model->closed_at = date('Y-m-d H:i:s');
+            if (!$ticket) {
+                return [
+                    'success' => false,
+                    'message' => 'Ticket not found'
+                ];
+            }
+
+            // Update status to closed
+            $ticket->setAttribute('status', 'closed');
             
-            if ($model->save()) {
-                $transaction->commit();
+            if ($ticket->save(false)) {
                 return [
                     'success' => true,
                     'message' => 'Ticket closed successfully'
                 ];
-            } else {
-                $transaction->rollBack();
-                return [
-                    'success' => false,
-                    'message' => 'Failed to close ticket: ' . implode(', ', $model->getErrorSummary(true))
-                ];
             }
-            
-        } catch (\Exception $e) {
-            if (isset($transaction)) {
-                $transaction->rollBack();
-            }
-            
-            Yii::error('Error closing ticket: ' . $e->getMessage());
+
             return [
                 'success' => false,
-                'message' => 'An error occurred while closing the ticket: ' . $e->getMessage()
+                'message' => 'Failed to close ticket'
+            ];
+
+        } catch (\Exception $e) {
+            Yii::error($e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'An error occurred while closing the ticket'
             ];
         }
     }
@@ -927,6 +952,121 @@ class TicketController extends Controller
                 'success' => false,
                 'message' => 'An error occurred while cancelling the ticket'
             ];
+        }
+    }
+
+    public function actionReopen()
+    {
+        Yii::$app->response->format = Response::FORMAT_JSON;
+        
+        try {
+            $id = Yii::$app->request->post('id');
+            $reason = Yii::$app->request->post('reason');
+            
+            if (!$id || !$reason) {
+                return [
+                    'success' => false,
+                    'message' => 'Ticket ID and reason are required'
+                ];
+            }
+
+            $ticket = Ticket::findOne($id);
+            if (!$ticket) {
+                return [
+                    'success' => false,
+                    'message' => 'Ticket not found'
+                ];
+            }
+
+            // Start transaction
+            $transaction = Yii::$app->db->beginTransaction();
+            
+            try {
+                // Update ticket
+                $ticket->status = 'approved';
+                $ticket->reopen_reason = $reason;
+                
+                if (!$ticket->save()) {
+                    throw new \Exception('Failed to save ticket changes');
+                }
+
+                // Get assigned developer email
+                if ($ticket->assigned_to) {
+                    $developer = User::findOne($ticket->assigned_to);
+                    if ($developer && $developer->company_email) {
+                        $this->sendEmailNotification(
+                            $developer->company_email,
+                            $ticket,
+                            $reason,
+                            'Assigned Developer'
+                        );
+                    }
+                }
+
+                // Get admin emails and send notifications
+                $admins = User::find()
+                    ->select(['id', 'company_email'])
+                    ->where(['role' => 'admin'])
+                    ->andWhere(['IS NOT', 'company_email', null])
+                    ->all();
+
+                foreach ($admins as $admin) {
+                    $this->sendEmailNotification(
+                        $admin->company_email,
+                        $ticket,
+                        $reason,
+                        'Admin'
+                    );
+                }
+
+                $transaction->commit();
+                
+                return [
+                    'success' => true,
+                    'message' => 'Ticket reopened and notifications sent successfully'
+                ];
+
+            } catch (\Exception $e) {
+                $transaction->rollBack();
+                throw $e;
+            }
+
+        } catch (\Exception $e) {
+            Yii::error('Error in reopen action: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => YII_DEBUG ? $e->getMessage() : 'An error occurred while reopening the ticket'
+            ];
+        }
+    }
+
+    private function sendEmailNotification($to, $ticket, $reason, $recipientType)
+    {
+        try {
+            $subject = "Ticket #{$ticket->id} Has Been Reopened";
+            
+            $emailContent = $this->renderPartial('//mail/ticket-reopen', [
+                'ticket' => $ticket,
+                'reason' => $reason,
+                'recipientType' => $recipientType,
+                'viewUrl' => Yii::$app->urlManager->createAbsoluteUrl(['ticket/view', 'id' => $ticket->id])
+            ]);
+
+            $sent = Yii::$app->mailer->compose()
+                ->setHtmlBody($emailContent)
+                ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name])
+                ->setTo($to)
+                ->setSubject($subject)
+                ->send();
+
+            if ($sent) {
+                Yii::info("Reopen notification email sent to $to", 'ticket');
+            } else {
+                Yii::error("Failed to send reopen notification to $to", 'ticket');
+            }
+
+        } catch (\Exception $e) {
+            Yii::error("Error sending email to $to: " . $e->getMessage(), 'ticket');
         }
     }
 

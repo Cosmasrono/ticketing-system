@@ -94,10 +94,11 @@ $this->params['breadcrumbs'][] = $this->title;
                                       $model->assigned_to !== Yii::$app->user->id;
                         return Html::button('Close', [
                             'class' => 'btn btn-danger btn-sm close-ticket' . ($isDisabled ? ' disabled' : ''),
-                            'onclick' => !$isDisabled ? "closeTicket({$model->id})" : 'return false;',
                             'data-id' => $model->id,
                             'type' => 'button',
-                            'title' => $isDisabled ? ($model->status === 'closed' ? 'Ticket is already closed' : 'You can only close your assigned tickets') : 'Close this ticket'
+                            'title' => $isDisabled ? 
+                                ($model->status === 'closed' ? 'Ticket is already closed' : 'You can only close your assigned tickets') : 
+                                'Close this ticket'
                         ]);
                     },
                 ],
@@ -213,7 +214,26 @@ function escalateTicket(ticketId) {
     }
 }
 
+// Remove the inline onclick handler and use event delegation instead
+$(document).ready(function() {
+    // For debugging
+    console.log('JavaScript loaded');
+    
+    $(document).on('click', '.close-ticket:not(.disabled)', function(e) {
+        e.preventDefault();
+        console.log('Close button clicked');
+        const ticketId = $(this).data('id');
+        if (ticketId) {
+            closeTicket(ticketId);
+        } else {
+            console.error('No ticket ID found on button');
+        }
+    });
+});
+
 function closeTicket(ticketId) {
+    console.log('Initiating close for ticket:', ticketId);
+
     Swal.fire({
         title: 'Close Ticket',
         text: 'Are you sure you want to close this ticket?',
@@ -224,73 +244,72 @@ function closeTicket(ticketId) {
         confirmButtonText: 'Yes, close it!'
     }).then((result) => {
         if (result.isConfirmed) {
+            // Show loading state
+            Swal.fire({
+                title: 'Processing...',
+                text: 'Please wait',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // Make the AJAX request
             $.ajax({
-                url: '<?= \yii\helpers\Url::to(['/ticket/close']) ?>',
+                url: '<?= Yii::$app->urlManager->createUrl(['ticket/close']) ?>',
                 type: 'POST',
                 data: {
                     id: ticketId,
                     _csrf: '<?= Yii::$app->request->csrfToken ?>'
                 },
-                dataType: 'json',
-                beforeSend: function() {
-                    // Show loading state
+                dataType: 'json'
+            })
+            .done(function(response) {
+                console.log('Server response:', response);
+                
+                if (response.success) {
                     Swal.fire({
-                        title: 'Processing...',
-                        text: 'Please wait while we close the ticket',
-                        allowOutsideClick: false,
+                        icon: 'success',
+                        title: 'Success!',
+                        text: response.message,
                         showConfirmButton: false,
-                        willOpen: () => {
-                            Swal.showLoading();
-                        }
+                        timer: 1500
+                    }).then(() => {
+                        location.reload();
                     });
-                },
-                success: function(response) {
-                    if (response.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success!',
-                            text: response.message || 'Ticket has been closed successfully',
-                            showConfirmButton: false,
-                            timer: 1500
-                        }).then(() => {
-                            // Reload the page to show updated status
-                            window.location.reload();
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: response.message || 'Failed to close ticket'
-                        });
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error details:', {
-                        status: status,
-                        error: error,
-                        response: xhr.responseText
-                    });
+                } else {
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
-                        text: 'An error occurred while closing the ticket. Please try again.'
+                        text: response.message || 'Failed to close ticket'
                     });
                 }
+            })
+            .fail(function(jqXHR, textStatus, errorThrown) {
+                console.error('AJAX Error:', {
+                    status: textStatus,
+                    statusCode: jqXHR.status,
+                    responseText: jqXHR.responseText,
+                    error: errorThrown
+                });
+
+                let errorMessage = 'An error occurred while closing the ticket.';
+                try {
+                    const response = JSON.parse(jqXHR.responseText);
+                    if (response.message) {
+                        errorMessage = response.message;
+                    }
+                } catch (e) {
+                    console.error('Error parsing response:', e);
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: errorMessage
+                });
             });
         }
     });
 }
-
-// Add event listener for close buttons
-$(document).ready(function() {
-    // For debugging
-    console.log('JavaScript loaded');
-    
-    $(document).on('click', '.close-ticket', function(e) {
-        e.preventDefault();
-        console.log('Close button clicked');
-        const ticketId = $(this).data('id');
-        closeTicket(ticketId);
-    });
-});
-</script>
+  </script>

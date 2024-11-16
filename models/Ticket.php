@@ -63,6 +63,11 @@ class Ticket extends ActiveRecord
             [['assigned_to'], 'integer'],
             [['status'], 'string'],
             [['created_at', 'assigned_at', 'closed_at'], 'safe'],
+            ['reopen_reason', 'safe'],
+            ['reopen_reason', 'string', 'max' => 65535],
+            ['closed_by', 'integer'],
+            ['closed_at', 'safe'],
+            
         ];
     }
 

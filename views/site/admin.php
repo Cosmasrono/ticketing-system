@@ -4,6 +4,7 @@ use yii\grid\GridView;
 use yii\web\JsExpression;
 use app\models\Ticket; // Add this line to import the Ticket model
 use yii\helpers\Url;
+use app\models\User; // Add this line to import the User class
 
 /* @var $this yii\web\View */
 /* @var $dataProvider yii\data\ActiveDataProvider */
@@ -18,16 +19,25 @@ $this->params['breadcrumbs'][] = $this->title;
 
 
 
+
+<!-- Add this button in a suitable location in your admin view -->
  
 
+    
+<div class="row mb-4">
+        <div class="col">
+            <?= Html::a('Create New User', ['site/create-user'], [
+                'class' => 'btn btn-success',
+                'style' => 'margin-right: 10px;'
+            ]) ?>
+            
+           
+        </div>
 
 <div class="row mb-2">
     <div class="col text-end">
         <?= Html::a('View Dashboard', ['site/dashboard'], ['class' => 'btn btn-info me-2']) ?>
-        <?= Html::a('New Client', ['/site/invitation'], [
-            'class' => 'btn btn-sm btn-success',
-            'style' => 'font-size: 0.8rem; padding: 0.25rem 0.5rem;'
-        ]) ?>
+  
     </div>
 </div>
 <div class="admin-index container mt-5">

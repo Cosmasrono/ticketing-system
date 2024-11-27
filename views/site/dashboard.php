@@ -252,6 +252,37 @@ function getStatusColor($status) {
             </div>
         </div>
     </div>
+
+    <!-- Recent Tickets -->
+    <div class="card">
+        <div class="card-header">
+            <h6 class="m-0 font-weight-bold text-primary">Recent Tickets</h6>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Issue</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($recentTickets as $ticket): ?>
+                            <tr>
+                                <td><?= $ticket->id ?></td>
+                                <td><?= Html::encode($ticket->issue) ?></td>
+                                <td><?= Html::encode($ticket->status) ?></td>
+                                <td><?= Yii::$app->formatter->asDatetime($ticket->created_at) ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 </div>
 
 <?php

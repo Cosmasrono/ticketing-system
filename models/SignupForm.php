@@ -1,129 +1,127 @@
 <?php
-
 namespace app\models;
 
-use Yii;
 use yii\base\Model;
-use app\models\User;
-use app\models\Admin;
-use app\models\Developer;
-use app\models\Client;
-use app\models\Invitation;
-use yii\db\Expression;
+use Yii;
 
 class SignupForm extends Model
 {
     public $name;
     public $company_email;
     public $company_name;
-    public $password;
     public $role;
+    public $selectedModules;
+    private $plainPassword;
 
-    /**
-     * {@inheritdoc}
-     */
     public function rules()
     {
         return [
-            [['name', 'company_email', 'company_name', 'password'], 'required'],
-            ['name', 'string', 'min' => 2, 'max' => 255],
+            [['name', 'company_email', 'company_name', 'role'], 'required'],
             ['company_email', 'email'],
-            ['company_email', 'validateInvitation'],
-            ['company_email', 'validateUniqueUser'],
-            ['company_name', 'string', 'max' => 255],
-            ['password', 'string', 'min' => 6],
-            ['role', 'in', 'range' => ['developer', 'admin', 'user']],
+            ['company_email', 'unique', 'targetClass' => User::class],
+            [['name', 'company_name'], 'string', 'max' => 255],
+            ['role', 'in', 'range' => ['user', 'admin', 'developer']],
+            [['selectedModules'], 'safe'],
         ];
     }
 
-    public function attributeLabels()
-    {
-        return [
-            'name' => 'Full Name',
-            'company_email' => 'Company Email',
-            'company_name' => 'Company Name',
-            'password' => 'Password',
-            'role' => 'Role',
-        ];
-    }
-
-    /**
-     * Signs user up.
-     *
-     * @return User|null the saved model or null if saving fails
-     */
     public function signup()
     {
-        if ($this->validate()) {
+        if (!$this->validate()) {
+            return null;
+        }
+
+        try {
             $user = new User();
+            
+            // Set user attributes
             $user->name = $this->name;
             $user->company_email = $this->company_email;
             $user->company_name = $this->company_name;
-            $user->password = $this->password;
             $user->role = $this->role;
+
+            // Handle modules based on role
+            if ($this->role === 'admin' || $this->role === 'developer') {
+                $user->selectedModules = 'All';
+            } else {
+                // For regular users, check if modules are selected
+                if (empty($this->selectedModules)) {
+                    throw new \Exception("Please select at least one module for user role");
+                }
+                $user->selectedModules = implode(',', $this->selectedModules);
+            }
             
-            if ($user->save()) {
-                return $user;
+            // Set other required fields
+            $user->status = 10;
+            $user->created_at = time();
+            $user->updated_at = time();
+            $user->first_login = 1;
+            
+            // Generate password and store it for email
+            $this->plainPassword = Yii::$app->security->generateRandomString(8);
+            $user->setPassword($this->plainPassword);
+            $user->generateAuthKey();
+
+            // Debugging: Log the modules value before saving
+            Yii::info('Selected Modules before saving: ' . $user->selectedModules);
+
+            if (!$user->save()) {
+                $errors = json_encode($user->errors);
+                Yii::error('User save failed: ' . $errors);
+                throw new \Exception("Failed to save user: $errors");
             }
-        }
-        
-        return null;
-    }
 
-    private function determineUserType()
-    {
-        // You need to implement logic here to determine the user type
-        // This could be based on the email domain, a selection made during signup, etc.
-        // For now, let's assume all new signups are clients
-        return 'client';
-    }
-
-  
-    
-    protected function sendVerificationEmail($user)
-    {
-        $verifyLink = Yii::$app->urlManager->createAbsoluteUrl(['site/verify-email', 'token' => $user->verification_token]);
-    
-        $subject = 'Account verification for ' . Yii::$app->name;
-        $htmlBody = $this->renderEmailTemplate('emailVerify-html', ['user' => $user, 'verifyLink' => $verifyLink]);
-        $textBody = $this->renderEmailTemplate('emailVerify-text', ['user' => $user, 'verifyLink' => $verifyLink]);
-    
-        $sent = Yii::$app->brevoMailer->send(
-            $user->company_email,
-            $subject,
-            $htmlBody,
-            $textBody
-        );
-    
-        if (!$sent) {
-            Yii::error('Failed to send verification email to ' . $user->company_email, 'signup');
-        }
-    
-        return $sent;
-    }
-
-    private function renderEmailTemplate($view, $params)
-    {
-        return Yii::$app->view->render("@app/mail/{$view}", $params);
-    }
-
-    public function validateInvitation($attribute, $params)
-    {
-        if (!$this->hasErrors()) {
-            $invitationExists = Yii::$app->db->createCommand('SELECT EXISTS(SELECT 1 FROM invitation WHERE company_email = :email)', [':email' => $this->company_email])->queryScalar();
-            if (!$invitationExists) {
-                $this->addError($attribute, 'No valid invitation found for this email address.');
+            // Send welcome email
+            if (!$this->sendWelcomeEmail($user, $this->plainPassword)) {
+                Yii::warning('Welcome email could not be sent to: ' . $user->company_email);
             }
+
+            // Final verification
+            $savedUser = User::findOne($user->id);
+            if (!$savedUser || empty($savedUser->selectedModules)) {
+                throw new \Exception('User was not saved correctly with modules');
+            }
+
+            return $user;
+
+        } catch (\Exception $e) {
+            Yii::error('Signup failed: ' . $e->getMessage());
+            throw $e;
         }
     }
 
-    public function validateUniqueUser($attribute, $params)
+    private function sendWelcomeEmail($user, $password)
     {
-        if (!$this->hasErrors()) {
-            $userExists = Yii::$app->db->createCommand('SELECT EXISTS(SELECT 1 FROM user WHERE company_email = :email)', [':email' => $this->company_email])->queryScalar();
-            if ($userExists) {
-                $this->addError($attribute, 'This email address has already been taken.');
-            }
+        try {
+            // Generate a unique token for first login
+            $token = Yii::$app->security->generateRandomString(32);
+            $user->password_reset_token = $token;
+            $user->save(false);
+
+            $resetLink = Yii::$app->urlManager->createAbsoluteUrl(['site/first-login', 'token' => $token]);
+
+            return Yii::$app->mailer->compose()
+                ->setTo($user->company_email)
+                ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->params['senderName']])
+                ->setSubject('Your Account Details')
+                ->setHtmlBody("
+                    <div style='font-family: Arial, sans-serif; padding: 20px;'>
+                        <h2>Welcome to " . Yii::$app->name . "</h2>
+                        <p>Hello {$user->name},</p>
+                        <p>Your account has been created. Here are your temporary credentials:</p>
+                        <p><strong>Email:</strong> {$user->company_email}</p>
+                        <p><strong>Temporary Password:</strong> {$password}</p>
+                        <p>Please click the link below to set your new password:</p>
+                        <p><a href='{$resetLink}'>Set Your New Password</a></p>
+                        <p>This link will expire in 24 hours.</p>
+                        <p>If you did not request this account, please contact support.</p>
+                    </div>
+                ")
+                ->send();
+
+        } catch (\Exception $e) {
+            Yii::error("Email error: " . $e->getMessage());
+            return false;
         }
     }
 }

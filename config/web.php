@@ -69,6 +69,8 @@ $config = [
                 'ticket/reopen/<id:\d+>' => 'ticket/reopen',
                 'ticket/reopen' => 'ticket/reopen',
                 'ticket/close' => 'ticket/close',
+                'change-password' => 'site/change-password',
+                'create-user' => 'site/create-user',
             ],
         ],
         'session' => [
@@ -93,6 +95,20 @@ $config = [
             'dateFormat' => 'php:Y-m-d',
             'datetimeFormat' => 'php:Y-m-d H:i:s',
             'timeFormat' => 'php:H:i:s',
+        ],
+        'access' => [
+            'class' => 'yii\filters\AccessControl',
+            'rules' => [
+                [
+                    'actions' => ['create-user'],
+                    'allow' => true,
+                    'roles' => ['@'],
+                    'matchCallback' => function ($rule, $action) {
+                        return Yii::$app->user->identity->role === 'admin';
+                    }
+                ],
+                // ... other rules ...
+            ],
         ],
     ],
     'params' => $params,

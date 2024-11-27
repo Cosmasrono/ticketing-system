@@ -2,45 +2,62 @@
 
 namespace app\models;
 
+use Yii;
 use yii\base\Model;
 use yii\base\InvalidArgumentException;
-use Yii;
 
 class ResetPasswordForm extends Model
 {
-    public $password;
-    public $password_repeat;
+    public $new_password;
+    public $confirm_password;
+    
+    private $_user;
+    private $_token;
 
     /**
-     * @var \app\models\User
+     * Creates a form model given a token.
+     *
+     * @param string $token
+     * @param array $config name-value pairs that will be used to initialize the object properties
+     * @throws InvalidArgumentException if token is empty or not valid
      */
-    private $_user;
-
     public function __construct($token, $config = [])
     {
         if (empty($token) || !is_string($token)) {
             throw new InvalidArgumentException('Password reset token cannot be blank.');
         }
+        
+        $this->_token = $token;
         $this->_user = User::findByPasswordResetToken($token);
+        
         if (!$this->_user) {
             throw new InvalidArgumentException('Wrong password reset token.');
         }
+        
         parent::__construct($config);
     }
 
+    /**
+     * {@inheritdoc}
+     */
     public function rules()
     {
         return [
-            [['password', 'password_repeat'], 'required'],
-            [['password', 'password_repeat'], 'string', 'min' => 6],
-            ['password_repeat', 'compare', 'compareAttribute' => 'password', 'message' => 'Passwords don\'t match.'],
+            [['new_password', 'confirm_password'], 'required'],
+            ['new_password', 'string', 'min' => 6],
+            ['confirm_password', 'compare', 'compareAttribute' => 'new_password'],
         ];
     }
 
+    /**
+     * Resets password.
+     *
+     * @return bool if password was reset.
+     */
     public function resetPassword()
     {
         $user = $this->_user;
-        $user->setPassword($this->password);
+        $user->setPassword($this->new_password);
         $user->removePasswordResetToken();
 
         return $user->save(false);

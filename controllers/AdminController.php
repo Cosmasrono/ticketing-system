@@ -23,10 +23,13 @@ class AdminController extends Controller
                         'allow' => true,
                         'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->isAdmin();
+                            return Yii::$app->user->identity->role === 'admin';
                         }
                     ],
                 ],
+                'denyCallback' => function ($rule, $action) {
+                    throw new \yii\web\ForbiddenHttpException('You are not allowed to access this page');
+                }
             ],
         ];
     }
@@ -59,5 +62,10 @@ class AdminController extends Controller
             'dataProvider' => $dataProvider,
             'ticketCounts' => $ticketCounts,
         ]);
+    }
+
+    public function actionDashboard()
+    {
+        return $this->render('dashboard');
     }
 }

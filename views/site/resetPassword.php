@@ -12,9 +12,9 @@ $this->params['breadcrumbs'][] = $this->title;
 
     <?php $form = ActiveForm::begin(['id' => 'reset-password-form']); ?>
 
-        <?= $form->field($model, 'password')->passwordInput(['autofocus' => true]) ?>
+        <?= $form->field($model, 'new_password')->passwordInput(['autofocus' => true]) ?>
 
-        <?= $form->field($model, 'password_repeat')->passwordInput() ?>
+        <?= $form->field($model, 'confirm_password')->passwordInput() ?>
 
         <div class="form-group">
             <?= Html::submitButton('Save', ['class' => 'btn btn-primary']) ?>

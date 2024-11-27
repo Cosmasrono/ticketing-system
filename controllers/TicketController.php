@@ -30,24 +30,80 @@ use yii\filters\Cors;
 use yii\queue\Queue;
 use app\jobs\SendTicketAssignmentEmail;
 use app\models\Notification;
+use yii\web\UploadedFile;
+ 
  
  
 
 class TicketController extends Controller
 {
     private $_moduleIssues = [
-        'HR' => ['Employee Onboarding', 'Leave Management', 'Payroll', 'Other'],
-        'IT' => ['Hardware', 'Software', 'Network', 'Other'],
-        'Finance' => ['Invoicing', 'Payments', 'Expenses', 'Other'],
-        
+        'Members Portal' => [
+            'Login Issues',
+            'Registration Problems',
+            'Profile Updates',
+            'Password Reset',
+            'Account Verification',
+            'Other'
+        ],
+        'Mobile App' => [
+            'App Crashes',
+            'Login Failed',
+            'Payment Issues',
+            'App Update Problems',
+            'Connectivity Issues',
+            'Other'
+        ],
+        'Power BI' => [
+            'Report Access',
+            'Data Refresh Issues',
+            'Dashboard Loading',
+            'Visualization Problems',
+            'Data Connection',
+            'Other'
+        ],
     ];
 
     public function behaviors()
     {
         return [
             'access' => [
-                'class' => AccessControl::className(),
+                'class' => \yii\filters\AccessControl::className(),
                 'rules' => [
+                    [
+                        'actions' => ['index', 'create', 'view', 'update', 'delete', 'close'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            if (Yii::$app->user->identity->role === 'admin') {
+                                Yii::$app->session->setFlash('error', 'Administrators do not have access to tickets.');
+                                Yii::$app->response->redirect(['/site/admin'])->send();
+                                return false;
+                            }
+                            return true;
+                        },
+                        'denyCallback' => function ($rule, $action) {
+                            throw new \yii\web\ForbiddenHttpException('You are not allowed to access this page.');
+                        }
+                    ],
+                    [
+                        'actions' => ['get-issues'],
+                        'allow' => true,
+                        'roles' => ['@'], // Allow authenticated users
+                    ],
+                    [
+                        'actions' => ['create', 'view', 'index'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                    ],
+                    [
+                        'actions' => ['update', 'delete', 'assign', 'admin'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            return in_array(Yii::$app->user->identity->role, ['admin', 'superadmin']);
+                        }
+                    ],
                     [
                         'actions' => ['cancel'],
                         'allow' => true,
@@ -55,7 +111,7 @@ class TicketController extends Controller
                     ],
 
                     [
-                        'actions' => ['close'],
+                        'actions' => ['close', 'view'],
                         'allow' => true,
                         'roles' => ['developer'],
                     ],
@@ -95,7 +151,7 @@ class TicketController extends Controller
                     ],
                     // Rule for developers
                     [
-                        'actions' => ['view', 'index'],
+                        'actions' => ['view', 'index','close'],
                         'allow' => true,
                         'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
@@ -118,26 +174,89 @@ class TicketController extends Controller
                         'allow' => true,
                         'roles' => ['@'], // Allow authenticated users
                     ],
+                    // Rule for developers to view assigned tickets
+                    [
+                        'actions' => ['view', 'index'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            if (Yii::$app->user->identity->role === 'developer') {
+                                if ($action->id === 'view') {
+                                    $ticketId = Yii::$app->request->get('id');
+                                    $ticket = Ticket::findOne($ticketId);
+                                    return $ticket && $ticket->assigned_to === Yii::$app->user->id;
+                                }
+                                // For index action, the filtering will be done in the action itself
+                                return true;
+                            }
+                            return false;
+                        }
+                    ],
+                    // Rule for developers to view their dashboard
+                    [
+                        'actions' => ['developer/view', 'view', 'index'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            return Yii::$app->user->identity->role === 'developer';
+                        }
+                    ],
+                    [
+                        'actions' => ['delete'],
+                        'allow' => true,
+                        'roles' => ['@'], // @ means authenticated users
+                        'matchCallback' => function ($rule, $action) {
+                            $id = Yii::$app->request->get('id');
+                            $ticket = $this->findModel($id);
+                            $user = Yii::$app->user->identity;
+                            
+                            // Allow if user owns the ticket
+                            return $ticket->created_by === $user->id;
+                        }
+                    ],
+                    [
+                        'actions' => ['assigned'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            return Yii::$app->user->identity->role === 'developer';
+                        }
+                    ],
+                    [
+                        'actions' => ['view'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            $user = Yii::$app->user->identity;
+                            if ($user->role === 'developer') {
+                                $ticketId = Yii::$app->request->get('id');
+                                $ticket = $this->findModel($ticketId);
+                                return $ticket->assigned_to == $user->id;
+                            }
+                            return true; // Allow other roles
+                        }
+                    ],
                 ],
-                'denyCallback' => function ($rule, $action) {
-                    Yii::$app->session->setFlash('error', 'You are not authorized to perform this action.');
-                    return $this->redirect(['site/index']);
-                }
+                // 'denyCallback' => function ($rule, $action) {
+                //     Yii::$app->session->setFlash('error', 'You are not authorized to perform this action.');
+                //     return $this->redirect(['site/index']);
+                // }
             ],
             'verbs' => [
-                'class' => VerbFilter::className(),
+                'class' => \yii\filters\VerbFilter::className(),
                 'actions' => [
                     'approve' => ['POST'],
-                    'delete' => ['POST'],
+                    'delete' => ['POST', 'GET'],
                     'assign' => ['POST', 'GET'],
                     'close' => ['POST'],
                     'escalate' => ['POST'],
                     'cancel' => ['POST'],
                     'reopen' => ['POST'],
+                    'get-issues' => ['post'],
                 ],
             ],
             'corsFilter' => [
-                'class' => Cors::className(),
+                'class' => \yii\filters\Cors::className(),
             ],
         ];
     }
@@ -148,8 +267,15 @@ class TicketController extends Controller
             return false;
         }
 
-        if (Yii::$app->user->can('admin')) {
-            throw new ForbiddenHttpException('Administrators do not have access to tickets.');
+        // Check if the action is 'close'
+        if ($action->id === 'close') {
+            // Allow only the ticket creator to close the ticket
+            $ticketId = Yii::$app->request->post('id');
+            $ticket = Ticket::findOne($ticketId);
+
+            if (!$ticket || $ticket->created_by !== Yii::$app->user->id) {
+                throw new \yii\web\ForbiddenHttpException('You are not allowed to close this ticket.');
+            }
         }
 
         return true;
@@ -157,8 +283,19 @@ class TicketController extends Controller
 
     public function actionIndex()
     {
+        $query = Ticket::find()
+            ->where(['created_by' => Yii::$app->user->id]); // Show only tickets created by current user
+
         $dataProvider = new ActiveDataProvider([
-            'query' => Ticket::find()->where(['company_email' => Yii::$app->user->identity->company_email]),
+            'query' => $query,
+            'sort' => [
+                'defaultOrder' => [
+                    'created_at' => SORT_DESC, // Latest tickets first
+                ]
+            ],
+            'pagination' => [
+                'pageSize' => 10, // Number of tickets per page
+            ],
         ]);
 
         return $this->render('index', [
@@ -182,98 +319,111 @@ class TicketController extends Controller
         throw new NotFoundHttpException('The requested ticket does not exist.');
     }
 
-    public function actionView($id = null)
+    public function actionView($id)
     {
-        if ($id === null) {
-            return $this->redirect(['index']);
-        }
-
-        $model = $this->findModel($id);
+        $ticket = $this->findModel($id);
         
-        // Check if the ticket belongs to the current user
-        if ($model->company_email !== Yii::$app->user->identity->company_email) {
-            throw new \yii\web\ForbiddenHttpException('You are not allowed to view this ticket.');
-        }
-
+        // Debug logging
+        Yii::debug([
+            'ticket_id' => $ticket->id,
+            'created_by' => $ticket->created_by,
+            'creator_details' => User::findOne($ticket->created_by),
+        ], 'ticket-view');
+        
         return $this->render('view', [
-            'model' => $model,
+            'model' => $ticket,
         ]);
     }
-    
-    public function actionCreate()
+
+    public function actionGetIssues()
     {
-        $model = new Ticket();
-        $user = Yii::$app->user->identity;
-    
-        // Find the invitation for the current user
-        $invitation = Invitation::findOne([
-            'company_email' => $user->company_email
-        ]);
-    
-        if (!$invitation) {
-            Yii::$app->session->setFlash('error', 'No invitation found. Please contact support.');
-            return $this->redirect(['site/index']);
-        }
-    
-        // Set the module from invitation
-        $model->module = $invitation->module;
-    
-        if ($model->load(Yii::$app->request->post())) {
-            // Explicitly set the current timestamp and other fields
-            $model->created_at = date('Y-m-d H:i:s');
-            $model->created_by = $user->id;
-            $model->company_name = $user->company_name;
-            $model->company_email = $user->company_email;
-            $model->status = Ticket::STATUS_PENDING;
-    
-            if ($model->save()) {
-                // Call the method to send email notification to admin
-                $htmlContent = $this->renderPartial('@app/mail/ticketNotification', [
-                    'username' => $user->username,
-                    'company_name' => $model->company_name,
-                    'description' => $model->description,
-                    'ticketId' => $model->id,
-                    'module' => $model->module,
-                    'issue' => $model->issue
-                ]);
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        
+        try {
+            $selectedModule = Yii::$app->request->post('module');
+            
+            // Debug logging
+            Yii::info('Received module: ' . $selectedModule);
+            
+            // Define issues for each module (ensure exact string matching)
+            $moduleIssues = [
+                'Members Portal' => [
+                    'Login Issues',
+                    'Password Reset',
+                    'Profile Update Problems',
+                    'Document Upload Issues',
+                    'Payment Gateway Problems',
+                    'Account Access',
+                    'Form Submission Errors',
+                    'Data Display Issues',
+                    'Registration Problems',
+                    'Account Verification',
+                    'Other'
+                ],
+                'Power BI' => [
+                    'Report Loading Issues',
+                    'Data Refresh Problems',
+                    'Dashboard Access',
+                    'Visualization Errors',
+                    'Filter Malfunction',
+                    'Export Issues',
+                    'Performance Problems',
+                    'Data Connection Issues',
+                    'Report Access',
+                    'Other'
+                ],
+                'Mobile App' => [
+                    'App Crashes',
+                    'Login Problems',
+                    'Data Sync Issues',
+                    'Performance Issues',
+                    'Feature Not Working',
+                    'UI/UX Problems',
+                    'Notification Issues',
+                    'Update Problems',
+                    'Account Issues',
+                    'Other'
+                ]
+            ];
 
-                $emailSent = Yii::$app->mailer->compose()
-                    ->setFrom([Yii::$app->params['senderEmail'] => 'Ticket System'])
-                    ->setTo([Yii::$app->params['adminEmail'] => 'Admin'])
-                    ->setReplyTo([$user->company_email => $user->username])
-                    ->setSubject("New Ticket #{$model->id} - {$model->company_name} - {$model->module}")
-                    ->setHtmlBody($htmlContent)
-                    ->send();
-
-                Yii::$app->session->setFlash(
-                    $emailSent ? 'success' : 'warning',
-                    $emailSent 
-                        ? 'Ticket created successfully and email notification sent.'
-                        : 'Ticket created but email notification failed.'
-                );
-
-                return $this->redirect(['view', 'id' => $model->id]);
-            } else {
-                Yii::$app->session->setFlash('error', 'There was an error creating the ticket: ' . print_r($model->errors, true));
+            // Case-insensitive module matching
+            $normalizedModule = null;
+            foreach (array_keys($moduleIssues) as $key) {
+                if (strtolower($key) === strtolower($selectedModule)) {
+                    $normalizedModule = $key;
+                    break;
+                }
             }
+            
+            // Debug logging
+            Yii::info('Normalized module: ' . ($normalizedModule ?? 'not found'));
+            
+            $issues = $normalizedModule ? $moduleIssues[$normalizedModule] : [];
+            
+            // Debug logging
+            Yii::info('Found issues: ' . print_r($issues, true));
+            
+            return [
+                'success' => true,
+                'issues' => $issues,
+                'module' => $selectedModule,
+                'debug' => [
+                    'receivedModule' => $selectedModule,
+                    'normalizedModule' => $normalizedModule,
+                    'issuesCount' => count($issues)
+                ]
+            ];
+            
+        } catch (\Exception $e) {
+            Yii::error('Error in getIssues: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Error loading issues',
+                'error' => YII_DEBUG ? $e->getMessage() : null
+            ];
         }
-    
-        // Get module-specific issues and recent tickets
-        $currentIssues = isset($this->_moduleIssues[$model->module]) ? $this->_moduleIssues[$model->module] : [];
-        $recentTickets = Ticket::find()
-            ->where(['created_by' => $user->id])
-            ->orderBy(['created_at' => SORT_DESC])
-            ->limit(5)
-            ->all();
-    
-        return $this->render('create', [
-            'model' => $model,
-            'moduleIssues' => $this->_moduleIssues,
-            'currentIssues' => $currentIssues,
-            'recentTickets' => $recentTickets,
-        ]);
     }
-    
+
     /**
      * Sends an email notification to the admin when a new ticket is raised.
      * @param Ticket $model The ticket model
@@ -295,19 +445,6 @@ class TicketController extends Controller
         }
     }
     
-
-    /**
-     * Gets issues for a specific module or all modules
-     * @param string|null $module
-     * @return array
-     */
-    private function getModuleIssues($module = null)
-    {
-        if ($module !== null && isset($this->_moduleIssues[$module])) {
-            return $this->_moduleIssues[$module];
-        }
-        return $this->_moduleIssues;
-    }
 
     private function getUserRole($user)
     {
@@ -372,48 +509,101 @@ class TicketController extends Controller
     public function actionApprove()
     {
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-
+        
         try {
             $id = Yii::$app->request->post('id');
             
-            if (!$id) {
-                return [
-                    'success' => false,
-                    'message' => 'Ticket ID is required'
-                ];
-            }
-
+            // Debug log
+            Yii::info('Attempting to approve ticket #' . $id);
+            
             $ticket = Ticket::findOne($id);
             
             if (!$ticket) {
+                Yii::error('Ticket not found: #' . $id);
                 return [
                     'success' => false,
-                    'message' => 'Ticket not found'
+                    'message' => 'Ticket not found.'
                 ];
             }
 
-            // Update the status to approved
-            $ticket->status = Ticket::STATUS_APPROVED;
-            
-            if ($ticket->save()) {
-                return [
-                    'success' => true,
-                    'message' => 'Ticket approved successfully'
-                ];
-            } else {
-                Yii::error('Failed to approve ticket: ' . json_encode($ticket->errors));
+            // Check current status
+            Yii::info('Current ticket status: ' . $ticket->status);
+
+            // Validate ticket status
+            if ($ticket->status === 'approved') {
                 return [
                     'success' => false,
-                    'message' => 'Failed to approve ticket: ' . json_encode($ticket->errors)
+                    'message' => 'Ticket is already approved.'
                 ];
             }
+
+            if ($ticket->status === 'cancelled') {
+                return [
+                    'success' => false,
+                    'message' => 'Cannot approve a cancelled ticket.'
+                ];
+            }
+
+            // Update ticket status only
+            $ticket->status = 'approved';
+
+            // Debug log before save
+            Yii::info('Attempting to save ticket with data: ' . json_encode($ticket->attributes));
+
+            if (!$ticket->save(false)) {
+                Yii::error('Failed to save ticket: ' . json_encode($ticket->errors));
+                return [
+                    'success' => false,
+                    'message' => 'Failed to save ticket: ' . json_encode($ticket->errors)
+                ];
+            }
+
+            // Log success
+            Yii::info('Successfully approved ticket #' . $id);
+
+            return [
+                'success' => true,
+                'message' => 'Ticket has been approved successfully.'
+            ];
 
         } catch (\Exception $e) {
-            Yii::error('Error in actionApprove: ' . $e->getMessage());
+            // Log the full error
+            Yii::error('Error approving ticket: ' . $e->getMessage() . "\n" . $e->getTraceAsString());
+            
             return [
                 'success' => false,
-                'message' => 'An error occurred while approving the ticket'
+                'message' => YII_DEBUG ? 
+                    'Error: ' . $e->getMessage() : 
+                    'An error occurred while approving the ticket.'
             ];
+        }
+    }
+
+    protected function sendApprovalEmail($ticket)
+    {
+        try {
+            $user = User::findOne($ticket->created_by);
+            if (!$user) {
+                Yii::error('User not found for ticket #' . $ticket->id);
+                return false;
+            }
+
+            $htmlContent = Yii::$app->controller->renderPartial('//mail/ticket-approved', [
+                'ticket' => $ticket,
+                'user' => $user
+            ]);
+
+            Yii::$app->mailer->compose()
+                ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->params['senderName']])
+                ->setTo($user->email)
+                ->setSubject('Ticket #' . $ticket->id . ' Approved')
+                ->setHtmlBody($htmlContent)
+                ->send();
+
+            return true;
+        } catch (\Exception $e) {
+            Yii::error('Failed to send approval email: ' . $e->getMessage());
+            return false;
         }
     }
     
@@ -509,110 +699,115 @@ class TicketController extends Controller
 
 
     public function actionAssign($id)
-{
-    $ticket = Ticket::findOne($id);
-    if (!$ticket) {
-        throw new NotFoundHttpException('The requested ticket does not exist.');
-    }
+    {
+        // Set JSON response format for AJAX requests
+        if (Yii::$app->request->isAjax) {
+            Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        }
 
-    $developers = User::find()
-        ->where(['role' => User::ROLE_DEVELOPER]);
-    
-    // Handle form submission
-    if ($ticket->load(Yii::$app->request->post())) {
-        // Start transaction
-        $transaction = Yii::$app->db->beginTransaction();
-        try {
-            // Store the original status
-            $originalStatus = $ticket->status;
-            
-            // First save the assigned_to field
-            if ($ticket->save(true, ['assigned_to'])) {
-                // Get the assigned developer's details
-                $developer = User::findOne($ticket->assigned_to);
+        // Get developers first
+        $developers = User::find()
+            ->where(['role' => User::ROLE_DEVELOPER])
+            ->andWhere(['status' => 10])
+            ->all();
+
+        if (empty($developers)) {
+            if (Yii::$app->request->isAjax) {
+                return [
+                    'success' => false,
+                    'message' => 'No developers available for assignment.'
+                ];
+            }
+            Yii::$app->session->setFlash('error', 'No developers available for assignment.');
+            return $this->redirect(['index']);
+        }
+
+        $ticket = Ticket::findOne($id);
+        if (!$ticket) {
+            throw new NotFoundHttpException('The requested ticket does not exist.');
+        }
+
+        if (Yii::$app->request->isAjax && Yii::$app->request->isPost) {
+            $transaction = Yii::$app->db->beginTransaction();
+            try {
+                $developerId = Yii::$app->request->post('Ticket')['assigned_to'] ?? null;
                 
-                // Send email notification to the assigned developer
-                $htmlContent = $this->renderPartial('@app/mail/assignmentNotification', [
-                    'developer_name' => $developer->username,
-                    'ticket_id' => $ticket->id,
-                    'company_name' => $ticket->company_name,
-                    'description' => $ticket->description,
-                    'module' => $ticket->module,
-                    'issue' => $ticket->issue
-                ]);
+                // Validate developer exists in our fetched list
+                $developerExists = false;
+                foreach ($developers as $developer) {
+                    if ($developer->id == $developerId) {
+                        $developerExists = true;
+                        break;
+                    }
+                }
 
-                $emailSent = Yii::$app->mailer->compose()
-                    ->setFrom([Yii::$app->params['senderEmail'] => 'Ticket System'])
-                    ->setTo([$developer->company_email => $developer->username])
-                    ->setSubject("Ticket #{$ticket->id} - {$ticket->company_name} - {$ticket->module}")
-                    ->setHtmlBody($htmlContent)
-                    ->send();
+                if (!$developerExists) {
+                    throw new \Exception('Selected developer is not valid');
+                }
 
-                // Check if it's an escalated ticket
-                if ($originalStatus === Ticket::STATUS_ESCALATED) {
-                    // Direct database update to ensure status change
-                    $success = Yii::$app->db->createCommand()
-                        ->update('ticket',
-                            ['status' => 'reassigned'],
-                            ['id' => $ticket->id]
-                        )->execute();
-
-                    if (!$success) {
-                        throw new \Exception('Failed to update ticket status');
+                $ticket->assigned_to = $developerId;
+                
+                if ($ticket->save(false)) {
+                    // Check if it's an escalated ticket
+                    if ($ticket->status === 'escalated') {
+                        $ticket->status = 'reassigned';
+                        $ticket->save(false);
+                        $message = 'Developer reassigned successfully';
+                    } else {
+                        $message = 'Developer assigned successfully';
                     }
 
-                    // Refresh the ticket model to get the new status
-                    $ticket->refresh();
-                }
-                
-                $transaction->commit();
-                
-                if (Yii::$app->request->isAjax) {
-                    Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+                    $transaction->commit();
+                    
+                    // Send email notification
+                    try {
+                        $emailSent = Yii::$app->mailer->compose('assignmentNotification', [
+                            'developer_name' => $developer->name,  // Using name
+                            'ticket_id' => $ticket->id,
+                            'company_name' => $ticket->company_name,
+                            'description' => $ticket->description,
+                            'module' => $ticket->module,
+                            'issue' => $ticket->issue
+                        ])
+                        ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->params['senderName']])
+                        ->setTo([$developer->company_email => $developer->name])  // Using name in recipient
+                        ->setSubject("Ticket Assignment #{$ticket->id} - {$ticket->company_name}")
+                        ->send();
+
+                        if (!$emailSent) {
+                            Yii::error('Failed to send email notification to developer: ' . $developer->name);
+                        }
+                    } catch (\Exception $e) {
+                        Yii::error('Email sending failed for developer ' . $developer->name . ': ' . $e->getMessage());
+                        // Continue execution even if email fails
+                    }
+
                     return [
                         'success' => true,
-                        'message' => 'Developer reassigned successfully' . ($emailSent ? ' and notified' : ''),
+                        'message' => $message,
                         'newStatus' => $ticket->status,
                         'ticketId' => $ticket->id
                     ];
                 }
-
-                Yii::$app->session->setFlash('success', 
-                    'Developer reassigned successfully' . ($emailSent ? ' and notified' : '')
-                );
-                return $this->redirect(['view', 'id' => $ticket->id]);
-            } else {
-                throw new \Exception('Failed to save assigned_to: ' . json_encode($ticket->errors));
-            }
-        } catch (\Exception $e) {
-            $transaction->rollBack();
-            Yii::error('Assignment error: ' . $e->getMessage());
-            
-            if (Yii::$app->request->isAjax) {
+                
+                throw new \Exception('Failed to save ticket');
+                
+            } catch (\Exception $e) {
+                $transaction->rollBack();
                 return [
                     'success' => false,
-                    'message' => 'Failed to reassign developer: ' . $e->getMessage()
+                    'message' => ($ticket->status === 'escalated' ? 'Failed to reassign' : 'Failed to assign') . 
+                                ' developer: ' . $e->getMessage()
                 ];
             }
-            
-            Yii::$app->session->setFlash('error', 'Failed to reassign developer: ' . $e->getMessage());
         }
-    }
 
-    $developers = $developers->all();
-
-    if (Yii::$app->request->isAjax) {
-        return $this->renderAjax('_assign_form', [
+        // For non-AJAX requests, render the form
+        return $this->render('assign', [
             'ticket' => $ticket,
-            'developers' => $developers,
+            'developers' => $developers
         ]);
     }
-
-    return $this->render('assign', [
-        'ticket' => $ticket,
-        'developers' => $developers,
-        ]);
-    }   
 
     private function getDevelopers()
     {
@@ -620,20 +815,38 @@ class TicketController extends Controller
         return ArrayHelper::map($developers, 'id', 'name'); // Assuming 'name' is the field for the developer's name
     }
 
+ 
+
     public function actionDelete($id)
     {
         $ticket = $this->findModel($id);
-        
-        // Check if the current user is the owner of the ticket
-        if (Yii::$app->user->id != $ticket->created_by) {
-            Yii::$app->session->setFlash('error', 'You can only delete your own tickets.');
+        $user = Yii::$app->user->identity;
+
+        // Check if the user owns this ticket or is an admin
+        if ($ticket->created_by !== $user->id && !Yii::$app->user->can('admin')) {
+            Yii::$app->session->setFlash('error', 'You do not have permission to delete this ticket.');
             return $this->redirect(['index']);
         }
 
-        if ($ticket->delete()) {
-            Yii::$app->session->setFlash('success', 'Ticket deleted successfully.');
-        } else {
-            Yii::$app->session->setFlash('error', 'Failed to delete the ticket.');
+        try {
+            // Delete the ticket
+            if ($ticket->delete()) {
+                // Delete associated screenshot if exists
+                if ($ticket->screenshot) {
+                    $uploadPath = Yii::getAlias('@webroot/uploads/');
+                    $filePath = $uploadPath . $ticket->screenshot;
+                    if (file_exists($filePath)) {
+                        unlink($filePath);
+                    }
+                }
+                
+                Yii::$app->session->setFlash('success', 'Ticket has been deleted successfully.');
+            } else {
+                Yii::$app->session->setFlash('error', 'Failed to delete the ticket.');
+            }
+        } catch (\Exception $e) {
+            Yii::$app->session->setFlash('error', 'An error occurred while deleting the ticket.');
+            Yii::error('Error deleting ticket: ' . $e->getMessage());
         }
 
         return $this->redirect(['index']);
@@ -732,38 +945,18 @@ class TicketController extends Controller
         
         try {
             $id = Yii::$app->request->post('id');
-            if (!$id) {
+            $comment = Yii::$app->request->post('comment');
+            
+            if (empty($comment)) {
                 return [
                     'success' => false,
-                    'message' => 'Ticket ID is required'
+                    'message' => 'Escalation comment is required'
                 ];
             }
 
             $ticket = $this->findModel($id);
-            if (!$ticket) {
-                return [
-                    'success' => false,
-                    'message' => 'Ticket not found'
-                ];
-            }
-
-            // Validate user permissions
-            if (!Yii::$app->user->can('developer')) {
-                return [
-                    'success' => false,
-                    'message' => 'Only developers can escalate tickets'
-                ];
-            }
-
-            // Validate ticket assignment
-            if ($ticket->assigned_to != Yii::$app->user->id) {
-                return [
-                    'success' => false,
-                    'message' => 'You can only escalate tickets assigned to you'
-                ];
-            }
-
-            // Check ticket status
+            
+            // Check if ticket can be escalated
             if ($ticket->status === 'escalated') {
                 return [
                     'success' => false,
@@ -771,42 +964,70 @@ class TicketController extends Controller
                 ];
             }
 
-            if ($ticket->status === 'closed') {
-                return [
-                    'success' => false,
-                    'message' => 'Cannot escalate closed tickets'
-                ];
-            }
-
+            // Start transaction
             $transaction = Yii::$app->db->beginTransaction();
+            
             try {
+                // Update ticket
                 $ticket->status = 'escalated';
-                $ticket->escalated_at = date('Y-m-d H:i:s');
-
-                if ($ticket->save()) {
+                $ticket->escalation_comment = $comment;
+                $ticket->escalated_at = new \yii\db\Expression('NOW()'); // If you have this column
+                $ticket->escalated_by = Yii::$app->user->id; // If you have this column
+                
+                if ($ticket->save(false)) {
+                    // Optional: Log the escalation
+                    Yii::info("Ticket #{$ticket->id} escalated. Comment: {$comment}", 'ticket');
+                    
+                    // Optional: Send notification
+                    $this->sendEscalationNotification($ticket);
+                    
                     $transaction->commit();
+                    
                     return [
                         'success' => true,
                         'message' => 'Ticket has been escalated successfully'
                     ];
                 }
-
-                $transaction->rollBack();
-                return [
-                    'success' => false,
-                    'message' => 'Failed to escalate ticket'
-                ];
-
+                
+                throw new \Exception('Failed to save ticket');
+                
             } catch (\Exception $e) {
                 $transaction->rollBack();
+                Yii::error("Escalation failed: " . $e->getMessage());
                 throw $e;
             }
+
         } catch (\Exception $e) {
-            Yii::error('Error in escalate action: ' . $e->getMessage());
             return [
                 'success' => false,
-                'message' => 'An error occurred while escalating the ticket'
+                'message' => YII_DEBUG ? $e->getMessage() : 'An error occurred while escalating the ticket'
             ];
+        }
+    }
+
+    protected function sendEscalationNotification($ticket)
+    {
+        // Optional: Send email notification about escalation
+        try {
+            $adminEmail = Yii::$app->params['adminEmail'];
+            
+            Yii::$app->mailer->compose()
+                ->setFrom(['iansoft.ticketing@gmail.com' => 'Iansoft Ticketing'])
+                ->setTo($adminEmail)
+                ->setSubject("Ticket #{$ticket->id} Escalated")
+                ->setHtmlBody("
+                    <h3>Ticket Escalation Notification</h3>
+                    <p>Ticket #{$ticket->id} has been escalated.</p>
+                    <p><strong>Escalation Comment:</strong></p>
+                    <p>{$ticket->escalation_comment}</p>
+                    <p><strong>Original Issue:</strong></p>
+                    <p>{$ticket->issue}</p>
+                    <hr>
+                    <p>Please review this escalation as soon as possible.</p>
+                ")
+                ->send();
+        } catch (\Exception $e) {
+            Yii::error("Failed to send escalation notification: " . $e->getMessage());
         }
     }
 
@@ -875,13 +1096,22 @@ class TicketController extends Controller
                 ];
             }
 
-            // Update status to closed
-            $ticket->setAttribute('status', 'closed');
-            
+            // Check if the current user is the ticket creator
+            if ($ticket->created_by !== Yii::$app->user->id) {
+                return [
+                    'success' => false,
+                    'message' => 'You can only close tickets that you created'
+                ];
+            }
+
+            $ticket->status = 'closed';
+            $ticket->closed_at = new \yii\db\Expression('NOW()');
+            $ticket->closed_by = Yii::$app->user->id;
+
             if ($ticket->save(false)) {
                 return [
                     'success' => true,
-                    'message' => 'Ticket closed successfully'
+                    'message' => 'Ticket has been closed successfully'
                 ];
             }
 
@@ -1068,6 +1298,94 @@ class TicketController extends Controller
         } catch (\Exception $e) {
             Yii::error("Error sending email to $to: " . $e->getMessage(), 'ticket');
         }
+    }
+
+    public function actionCreate()
+    {
+        $model = new Ticket();
+        $user = Yii::$app->user->identity;
+        
+        // Get user's assigned modules from selectedModules column
+        $userModules = array_map('trim', explode(',', $user->selectedModules));
+        $modulesList = array_combine($userModules, $userModules); // Create associative array
+
+        if ($model->load(Yii::$app->request->post())) {
+            // Validate if selected module is assigned to user
+            if (!in_array($model->selectedModule, $userModules)) {
+                Yii::$app->session->setFlash('error', 'You are not authorized to create tickets for this module.');
+                return $this->redirect(['create']);
+            }
+
+            $model->created_at = date('Y-m-d H:i:s');
+            $model->created_by = $user->id;
+            $model->company_name = $user->company_name;
+            $model->company_email = $user->company_email;
+            $model->status = Ticket::STATUS_PENDING;
+            $model->module = $model->selectedModule;
+
+            // Handle file upload
+            $model->screenshot = UploadedFile::getInstance($model, 'screenshot');
+            if ($model->screenshot) {
+                $fileName = 'ticket_' . time() . '.' . $model->screenshot->extension;
+                $uploadPath = Yii::getAlias('@webroot/uploads/');
+                if (!is_dir($uploadPath)) {
+                    mkdir($uploadPath, 0777, true);
+                }
+                $model->screenshot->saveAs($uploadPath . $fileName);
+                $model->screenshot = $fileName;
+            }
+
+            if ($model->save()) {
+                // Send email notification
+                $this->sendTicketNotification($model, $user);
+                return $this->redirect(['view', 'id' => $model->id]);
+            }
+        }
+
+        return $this->render('create', [
+            'model' => $model,
+            'modulesList' => $modulesList,
+        ]);
+    }
+
+    // Helper method for email notification
+    private function sendTicketNotification($model, $user)
+    {
+        $htmlContent = $this->renderPartial('@app/mail/ticketNotification', [
+            'username' => $user->username,
+            'company_name' => $model->company_name,
+            'description' => $model->description,
+            'ticketId' => $model->id,
+            'module' => $model->selectedModule,
+            'issue' => $model->issue
+        ]);
+
+        $emailSent = Yii::$app->mailer->compose()
+            ->setFrom([Yii::$app->params['senderEmail'] => 'Ticket System'])
+            ->setTo([Yii::$app->params['adminEmail'] => 'Admin'])
+            ->setReplyTo([$user->company_email => $user->username])
+            ->setSubject("New Ticket #{$model->id} - {$model->company_name} - {$model->selectedModule}")
+            ->setHtmlBody($htmlContent)
+            ->send();
+
+        Yii::$app->session->setFlash(
+            $emailSent ? 'success' : 'warning',
+            $emailSent 
+                ? 'Ticket created successfully and email notification sent.'
+                : 'Ticket created but email notification failed.'
+        );
+    }
+
+    public function actionAssigned()
+    {
+        $tickets = Ticket::find()
+            ->where(['assigned_to' => Yii::$app->user->id])
+            ->orderBy(['created_at' => SORT_DESC])
+            ->all();
+
+        return $this->render('assigned', [
+            'tickets' => $tickets
+        ]);
     }
 
 }

@@ -27,41 +27,62 @@ use app\models\Client;
 use app\models\Invitation;
 use yii\helpers\ArrayHelper;
 use yii\db\Expression;
+use app\models\FirstLoginForm;
 
  
 
 
 class SiteController extends Controller
+
 {
-    /**
-     * {@inheritdoc}
-     */
+     
     public function behaviors()
     {
         return [
             'access' => [
-                'class' => AccessControl::class,
-                'only' => ['logout', 'super-admin'],
+                'class' => \yii\filters\AccessControl::class,
                 'rules' => [
                     [
-                        'actions' => ['logout'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                    ],
-                    [
-                        'actions' => ['super-admin'],
+                        'actions' => ['create-user'],
                         'allow' => true,
                         'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->isSuperAdmin();
-                        },
+                            return !Yii::$app->user->isGuest && Yii::$app->user->identity->role === 'admin';
+                        }
+                    ],
+                    // Public actions (no login required)
+                    [
+                        'actions' => ['login', 'error'],
+                        'allow' => true,
+                    ],
+                    // Admin only actions
+                    [
+                        'actions' => ['dashboard', 'admin'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            return Yii::$app->user->identity->role === 'admin';
+                        }
+                    ],
+                    // Regular user actions
+                    [
+                        'actions' => ['index', 'logout'],
+                        'allow' => true,
+                        'roles' => ['@'],
                     ],
                 ],
+                'denyCallback' => function ($rule, $action) {
+                    if (Yii::$app->user->isGuest) {
+                        return Yii::$app->response->redirect(['site/login']);
+                    } else {
+                        throw new \yii\web\ForbiddenHttpException('You are not allowed to perform this action.');
+                    }
+                }
             ],
             'verbs' => [
-                'class' => VerbFilter::class,
+                'class' => \yii\filters\VerbFilter::class,
                 'actions' => [
-                    'logout' => ['post'],
+                    'create-user' => ['GET', 'POST'],
                 ],
             ],
         ];
@@ -75,10 +96,6 @@ class SiteController extends Controller
         return [
             'error' => [
                 'class' => 'yii\web\ErrorAction',
-            ],
-            'captcha' => [
-                'class' => 'yii\captcha\CaptchaAction',
-                'fixedVerifyCode' => YII_ENV_TEST ? 'testme' : null,
             ],
         ];
     }
@@ -280,18 +297,13 @@ public function actionSignup($token = null)
      public function actionLogin()
      {
          if (!Yii::$app->user->isGuest) {
-             return $this->goHome();
+             return $this->redirect(['/site/index']); // Already logged in users
          }
 
          $model = new LoginForm();
          if ($model->load(Yii::$app->request->post()) && $model->login()) {
-             if (Yii::$app->user->identity->isSuperAdmin()) {
-                 Yii::$app->session->setFlash('success', 'Welcome, Super Admin!');
-             }
-             if (Yii::$app->user->can('viewDeveloperDashboard')) {
-                 return $this->redirect(['developer/view']);
-             }
-             return $this->goBack();
+             // After successful login, redirect to index page for all roles
+             return $this->redirect(['/site/index']);
          }
 
          $model->password = '';
@@ -416,78 +428,39 @@ public function actionDeveloperDashboard()
 
 public function actionAdmin()
 {
-    if (Yii::$app->request->referrer && strpos(Yii::$app->request->referrer, 'ticket/assign') !== false) {
-        Yii::$app->session->setFlash('error', 'An error occurred while assigning the ticket. It may have been cancelled.');
+    if (Yii::$app->user->identity->role !== 'admin') {
+        Yii::$app->session->setFlash('error', 'You do not have permission to access the admin area.');
+        return $this->redirect(['/site/index']);
     }
 
-    // Check if the user is logged in
-    if (Yii::$app->user->isGuest) {
-        // Redirect to login page if the user is not logged in
-        return $this->redirect(['site/login']);
-    }
-
-    // Check if the user has an identity
-    if (Yii::$app->user->identity === null) {
-        // Handle the case where the user doesn't have an identity
-        Yii::$app->session->setFlash('error', 'User identity not found. Please log in again.');
-        return $this->redirect(['site/login']);
-    }
-
-    // Ensure only admin users can access this action
-    if (!Yii::$app->user->identity->isAdmin) {
-        throw new ForbiddenHttpException('You are not allowed to perform this action.');
-    }
-
-    $ticketCounts = [
-        'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
-        'approved' => Ticket::find()->where(['status' => 'approved'])->count(),
-        'cancelled' => Ticket::find()->where(['status' => 'cancelled'])->count(),
-        'assigned' => Ticket::find()->where(['not', ['assigned_to' => null]])->count(),
-        'notAssigned' => Ticket::find()->where(['assigned_to' => null])->count(),
-        'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
-        'escalated' => Ticket::find()->where(['status' => 'escalated'])->count(),
-        'reopen' => Ticket::find()->where(['status' => 'reopen'])->count(),
-        'deleted' => Ticket::find()->where(['status' => 'deleted'])->count(),
-        'reassigned' => Ticket::find()->where(['status' => 'reassigned'])->count(),
-        'total' => Ticket::find()->count(),
-    ];
-
-    // Changed to SORT_ASC for ascending order
-    $query = Ticket::find()
-        ->with('user')
-        ->orderBy(['id' => SORT_ASC]);  // Changed to ASC
-
-    $dataProvider = new ActiveDataProvider([
-        'query' => $query,
+    // Create data provider for tickets
+    $dataProvider = new \yii\data\ActiveDataProvider([
+        'query' => Ticket::find(),
         'pagination' => [
             'pageSize' => 10,
         ],
         'sort' => [
-            'defaultOrder' => [
-                'id' => SORT_ASC,  // Changed to ASC
-            ],
-        ],
+            'defaultOrder' => ['id' => SORT_DESC]
+        ]
     ]);
 
-    // Set timezone to Nairobi/Kenya
-    date_default_timezone_set('Africa/Nairobi');
-
-    // Add this query to get developer ticket counts
-    $developerTicketCounts = (new \yii\db\Query())
-        ->select([
-            'name' => 'user.name',
-            'ticket_count' => 'COUNT(ticket.id)'
-        ])
-        ->from('user')
-        ->leftJoin('ticket', 'ticket.assigned_to = user.id')
-        ->where(['user.role' => 'developer']) // Adjust this based on how you identify developers
-        ->groupBy('user.id, user.name')
-        ->all();
+    // Get ticket counts for different statuses
+    $ticketCounts = [
+        'total' => Ticket::find()->count(),
+        'pending' => Ticket::find()->where(['status' => Ticket::STATUS_PENDING])->count(),
+        'approved' => Ticket::find()->where(['status' => Ticket::STATUS_APPROVED])->count(),
+        'cancelled' => Ticket::find()->where(['status' => Ticket::STATUS_CANCELLED])->count(),
+        'assigned' => Ticket::find()->where(['not', ['assigned_to' => null]])->count(),
+        'notAssigned' => Ticket::find()->where(['assigned_to' => null])->count(),
+        'closed' => Ticket::find()->where(['status' => Ticket::STATUS_CLOSED])->count(),
+        'reopen' => Ticket::find()->where(['status' => Ticket::STATUS_REOPEN])->count(),
+        'reassigned' => Ticket::find()->where(['status' => Ticket::STATUS_REASSIGNED])->count(),
+        'escalated' => Ticket::find()->where(['status' => Ticket::STATUS_ESCALATED])->count(),
+    ];
 
     return $this->render('admin', [
         'dataProvider' => $dataProvider,
         'ticketCounts' => $ticketCounts,
-        'developerTicketCounts' => $developerTicketCounts,
     ]);
 }
 
@@ -926,91 +899,71 @@ public function actionDeveloperTickets()
 
 public function actionDashboard()
 {
-    if (!Yii::$app->user->identity->isAdmin()) {
-        throw new ForbiddenHttpException('Access denied.');
+    if (Yii::$app->user->identity->role !== 'admin') {
+        Yii::$app->session->setFlash('error', 'Access denied.');
+        return $this->redirect(['site/index']);
     }
 
     // Get developer statistics
-    $developerStats = (new \yii\db\Query())
+    $developerStats = User::find()
         ->select([
-            'name' => 'user.name',
-            'active_tickets' => 'COUNT(CASE WHEN ticket.status IN ("pending", "assigned") THEN 1 END)',
-            'completed_tickets' => 'COUNT(CASE WHEN ticket.status = "closed" THEN 1 END)'
+            'user.id',
+            'user.name',
+            'COUNT(CASE WHEN ticket.status != "closed" THEN 1 END) as active_tickets',
+            'COUNT(CASE WHEN ticket.status = "closed" THEN 1 END) as completed_tickets',
+            'COUNT(ticket.id) as total_tickets'
         ])
-        ->from('user')
         ->leftJoin('ticket', 'ticket.assigned_to = user.id')
         ->where(['user.role' => 'developer'])
-        ->groupBy('user.id, user.name')
+        ->groupBy(['user.id', 'user.name'])
+        ->asArray()
         ->all();
 
-    // Get ticket status data
-    $ticketStatusData = (new \yii\db\Query())
-        ->select(['status'])
-        ->from('ticket')
-        ->groupBy('status')
-        ->indexBy('status')
-        ->column();
+    // Get ticket statistics
+    $ticketStats = [
+        'total' => Ticket::find()->count(),
+        'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
+        'assigned' => Ticket::find()->where(['status' => 'assigned'])->count(),
+        'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
+    ];
 
-    // Get recent activity (simplified without CASE statement)
+    // Prepare data for the doughnut chart
+    $ticketStatusData = [
+        'Pending' => $ticketStats['pending'],
+        'Assigned' => $ticketStats['assigned'],
+        'Closed' => $ticketStats['closed'],
+    ];
+
+    // Get recent tickets and activity
+    $recentTickets = Ticket::find()
+        ->orderBy(['created_at' => SORT_DESC])
+        ->limit(5)
+        ->all();
+
+    // Get recent activity with developer info and escalation comments
     $recentActivity = (new \yii\db\Query())
         ->select([
-            'timestamp' => 'ticket.created_at',
-            'ticket_id' => 'ticket.id',
-            'developer' => 'user.name',
-            'status' => 'ticket.status'
+            'ticket.id as ticket_id',
+            'ticket.status',
+            'ticket.created_at as timestamp',
+            'assigned_user.name as developer',
+            'escalated_user.name as escalated_to',
+            'ticket_comments.comment as escalation_comment'
         ])
         ->from('ticket')
-        ->leftJoin('user', 'ticket.assigned_to = user.id')
+        ->leftJoin('user assigned_user', 'ticket.assigned_to = assigned_user.id')
+        ->leftJoin('user escalated_user', 'ticket.escalated_to = escalated_user.id')
+        ->leftJoin('ticket_comments', 'ticket.id = ticket_comments.ticket_id AND ticket_comments.type = "escalation"')
         ->orderBy(['ticket.created_at' => SORT_DESC])
         ->limit(10)
         ->all();
 
-    // Get companies with their ticket counts
-    $topCompanies = (new \yii\db\Query())
-        ->select([
-            'name' => 'company_name',  // Assuming the column is named company_name
-            'ticket_count' => 'COUNT(id)'  // Count tickets directly from ticket table
-        ])
-        ->from('ticket')  // Start from ticket table
-        ->groupBy('company_name')  // Group by company name
-        ->orderBy(['ticket_count' => SORT_DESC])  // Most tickets first
-        ->limit(5)  // Top 5 companies
-        ->all();
-
-    // Get total number of companies
-    $totalCompanies = (new \yii\db\Query())
-        ->from('ticket')
-        ->select('DISTINCT company_name')
-        ->count();
-
-    // Add these new metrics
-    $totalActiveTickets = (new \yii\db\Query())
-        ->from('ticket')
-        ->where(['status' => ['pending', 'assigned']])
-        ->count();
-        
-    $resolutionRate = (new \yii\db\Query())
-        ->from('ticket')
-        ->where(['status' => 'closed'])
-        ->count() / (new \yii\db\Query())->from('ticket')->count() * 100;
-        
-    $avgResponseTime = // ... calculate average response time ...
-    
-    $pendingTickets = (new \yii\db\Query())
-        ->from('ticket')
-        ->where(['status' => 'pending'])
-        ->count();
-
     return $this->render('dashboard', [
         'developerStats' => $developerStats,
-        'ticketStatusData' => $ticketStatusData,
+        'ticketStats' => $ticketStats,
+        'recentTickets' => $recentTickets,
         'recentActivity' => $recentActivity,
-        'totalCompanies' => $totalCompanies,
-        'topCompanies' => $topCompanies,
-        'totalActiveTickets' => $totalActiveTickets,
-        'resolutionRate' => number_format($resolutionRate, 1) . '%',
-        'avgResponseTime' => $avgResponseTime,
-        'pendingTickets' => $pendingTickets,
+        'ticketStatusData' => $ticketStatusData,
     ]);
 }
 
@@ -1034,75 +987,107 @@ private function getStatusLabel($status)
     ][$status] ?? ucfirst($status);
 }
 
+public function actionCreateClient()
+{
+    // Check if user is admin
+    if (Yii::$app->user->isGuest || Yii::$app->user->identity->company_email !== 'ccosmas001@gmail.com') {
+        throw new ForbiddenHttpException('You are not authorized to perform this action.');
+    }
+
+    $model = new SignupForm();
+    // Set default role for clients
+    $model->role = 'client';
+
+    if ($model->load(Yii::$app->request->post())) {
+        if ($user = $model->signup()) {
+            Yii::$app->session->setFlash('success', 'Client account created successfully. Login credentials have been sent to ' . $user->company_email);
+            return $this->redirect(['admin']);
+        } else {
+            Yii::$app->session->setFlash('error', 'There was an error creating the client account.');
+        }
+    }
+
+    return $this->render('create-client', [
+        'model' => $model,
+    ]);
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+public function actionCreateUser()
+{
+    // Check if user is logged in and is admin
+    if (Yii::$app->user->isGuest || Yii::$app->user->identity->role !== 'admin') {
+        Yii::$app->session->setFlash('error', 'Access denied. Only administrators can create new users.');
+        return $this->redirect(['site/index']);
+    }
+
+    $model = new User();
+    $model->scenario = 'create'; // If you have a specific scenario for user creation
+
+    if ($model->load(Yii::$app->request->post())) {
+        // Set default values or additional processing
+        $model->auth_key = Yii::$app->security->generateRandomString();
+        $model->password_hash = Yii::$app->security->generatePasswordHash($model->password);
+        
+        if ($model->save()) {
+            Yii::$app->session->setFlash('success', 'User created successfully.');
+            return $this->redirect(['site/admin']); // or wherever you want to redirect after success
+        }
+    }
+
+    return $this->render('create-user', [
+        'model' => $model,
+    ]);
+}
+
+/**
+ * Check if required columns exist in the specified table
+ * @param string $tableName
+ * @param array $requiredColumns
+ * @return array Missing columns
+ */
+private function checkMissingColumns($tableName, $requiredColumns)
+{
+    $schema = Yii::$app->db->schema;
+    $tableSchema = $schema->getTableSchema($tableName);
+    
+    if ($tableSchema === null) {
+        throw new \yii\base\Exception("Table '$tableName' does not exist!");
+    }
+
+    $existingColumns = array_keys($tableSchema->columns);
+    return array_diff($requiredColumns, $existingColumns);
+}
+
+public function actionFirstLogin($token)
+{
+    $user = User::findOne(['password_reset_token' => $token]);
+    
+    if (!$user) {
+        Yii::error("Invalid token used: " . $token);
+        Yii::$app->session->setFlash('error', 'Invalid or expired password reset token.');
+        return $this->redirect(['site/login']);
+    }
+
+    $model = new FirstLoginForm();
+    $model->token = $token;
+
+    if ($model->load(Yii::$app->request->post())) {
+        try {
+            if ($model->changePassword()) {
+                Yii::$app->session->setFlash('success', 'Password changed successfully. Please login with your new password.');
+                return $this->redirect(['site/login']);
+            } else {
+                Yii::$app->session->setFlash('error', 'Failed to change password: ' . print_r($model->errors, true));
+            }
+        } catch (\Exception $e) {
+            Yii::error("Exception in first login: " . $e->getMessage());
+            Yii::$app->session->setFlash('error', 'An error occurred while changing your password.');
+        }
+    }
+
+    return $this->render('first-login', [
+        'model' => $model,
+        'user' => $user,
+    ]);
+}
+}

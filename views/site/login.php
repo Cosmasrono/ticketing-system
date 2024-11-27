@@ -1,7 +1,7 @@
 <?php
 
 use yii\helpers\Html;
-use yii\widgets\ActiveForm;
+use yii\bootstrap5\ActiveForm;
 
 /** @var yii\web\View $this */
 /** @var yii\bootstrap5\ActiveForm $form */
@@ -14,88 +14,107 @@ $this->title = 'Login';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
 <div class="site-login">
-    <h1><?= Html::encode($this->title) ?></h1>
+    <div class="row justify-content-center">
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-body">
+                    <h1 class="text-center mb-4"><?= Html::encode($this->title) ?></h1>
 
-    <p>Please fill out the following fields to login:</p>
+                    <?php $form = ActiveForm::begin([
+                        'id' => 'login-form',
+                        'options' => ['class' => 'form-vertical'],
+                    ]); ?>
 
-    <?php $form = ActiveForm::begin([
-        'id' => 'login-form',
-        'options' => ['class' => 'form-horizontal'],
-    ]) ?>
+                    <?= $form->field($model, 'company_email', [
+                        'options' => ['class' => 'form-group mb-3']
+                    ])->textInput([
+                        'autofocus' => true,
+                        'placeholder' => 'Enter your company email',
+                        'class' => 'form-control'
+                    ]) ?>
 
-        <?= $form->field($model, 'company_email')->textInput(['autofocus' => true]) ?>
+                    <?= $form->field($model, 'password', [
+                        'options' => ['class' => 'form-group mb-3']
+                    ])->passwordInput([
+                        'placeholder' => 'Enter your password',
+                        'class' => 'form-control'
+                    ]) ?>
 
-        <?= $form->field($model, 'password')->passwordInput() ?>
+                    <?php if ($model->isFirstLogin): ?>
+                        <div class="alert alert-info">
+                            Please set your new password below.
+                        </div>
 
-        <?= $form->field($model, 'rememberMe')->checkbox() ?>
+                        <?= $form->field($model, 'new_password', [
+                            'options' => ['class' => 'form-group mb-3']
+                        ])->passwordInput([
+                            'placeholder' => 'Enter new password',
+                            'class' => 'form-control'
+                        ]) ?>
 
-        <div class="form-group">
-            <?= Html::submitButton('Login', ['class' => 'btn btn-primary', 'name' => 'login-button']) ?>
+                        <?= $form->field($model, 'confirm_password', [
+                            'options' => ['class' => 'form-group mb-3']
+                        ])->passwordInput([
+                            'placeholder' => 'Confirm new password',
+                            'class' => 'form-control'
+                        ]) ?>
+                    <?php endif; ?>
+
+                    <?= $form->field($model, 'rememberMe', [
+                        'options' => ['class' => 'form-group mb-3']
+                    ])->checkbox([
+                        'template' => "<div class=\"custom-control custom-checkbox\">{input} {label}</div>\n<div class=\"col-lg-8\">{error}</div>",
+                        'class' => 'custom-control-input',
+                        'labelOptions' => ['class' => 'custom-control-label'],
+                    ]) ?>
+
+                    <div class="form-group text-center">
+                        <?= Html::submitButton('Login', [
+                            'class' => 'btn btn-primary btn-block',
+                            'name' => 'login-button'
+                        ]) ?>
+                    </div>
+
+                    <?php ActiveForm::end(); ?>
+                </div>
+            </div>
+
+            <?php if (Yii::$app->session->hasFlash('error')): ?>
+                <div class="alert alert-danger mt-3">
+                    <?= Yii::$app->session->getFlash('error') ?>
+                </div>
+            <?php endif; ?>
+
+            <?php if (Yii::$app->session->hasFlash('success')): ?>
+                <div class="alert alert-success mt-3">
+                    <?= Yii::$app->session->getFlash('success') ?>
+                </div>
+            <?php endif; ?>
         </div>
-
-    <?php ActiveForm::end(); ?>
-
-    <div class="form-group">
-        <p>If you are a new user, you can <?= Html::a('signup here', ['site/signup']) ?>.</p>
     </div>
-
-    <?= Html::a('Forgot password?', ['site/request-password-reset']) ?>
 </div>
 
-<style>
-
-/* Orange-themed Login Form Styles */
-.site-login {
-    max-width: 400px;
-    margin: 0 auto;
-    padding: 20px;
-    background-color: #FFF3E0;
-    border-radius: 8px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-}
-
-.site-login h1 {
-    color: #FF9800;
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-.site-login p {
-    color: #F57C00;
-    margin-bottom: 20px;
-}
-
-.form-group {
-    margin-bottom: 15px;
-}
-
-.form-control {
-    border-color: #FFB74D;
-}
-
-.form-control:focus {
-    border-color: #FF9800;
-    box-shadow: 0 0 0 0.2rem rgba(255, 152, 0, 0.25);
-}
-
-.btn-primary {
-    background-color: #FF9800;
-    border-color: #FF9800;
-}
-
-.btn-primary:hover, .btn-primary:focus {
-    background-color: #F57C00;
-    border-color: #F57C00;
-}
-
-.checkbox label {
-    color: #E65100;
-}
-
-a {
-    color: #FF5722;
-}
-
-a:hover {
-    color: #E64A19;
-}
+<?php
+$css = <<<CSS
+    .site-login {
+        padding: 40px 0;
+    }
+    .card {
+        box-shadow: 0 2px 4px rgba(0,0,0,.1);
+    }
+    .card-body {
+        padding: 30px;
+    }
+    .form-control {
+        height: 45px;
+    }
+    .btn-primary {
+        height: 45px;
+        font-size: 16px;
+    }
+    .alert {
+        margin-bottom: 20px;
+    }
+CSS;
+$this->registerCss($css);
+?>

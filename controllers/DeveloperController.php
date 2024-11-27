@@ -19,15 +19,22 @@ class DeveloperController extends Controller
         return [
             'access' => [
                 'class' => AccessControl::class,
+                'only' => ['index', 'view'],
                 'rules' => [
                     [
                         'allow' => true,
-                        'actions' => ['view'],
-                        'roles' => ['viewDashboard'],
+                        'actions' => ['index', 'view'],
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            // Allow both developers and admins
+                            $allowedRoles = ['developer', 'admin', 'superadmin'];
+                            return in_array(Yii::$app->user->identity->role, $allowedRoles);
+                        }
                     ],
                 ],
                 'denyCallback' => function ($rule, $action) {
-                    throw new ForbiddenHttpException('Access denied.');
+                    Yii::$app->session->setFlash('error', 'You do not have permission to access this page.');
+                    return $this->redirect(['/site/index']);
                 }
             ],
         ];
@@ -35,6 +42,10 @@ class DeveloperController extends Controller
 
     public function actionView()
     {
+        if (Yii::$app->user->isGuest || !in_array(Yii::$app->user->identity->role, ['developer', 'admin', 'superadmin'])) {
+            throw new \yii\web\ForbiddenHttpException('Access denied.');
+        }
+
         $user = Yii::$app->user->identity;
         
         // Add this dataProvider for the GridView

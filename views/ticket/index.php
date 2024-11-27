@@ -7,14 +7,12 @@ use yii\widgets\Pjax;
 /* @var $this yii\web\View */
 /* @var $dataProvider yii\data\ActiveDataProvider */
 
-$this->title = 'Tickets';
+$this->title = 'My Tickets';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
 <div class="ticket-index">
 
     <h1><?= Html::encode($this->title) ?></h1>
-
-    
 
     <p>
         <?= Html::a('Create Ticket', ['create'], ['class' => 'btn btn-success']) ?>
@@ -29,27 +27,44 @@ $this->params['breadcrumbs'][] = $this->title;
             'id',
             'module',
             'issue',
-            'description',
-            'status',
-            // 'screenshot',
-
+            [
+                'attribute' => 'description',
+                'format' => 'ntext',
+                'contentOptions' => ['style' => 'max-width:300px; overflow:hidden; text-overflow:ellipsis;'],
+            ],
+            [
+                'attribute' => 'status',
+                'format' => 'raw',
+                'value' => function($model) {
+                    $statusClasses = [
+                        'pending' => 'badge bg-warning',
+                        'closed' => 'badge bg-secondary',
+                        'escalated' => 'badge bg-danger',
+                    ];
+                    $class = isset($statusClasses[$model->status]) ? $statusClasses[$model->status] : 'badge bg-primary';
+                    return Html::tag('span', $model->status, ['class' => $class]);
+                }
+            ],
             [
                 'attribute' => 'screenshot',
                 'format' => 'raw',
                 'value' => function ($model) {
                     if ($model->screenshot) {
                         return Html::img('data:image/png;base64,' . $model->screenshot, [
-                            'alt' => 'Ticket Screenshot',
+                            'alt' => 'Screenshot',
                             'style' => 'max-width: 100px; max-height: 100px;'
                         ]);
                     }
-                    return 'No screenshot';
+                    return '<span class="text-muted">No screenshot</span>';
                 },
             ],
-            'created_at',
+            [
+                'attribute' => 'created_at',
+                'format' => 'datetime',
+            ],
             [
                 'class' => 'yii\grid\ActionColumn',
-                'template' => '{delete} {reopen}',
+                'template' => '{delete} {close}',
                 'buttons' => [
                     'delete' => function ($url, $model, $key) {
                         return Html::a('Delete', ['delete', 'id' => $model->id], [
@@ -60,20 +75,19 @@ $this->params['breadcrumbs'][] = $this->title;
                             ],
                         ]);
                     },
-                    'reopen' => function ($url, $model, $key) {
-                        if ($model->status === 'closed') {
-                            return Html::a('Reopen', '#', [
-                                'class' => 'btn btn-primary btn-sm',
-                                'onclick' => new \yii\web\JsExpression("
-                                    reopenTicket(this, {$model->id});
-                                    return false;
-                                "),
+                    'close' => function ($url, $model, $key) {
+                        if ($model->status !== 'closed' && $model->created_by == Yii::$app->user->id) {
+                            return Html::button('Close', [
+                                'class' => 'btn btn-danger btn-sm close-ticket',
                                 'data-id' => $model->id,
+                                'type' => 'button',
+                                'title' => 'Close this ticket'
                             ]);
                         }
                         return '';
                     },
                 ],
+                'contentOptions' => ['style' => 'min-width:150px;'],
             ],
         ],
     ]); ?>
@@ -81,122 +95,108 @@ $this->params['breadcrumbs'][] = $this->title;
     <?php Pjax::end(); ?>
 
 </div>
-<script>
-function reopenTicket(button, id) {
-    Swal.fire({
-        title: 'Reopen Ticket',
-        input: 'textarea',
-        inputLabel: 'Please provide a reason for reopening',
-        inputPlaceholder: 'Enter your reason here...',
-        showCancelButton: true,
-        confirmButtonText: 'Submit',
-        showLoaderOnConfirm: true,
-        preConfirm: (reason) => {
-            if (!reason) {
-                Swal.showValidationMessage('Please enter a reason');
-                return false;
-            }
-            
-            console.log('Sending reopen request:', { id, reason });
-            
-            return $.ajax({
-                url: '<?= Yii::$app->urlManager->createUrl(['ticket/reopen']) ?>',
-                type: 'POST',
-                data: {
-                    id: id,
-                    reason: reason,
-                    _csrf: '<?= Yii::$app->request->csrfToken ?>'
-                },
-                dataType: 'json'
-            })
-            .then(response => {
-                console.log('Server response:', response);
-                if (!response.success) {
-                    throw new Error(response.message || 'Failed to reopen ticket');
-                }
-                return response;
-            })
-            .catch(error => {
-                console.error('Ajax error:', error);
-                throw new Error(error.message || 'Failed to reopen ticket');
-            });
-        },
-        allowOutsideClick: () => !Swal.isLoading()
-    }).then((result) => {
-        if (result.isConfirmed && result.value.success) {
-            Swal.fire({
-                icon: 'success',
-                title: 'Success!',
-                text: result.value.message,
-                showConfirmButton: false,
-                timer: 1500
-            }).then(() => {
-                location.reload();
-            });
-        }
-    }).catch(error => {
-        Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: error.message || 'Failed to reopen ticket'
-        });
-    });
-}
-</script>
 
 <style>
-#reopenTicketModal .modal-dialog {
-    max-width: 500px;
+.grid-view td {
+    white-space: normal !important;
+    vertical-align: middle !important;
 }
 
-#reopenTicketModal textarea {
-    resize: vertical;
-    min-height: 120px;
+.badge {
+    padding: 5px 10px;
+    font-size: 12px;
 }
 
-.modal-header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
-}
-
-.modal-footer {
-    background-color: #f8f9fa;
-    border-top: 1px solid #dee2e6;
-}
-
-#reopenTicketForm .form-label {
-    font-weight: bold;
+.btn-xs {
+    padding: 1px 5px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-radius: 3px;
 }
 </style>
 
-<!-- Add this modal form -->
-<div class="modal fade" id="reopenTicketModal" tabindex="-1" aria-labelledby="reopenTicketModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="reopenTicketModalLabel">Add Reopen Reason</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <form id="reopenTicketForm">
-                    <input type="hidden" name="ticket_id" id="reopen_ticket_id">
-                    <div class="mb-3">
-                        <label for="reopen_reason" class="form-label">Reason:</label>
-                        <textarea 
-                            class="form-control" 
-                            id="reopen_reason" 
-                            name="reopen_reason" 
-                            rows="4" 
-                            required 
-                            placeholder="Enter your reason..."
-                        ></textarea>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="submitReopenReason()">Submit</button>
-            </div>
-        </div>
-    </div>
-</div>
+<?php
+$this->registerJs("
+    $(document).ready(function() {
+        $(document).on('click', '.close-ticket', function(e) {
+            e.preventDefault();
+            const ticketId = $(this).data('id');
+            if (ticketId) {
+                closeTicket(ticketId);
+            }
+        });
+    });
+
+    function closeTicket(ticketId) {
+        Swal.fire({
+            title: 'Close Ticket',
+            text: 'Are you sure you want to close this ticket?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, close it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    title: 'Processing...',
+                    text: 'Please wait',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                $.ajax({
+                    url: '" . Yii::$app->urlManager->createUrl(['ticket/close']) . "',
+                    type: 'POST',
+                    data: {
+                        id: ticketId,
+                        _csrf: '" . Yii::$app->request->csrfToken . "'
+                    },
+                    dataType: 'json'
+                })
+                .done(function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success!',
+                            text: response.message,
+                            showConfirmButton: false,
+                            timer: 1500
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.message || 'Failed to close ticket'
+                        });
+                    }
+                })
+                .fail(function(jqXHR) {
+                    let errorMessage = 'An error occurred while closing the ticket.';
+                    try {
+                        const response = JSON.parse(jqXHR.responseText);
+                        if (response.message) {
+                            errorMessage = response.message;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing response:', e);
+                    }
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: errorMessage
+                    });
+                });
+            }
+        });
+    }
+");
+?>
+
+<!-- Add SweetAlert2 CDN -->
+<?php $this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11', ['position' => \yii\web\View::POS_HEAD]); ?>

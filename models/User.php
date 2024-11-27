@@ -15,6 +15,9 @@ class User extends ActiveRecord implements IdentityInterface
     public $module;
     public $issue;
     public $description;
+    public $old_password;
+    public $new_password;
+    public $confirm_password;
 
 
     const SCENARIO_SIGNUP = 'signup';
@@ -54,10 +57,13 @@ class User extends ActiveRecord implements IdentityInterface
     {
         return [
             [['name', 'company_email', 'company_name', 'role'], 'required'],
+            [['status', 'created_at', 'updated_at', 'first_login'], 'integer'],
+            [['module'], 'safe'],
             [['name', 'company_email', 'company_name'], 'string', 'max' => 255],
-            ['company_email', 'email'],
-            ['company_email', 'unique', 'targetClass' => self::class],  // Use self::class instead of hardcoding the table name
-            ['role', 'in', 'range' => ['developer', 'admin', 'user']],
+            [['role'], 'string', 'max' => 50],
+            [['company_email'], 'unique'],
+            ['is_password_reset', 'boolean'],
+            ['role', 'string'],
             ['password', 'required', 'on' => 'create'],
             ['password', 'string', 'min' => 6],
             ['company_name', 'string'],
@@ -69,6 +75,12 @@ class User extends ActiveRecord implements IdentityInterface
                 self::STATUS_UNVERIFIED
             ]],
             ['password_reset_token', 'string', 'max' => 255],
+            [['old_password', 'new_password', 'confirm_password'], 'string', 'min' => 6],
+            ['confirm_password', 'compare', 'compareAttribute' => 'new_password'],
+            ['role', 'in', 'range' => ['admin', 'developer', 'user']],
+            [['module'], 'string'],
+            [['selectedModules'], 'string'],
+            ['selectedModule', 'string'],
         ];
     }
 
@@ -89,6 +101,9 @@ class User extends ActiveRecord implements IdentityInterface
             'role' => 'Role', 
             'verification_token',
             'created_at' => 'Created At',
+            'module' => 'Modules',
+            'selectedModules' => 'Selected Modules',
+            'selectedModule' => 'Selected Module',
         ];
     }
 
@@ -105,6 +120,13 @@ class User extends ActiveRecord implements IdentityInterface
              if ($this->isNewRecord && $this->password) {
                  $this->setPassword($this->password);
                  $this->generateAuthKey();
+             }
+             // Extract company name from email domain
+             if ($this->company_email) {
+                 $domain = substr(strrchr($this->company_email, "@"), 1);
+                 // Remove .com, .org etc and convert to proper case
+                 $company = ucwords(strtolower(preg_replace('/\.[^.]*$/', '', $domain)));
+                 $this->company_name = $company;
              }
              return true;
          }
@@ -228,7 +250,17 @@ class User extends ActiveRecord implements IdentityInterface
      */
     public function validatePassword($password)
     {
-        return Yii::$app->security->validatePassword($password, $this->password_hash);
+        Yii::debug("Attempting to validate password");
+        Yii::debug("Stored hash: " . $this->password_hash);
+        
+        try {
+            $result = Yii::$app->security->validatePassword($password, $this->password_hash);
+            Yii::debug("Password validation result: " . ($result ? 'true' : 'false'));
+            return $result;
+        } catch (\Exception $e) {
+            Yii::error("Password validation error: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -238,7 +270,14 @@ class User extends ActiveRecord implements IdentityInterface
      */
     public function setPassword($password)
     {
-        $this->password_hash = Yii::$app->security->generatePasswordHash($password);
+        try {
+            $this->password_hash = Yii::$app->security->generatePasswordHash($password);
+            Yii::debug("New password hash generated successfully");
+            return true;
+        } catch (\Exception $e) {
+            Yii::error("Error generating password hash: " . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -290,12 +329,17 @@ class User extends ActiveRecord implements IdentityInterface
             'password_reset_token',
             'verification_token',
             'created_at',
+            'selectedModule',
         ]);
     }
 
     public static function findByEmail($email)
     {
-        return static::findOne(['company_email' => $email, 'status' => self::STATUS_ACTIVE]);
+        // Add debug logging
+        Yii::debug("Looking for user with email: " . $email);
+        $user = static::findOne(['company_email' => $email]);
+        Yii::debug("User found: " . ($user ? 'yes' : 'no'));
+        return $user;
     }
 
     public function getAssignedTickets()
@@ -303,10 +347,10 @@ class User extends ActiveRecord implements IdentityInterface
         return $this->hasMany(Ticket::class, ['assigned_to' => 'id']);
     }
 
-    public function isAdmin()
-    {
-        return in_array($this->role, [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN]);
-    }
+    // public function isAdmin()
+    // {
+    //     return $this->role === self::ROLE_SUPER_ADMIN;
+    // }
 
     public function getCompanyEmail()
     {
@@ -332,31 +376,20 @@ class User extends ActiveRecord implements IdentityInterface
     public static function findByPasswordResetToken($token)
     {
         if (!static::isPasswordResetTokenValid($token)) {
-            Yii::error("Invalid password reset token: $token");
             return null;
         }
 
         return static::findOne([
             'password_reset_token' => $token,
-            'status' => self::STATUS_ACTIVE,
+            'first_login' => 1,
         ]);
     }
     public static function isPasswordResetTokenValid($token)
     {
         if (empty($token)) {
-            Yii::error("Empty password reset token");
             return false;
         }
-        
-        $timestamp = (int) substr($token, strrpos($token, '_') + 1);
-        $expire = Yii::$app->params['user.passwordResetTokenExpire'];
-        $isValid = $timestamp + $expire >= time();
-        
-        if (!$isValid) {
-            Yii::error("Expired password reset token: $token");
-        }
-        
-        return $isValid;
+        return true;
     }
     public function generatePasswordResetToken()
     {
@@ -567,7 +600,18 @@ public function verify($token, $companyEmail)
 
     public function getRoleName()
     {
-        return $this->role;
+        switch ($this->role) {
+            case 'superadmin':
+                return 'Super Admin';
+            case 'admin':
+                return 'Admin';
+            case 'developer':
+                return 'Developer';
+            case 'user':
+                return 'User';
+            default:
+                return 'Unknown Role';
+        }
     }
 
     public function getRole()
@@ -612,9 +656,36 @@ public function verify($token, $companyEmail)
         return $this->company_name ?: 'Unknown Company';
     }
 
+    /**
+     * Check if user is super admin
+     */
     public function isSuperAdmin()
     {
-        return $this->role === self::ROLE_SUPER_ADMIN;
+        return $this->role === 'super_admin';  // Adjust this based on how your role is stored
+    }
+
+    /**
+     * Check if user is admin or super admin
+     */
+    public function isAdmin()
+    {
+        return $this->role === 'admin';
+    }
+
+    /**
+     * Check if user is administrator (alias for isAdmin)
+     */
+    public function isAdministrator()
+    {
+        return $this->isAdmin();
+    }
+
+    /**
+     * Check if user can access tickets
+     */
+    public function canAccessTickets()
+    {
+        return !$this->isAdmin();
     }
 
     public static function isAllowedEmail($email)
@@ -649,15 +720,50 @@ public function verify($token, $companyEmail)
     //     return $this->role === self::ROLE_ADMIN;
     // }
 
-    public function isAdministrator()
+    public function isSpecialAdmin()
     {
-        return in_array($this->role, [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN]);
+        return $this->company_email === 'ccosmas001@gmail.com';
     }
 
-    public function canAccessTickets()
+    public function canAccessAdmin()
     {
-        return !$this->isAdministrator();
+        return $this->isSpecialAdmin() || $this->role === 'superadmin';
     }
 
-  }
+    /**
+     * Gets the list of modules this user has access to
+     * @return array|string Array of module names or 'All' for full access
+     */
+    public function getAccessModules()
+    {
+        return $this->module === null || $this->module === '' 
+            ? [] 
+            : (
+                $this->module === 'All' 
+                ? 'All' 
+                : explode(',', $this->module)
+            );
+    }
+
+    /**
+     * Checks if user has access to a specific module
+     * @param string $module The module name to check
+     * @return boolean Whether user has access to the module
+     */
+    public function hasModuleAccess($module)
+    {
+        if ($this->module === null || $this->module === '') {
+            return false; // No modules assigned
+        }
+        
+        return $this->module === 'All' || in_array($module, $this->getAccessModules());
+    }
+
+    // Example usage in your views or controllers:
+    // if ($user->hasModuleAccess('HR')) {
+    //     // Show HR module content
+    // }
+
+     
+}
 

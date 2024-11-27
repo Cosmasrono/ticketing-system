@@ -46,47 +46,46 @@ class Ticket extends ActiveRecord
     public function rules()
     {
         return [
-            [['module', 'issue', 'description'], 'required'],
-            [['module', 'issue', 'description', 'screenshot'], 'string'],
-            ['status', 'default', 'value' => self::STATUS_PENDING],
-            ['status', 'in', 'range' => [
-                self::STATUS_PENDING,
-                self::STATUS_APPROVED,
-                self::STATUS_CANCELLED,
-                self::STATUS_ASSIGNED,
-                self::STATUS_ESCALATED,
-                self::STATUS_CLOSED,
-                self::STATUS_REOPEN,
-                self::STATUS_REASSIGNED
-            ]],
-            ['screenshot_base64', 'safe'],
-            [['assigned_to'], 'integer'],
+            [['selectedModule'], 'required', 'on' => 'create'],
+            [['issue', 'description'], 'required'],
+            [['description'], 'string'],
+            [['created_at'], 'safe'],
+            [['created_by'], 'integer'],
+            [['selectedModule', 'issue', 'status'], 'string', 'max' => 255],
+            [['screenshot'], 'file', 'extensions' => 'png, jpg, jpeg', 'maxSize' => 2 * 1024 * 1024],
+            [['screenshot_base64'], 'safe'],
             [['status'], 'string'],
-            [['created_at', 'assigned_at', 'closed_at'], 'safe'],
-            ['reopen_reason', 'safe'],
-            ['reopen_reason', 'string', 'max' => 65535],
-            ['closed_by', 'integer'],
-            ['closed_at', 'safe'],
-            
+            [['approved_at'], 'safe'],
+            // [['approved_by'], 'integer'],
+            [['escalation_comment'], 'string'],
+            [['assigned_to'], 'integer'],
+            [['escalated_to'], 'required', 'when' => function($model) {
+                return $model->status === 'reassigned';
+            }, 'whenClient' => "function (attribute, value) {
+                return $('#ticket-status').val() === 'reassigned';
+            }"],
         ];
     }
-
 
     public function attributeLabels()
     {
         return [
-            'id' => 'ID',
-            'module' => 'Module',
-            'issue' => 'Issue',
+            'selectedModule' => 'Select Module',
+            'issue' => 'Select Issue',
             'description' => 'Description',
+            'screenshot' => 'Upload Screenshot (Optional)',
             'status' => 'Status',
-            'screenshot' => 'Screenshot',
             'created_at' => 'Created At',
             'updated_at' => 'Updated At',
-            'assigned_to' => 'Reassign To',
+            'created_by' => 'Created By',
+            'updated_by' => 'Updated By',
+            'escalation_comment' => 'Escalation Comment',
+            'assigned_to' => 'Assigned To',
         ];
     }
- 
+
+  
+
     public function getUser()
     {
         return $this->hasOne(User::class, ['id' => 'created_by']);
@@ -136,19 +135,15 @@ class Ticket extends ActiveRecord
 
     public function approve()
     {
-        if ($this->status !== 'Pending') {
-            $this->addError('status', "Cannot approve ticket: Ticket must be in Pending status to approve. Current status: {$this->status}");
+        if ($this->status === self::STATUS_CANCELLED) {
             return false;
         }
-    
-        $this->status = 'Approved';
-        
-        if (!$this->save()) {
-            Yii::error("Failed to save approved ticket {$this->id}. Errors: " . json_encode($this->errors));
-            return false;
-        }
-    
-        return true;
+
+        $this->status = self::STATUS_APPROVED;
+        $this->approved_at = new \yii\db\Expression('NOW()');
+        $this->approved_by = Yii::$app->user->id;
+
+        return $this->save(false);
     }
 
 
@@ -416,25 +411,19 @@ class Ticket extends ActiveRecord
 
     public function beforeSave($insert)
     {
-        if (parent::beforeSave($insert)) {
-            // For new records
-            if ($this->isNewRecord) {
-                $this->created_at = date('Y-m-d H:i:s');
-            }
-            
-            // When status changes to assigned
-            if ($this->isAttributeChanged('assigned_to') && !empty($this->assigned_to)) {
-                $this->assigned_at = date('Y-m-d H:i:s');
-            }
-            
-            // When status changes to closed
-            if ($this->isAttributeChanged('status') && $this->status === 'closed') {
-                $this->closed_at = date('Y-m-d H:i:s');
-            }
-            
-            return true;
+        if (!parent::beforeSave($insert)) {
+            return false;
         }
-        return false;
+
+        // Only validate selectedModule on insert
+        if ($this->isNewRecord) {
+            if (empty($this->selectedModule)) {
+                $this->addError('selectedModule', 'Select Module cannot be blank.');
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function getLocalCreatedAt()
@@ -464,5 +453,47 @@ class Ticket extends ActiveRecord
         return $this->closed_at ? 
             Yii::$app->formatter->asDatetime($this->closed_at, 'php:Y-m-d H:i:s') : 
             'Not Closed';
+    }
+
+    public $selectedModule;
+    public $screenshot;
+    public $screenshot_base64;
+
+    public static function getModulesList()
+    {
+        return [
+            'Power BI' => 'Power BI',
+            'Members Portal' => 'Members Portal',
+            'Mobile App' => 'Mobile App',
+            'CRM' => 'CRM',
+        ];
+    }
+
+    public function getCompanyNameFromEmail($email)
+    {
+        if (empty($email)) {
+            return null;
+        }
+        $parts = explode('@', $email);
+        if (count($parts) !== 2) {
+            return null;
+        }
+        $domain = $parts[1];
+        return ucwords(str_replace(['.com', '.org', '.net'], '', $domain));
+    }
+
+    public function getEscalationHistory()
+    {
+        return $this->hasOne(TicketEscalation::class, ['ticket_id' => 'id']);
+    }
+
+    public function getEscalatedTo()
+    {
+        return $this->hasOne(User::class, ['id' => 'escalated_to']);
+    }
+
+    public function getEscalatedBy()
+    {
+        return $this->hasOne(User::class, ['id' => 'escalated_by']);
     }
 }

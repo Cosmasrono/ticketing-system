@@ -8,40 +8,33 @@ $this->title = 'Set Your New Password';
 <div class="site-first-login">
     <div class="row justify-content-center">
         <div class="col-lg-5">
-            <div class="card">
+            <div class="card shadow-lg">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="text-center"><?= Html::encode($this->title) ?></h2>
+                </div>
                 <div class="card-body">
-                    <h1 class="text-center h3 mb-4"><?= Html::encode($this->title) ?></h1>
-                    
-                    <?php if (isset($user)): ?>
-                        <div class="alert alert-info">
-                            Welcome <?= Html::encode($user->name) ?>! Please set your new password.
-                        </div>
-                    <?php endif; ?>
+                    <p class="text-muted text-center mb-4">
+                        Please set your new password for account: <strong><?= Html::encode($email) ?></strong>
+                    </p>
 
                     <?php $form = ActiveForm::begin(['id' => 'first-login-form']); ?>
 
-                        <?= $form->field($model, 'current_password')->passwordInput([
-                            'autofocus' => true,
-                            'class' => 'form-control',
-                            'placeholder' => 'Enter the temporary password from your email'
-                        ]) ?>
+                    <?= $form->field($model, 'newPassword')->passwordInput([
+                        'class' => 'form-control form-control-lg',
+                        'placeholder' => 'Enter new password'
+                    ]) ?>
 
-                        <?= $form->field($model, 'new_password')->passwordInput([
-                            'class' => 'form-control',
-                            'placeholder' => 'Enter your new password'
-                        ]) ?>
+                    <?= $form->field($model, 'confirmPassword')->passwordInput([
+                        'class' => 'form-control form-control-lg',
+                        'placeholder' => 'Confirm new password'
+                    ]) ?>
 
-                        <?= $form->field($model, 'confirm_password')->passwordInput([
-                            'class' => 'form-control',
-                            'placeholder' => 'Confirm your new password'
+                    <div class="form-group text-center mt-4">
+                        <?= Html::submitButton('Set Password', [
+                            'class' => 'btn btn-primary btn-lg px-5',
+                            'name' => 'first-login-button'
                         ]) ?>
-
-                        <div class="form-group text-center mt-4">
-                            <?= Html::submitButton('Change Password', [
-                                'class' => 'btn btn-primary btn-block',
-                                'name' => 'change-button'
-                            ]) ?>
-                        </div>
+                    </div>
 
                     <?php ActiveForm::end(); ?>
                 </div>
@@ -52,22 +45,22 @@ $this->title = 'Set Your New Password';
 
 <?php
 $css = <<<CSS
-.site-first-login {
-    padding: 40px 0;
-}
-.card {
-    box-shadow: 0 2px 4px rgba(0,0,0,.1);
-}
-.card-body {
-    padding: 30px;
-}
-.form-control {
-    height: 45px;
-}
-.btn-primary {
-    height: 45px;
-    font-size: 16px;
-}
+    .site-first-login {
+        padding: 40px 0;
+        background-color: #f8f9fa;
+        min-height: 100vh;
+    }
+    .card {
+        border: none;
+        border-radius: 15px;
+        overflow: hidden;
+    }
+    .card-header {
+        border-bottom: none;
+    }
+    .card-body {
+        padding: 2rem;
+    }
 CSS;
 $this->registerCss($css);
 ?> 

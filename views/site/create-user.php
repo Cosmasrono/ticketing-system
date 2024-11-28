@@ -114,7 +114,7 @@ $modules = [
 $css = <<<CSS
     .site-create-user {
         padding: 40px 0;
-        background-color: #f8f9fa;
+        background-color: #fff5eb;
         min-height: 100vh;
     }
     .card {
@@ -124,35 +124,44 @@ $css = <<<CSS
     }
     .card-header {
         border-bottom: none;
+        background-color: #ff7f27 !important;
     }
     .card-body {
         padding: 2rem;
     }
     .form-control, .form-select {
         border-radius: 8px;
-        border: 1px solid #ced4da;
+        border: 1px solid #ffd4b3;
         padding: 0.75rem 1rem;
         font-size: 1rem;
         transition: all 0.3s ease;
     }
     .form-control:focus, .form-select:focus {
-        border-color: #80bdff;
-        box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+        border-color: #ff7f27;
+        box-shadow: 0 0 0 0.2rem rgba(255, 127, 39, 0.25);
     }
     .btn-primary {
+        background-color: #ff7f27 !important;
+        border-color: #ff7f27 !important;
         border-radius: 8px;
         padding: 0.75rem 2rem;
         font-weight: 500;
         transition: all 0.3s ease;
     }
     .btn-primary:hover {
+        background-color: #ff6b00 !important;
+        border-color: #ff6b00 !important;
         transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 8px rgba(255, 127, 39, 0.2);
     }
     .form-check-input {
         width: 1.2em;
         height: 1.2em;
         margin-top: 0.2em;
+    }
+    .form-check-input:checked {
+        background-color: #ff7f27 !important;
+        border-color: #ff7f27 !important;
     }
     .form-check-label {
         padding-left: 0.5rem;
@@ -161,6 +170,17 @@ $css = <<<CSS
     .alert {
         border-radius: 10px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .alert-success {
+        background-color: #ffebda;
+        border-color: #ffd4b3;
+        color: #cc5500;
+    }
+    .text-muted {
+        color: #cc5500 !important;
+    }
+    .text-white {
+        color: #ffffff !important;
     }
 CSS;
 $this->registerCss($css);

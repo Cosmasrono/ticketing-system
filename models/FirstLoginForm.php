@@ -6,20 +6,23 @@ use yii\base\Model;
 
 class FirstLoginForm extends Model
 {
-    public $token;
+    public $company_email;
     public $current_password;
     public $new_password;
     public $confirm_password;
 
-    private $_user;
+    private $_user = false;
 
     public function rules()
     {
         return [
             [['current_password', 'new_password', 'confirm_password'], 'required'],
-            ['current_password', 'validateCurrentPassword'],
-            ['new_password', 'string', 'min' => 6],
-            ['confirm_password', 'compare', 'compareAttribute' => 'new_password', 'message' => 'Passwords do not match.'],
+            ['current_password', 'validateTemporaryPassword'],
+            ['new_password', 'string', 'min' => 8],
+            ['confirm_password', 'compare', 'compareAttribute' => 'new_password'],
+            ['new_password', 'match', 
+             'pattern' => '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/',
+             'message' => 'Password must contain at least one uppercase letter, one lowercase letter, and one number'],
         ];
     }
 
@@ -32,23 +35,13 @@ class FirstLoginForm extends Model
         ];
     }
 
-    public function validateCurrentPassword($attribute, $params)
+    public function validateTemporaryPassword($attribute, $params)
     {
         if (!$this->hasErrors()) {
             $user = $this->getUser();
-            
-            // Add debug logging
-            Yii::debug("Validating temporary password for user: " . ($user ? $user->company_email : 'User not found'));
-            Yii::debug("Submitted password: " . $this->current_password);
-            
-            if (!$user || !$user->validatePassword($this->current_password)) {
-                Yii::debug("Password validation failed");
+            if (!$user || !Yii::$app->security->validatePassword($this->current_password, $user->password_hash)) {
                 $this->addError($attribute, 'Incorrect temporary password.');
-                return false;
             }
-            
-            Yii::debug("Password validation successful");
-            return true;
         }
     }
 

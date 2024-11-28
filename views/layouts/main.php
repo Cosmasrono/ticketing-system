@@ -187,10 +187,10 @@ JqueryAsset::register($this);
 
                     // Add logout button for all logged-in users
                     $menuItems[] = '<li>'
-                        . Html::beginForm(['/site/logout'], 'post')
+                        . Html::beginForm(['/site/logout'], 'post', ['class' => 'd-flex'])
                         . Html::submitButton(
-                            'Logout (' . Yii::$app->user->identity->companyName . ')',
-                            ['class' => 'btn btn-link logout']
+                            'Logout (' . Yii::$app->user->identity->company_name . ')',
+                            ['class' => 'btn btn-link logout text-decoration-none']
                         )
                         . Html::endForm()
                         . '</li>';

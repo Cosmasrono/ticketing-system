@@ -1,7 +1,7 @@
 <?php
 
 use yii\helpers\Html;
-use yii\widgets\ActiveForm;
+use yii\bootstrap5\ActiveForm;
 
 $this->title = 'Create Ticket';
 $this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
@@ -12,83 +12,128 @@ $userModules = array_map('trim', explode(',', Yii::$app->user->identity->selecte
 $modulesList = array_combine($userModules, $userModules);
 ?>
 
-<div class="ticket-create">
-    <h1><?= Html::encode($this->title) ?></h1>
+<div class="site-ticket-create">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    <h1 class="text-center mb-4"><?= Html::encode($this->title) ?></h1>
 
-    <?php if (Yii::$app->session->hasFlash('error')): ?>
-        <div class="alert alert-danger">
-            <?= Yii::$app->session->getFlash('error') ?>
-        </div>
-    <?php endif; ?>
+                    <?php if (Yii::$app->session->hasFlash('error')): ?>
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <?= Yii::$app->session->getFlash('error') ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
 
-    <div class="row">
-        <div class="col-md-8">
-            <?php $form = ActiveForm::begin(['options' => ['enctype' => 'multipart/form-data']]); ?>
+                    <?php $form = ActiveForm::begin([
+                        'id' => 'ticket-form',
+                        'options' => [
+                            'class' => 'form-vertical',
+                            'enctype' => 'multipart/form-data'
+                        ],
+                    ]); ?>
 
-            <?= $form->field($model, 'selectedModule')->dropDownList(
-                $modulesList,  // Use the modules assigned to the user
-                [
-                    'prompt' => 'Select a module',
-                    'class' => 'form-control'
-                ]
-            ) ?>
+                    <?= $form->field($model, 'selectedModule', [
+                        'options' => ['class' => 'form-group mb-3']
+                    ])->dropDownList(
+                        $modulesList,
+                        [
+                            'prompt' => 'Select a module',
+                            'class' => 'form-control form-select'
+                        ]
+                    ) ?>
 
-            <?= $form->field($model, 'issue')->dropDownList(
-                [],
-                [
-                    'prompt' => 'Select an issue',
-                    'id' => 'ticket-issue',
-                    'class' => 'form-control'
-                ]
-            ) ?>
+                    <?= $form->field($model, 'issue', [
+                        'options' => ['class' => 'form-group mb-3']
+                    ])->dropDownList(
+                        [],
+                        [
+                            'prompt' => 'Select an issue',
+                            'id' => 'ticket-issue',
+                            'class' => 'form-control form-select'
+                        ]
+                    ) ?>
 
-            <?= $form->field($model, 'description')->textarea(['rows' => 6]) ?>
+                    <?= $form->field($model, 'description', [
+                        'options' => ['class' => 'form-group mb-3']
+                    ])->textarea([
+                        'rows' => 6,
+                        'class' => 'form-control',
+                        'placeholder' => 'Please provide detailed description of the issue...'
+                    ]) ?>
 
-            <?= $form->field($model, 'screenshot')->fileInput([
-                'accept' => 'image/*',
-                'class' => 'form-control'
-            ]) ?>
-            
-            <?= $form->field($model, 'screenshot_base64')->hiddenInput()->label(false) ?>
+                    <?= $form->field($model, 'screenshot', [
+                        'options' => ['class' => 'form-group mb-3']
+                    ])->fileInput([
+                        'accept' => 'image/*',
+                        'class' => 'form-control',
+                        'id' => 'customFile'
+                    ])->hint('<small class="text-muted">Supported formats: JPG, PNG, GIF (Max 2MB)</small>') ?>
 
-            <div class="form-group">
-                <?= Html::submitButton('Create Ticket', [
-                    'class' => 'btn btn-success',
-                    'data-loading-text' => 'Creating...'
-                ]) ?>
+                    <?= $form->field($model, 'screenshot_base64')->hiddenInput()->label(false) ?>
+
+                    <div class="form-group text-center">
+                        <?= Html::submitButton('Create Ticket', [
+                            'class' => 'btn btn-primary btn-block',
+                            'name' => 'create-button'
+                        ]) ?>
+                    </div>
+
+                    <?php ActiveForm::end(); ?>
+                </div>
             </div>
 
-            <?php ActiveForm::end(); ?>
-        </div>
-
-        <?php if (!empty($recentTickets)): ?>
-        <div class="col-md-4">
-            <div class="panel panel-default">
-                <div class="panel-heading">
-                    <h3 class="panel-title">Recent Tickets</h3>
+            <?php if (Yii::$app->session->hasFlash('success')): ?>
+                <div class="alert alert-success mt-3">
+                    <?= Yii::$app->session->getFlash('success') ?>
                 </div>
-                <div class="panel-body">
-                    <ul class="list-unstyled">
-                        <?php foreach ($recentTickets as $ticket): ?>
-                            <li>
-                                <?= Html::a(
-                                    "#" . $ticket->id . " - " . $ticket->module,
-                                    ['view', 'id' => $ticket->id]
-                                ) ?>
-                                <small class="text-muted">
-                                    (<?= Yii::$app->formatter->asRelativeTime($ticket->created_at) ?>)
-                                </small>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            </div>
+            <?php endif; ?>
         </div>
-        <?php endif; ?>
     </div>
 </div>
 
 <?php
+$css = <<<CSS
+    .site-ticket-create {
+        padding: 40px 0;
+    }
+    .card {
+        box-shadow: 0 2px 4px rgba(0,0,0,.1);
+        border-radius: 8px;
+        border: none;
+    }
+    .card-body {
+        padding: 30px;
+    }
+    .form-control, .form-select {
+        height: 45px;
+        border-radius: 4px;
+        border: 1px solid #ced4da;
+    }
+    textarea.form-control {
+        height: auto;
+    }
+    .btn-primary {
+        height: 45px;
+        font-size: 16px;
+        padding: 0 30px;
+        border-radius: 4px;
+        width: 200px;
+    }
+    .alert {
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    .form-group.mb-3 {
+        margin-bottom: 1.5rem !important;
+    }
+    .text-muted {
+        font-size: 0.875rem;
+    }
+CSS;
+$this->registerCss($css);
+
 // Add this at the beginning of your JavaScript to get the correct URL
 $getIssuesUrl = \yii\helpers\Url::to(['ticket/get-issues']);
 

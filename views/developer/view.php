@@ -4,6 +4,7 @@ use yii\helpers\Html;
 use yii\grid\GridView;
 use yii\widgets\Pjax;
 use app\models\Ticket;
+use app\models\User;
 
 /* @var $this yii\web\View */
 /* @var $user app\models\User */
@@ -48,37 +49,17 @@ $this->params['breadcrumbs'][] = $this->title;
                 'format' => 'raw',
                 'label' => 'Escalation Comment',
                 'value' => function ($model) {
-                    // Add debug line
-                    \Yii::debug([
-                        'assigned_to' => $model->assigned_to,
-                        'current_user' => Yii::$app->user->id,
-                        'status' => $model->status,
-                        'has_comment' => !empty($model->escalation_comment),
-                    ], 'escalation-debug');
-
-                    // Only show view button if:
-                    // 1. This ticket is assigned to the current user
-                    // 2. The ticket is escalated and has a comment
-                    if ($model->assigned_to === Yii::$app->user->id && 
-                        $model->status === 'escalated' && 
-                        !empty($model->escalation_comment)) {
-                        
-                        return Html::button('View Escalation', [
-                            'class' => 'btn btn-warning btn-sm view-escalation',
-                            'data-comment' => Html::encode($model->escalation_comment),
-                            'data-ticket-id' => $model->id,
-                        ]);
+                    if ($model->escalated_to === Yii::$app->user->id) {
+                        return Html::tag('div', 
+                            Html::encode($model->escalation_comment) . 
+                            '<br><small class="text-muted">Escalated by: ' . 
+                            Html::encode(User::findOne($model->escalated_by)->name ?? 'Unknown') . 
+                            '</small>',
+                            ['class' => 'alert alert-warning']
+                        );
                     }
-                    
-                    // Add visual feedback for debugging
-                    $reasons = [];
-                    if ($model->assigned_to !== Yii::$app->user->id) $reasons[] = 'not assigned';
-                    if ($model->status !== 'escalated') $reasons[] = 'not escalated';
-                    if (empty($model->escalation_comment)) $reasons[] = 'no comment';
-                    
-                    return '<span class="text-muted" title="' . implode(', ', $reasons) . '">-</span>';
+                    return '';  // Return empty if not escalated to this user
                 },
-                'contentOptions' => ['style' => 'text-align: center;'],
             ],
             // company name
             [

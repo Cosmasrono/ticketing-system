@@ -28,6 +28,8 @@ use app\models\Invitation;
 use yii\helpers\ArrayHelper;
 use yii\db\Expression;
 use app\models\FirstLoginForm;
+use app\models\ChangePasswordForm;
+use app\models\SetPasswordForm;
 
  
 
@@ -40,49 +42,25 @@ class SiteController extends Controller
     {
         return [
             'access' => [
-                'class' => \yii\filters\AccessControl::class,
+                'class' => \yii\filters\AccessControl::className(),
+                'only' => ['logout', 'index', /* other actions that need auth */],
                 'rules' => [
                     [
-                        'actions' => ['create-user'],
                         'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            return !Yii::$app->user->isGuest && Yii::$app->user->identity->role === 'admin';
-                        }
+                        'actions' => ['login', 'change-password', 'signup'],
+                        'roles' => ['?'],
                     ],
-                    // Public actions (no login required)
                     [
-                        'actions' => ['login', 'error'],
                         'allow' => true,
-                    ],
-                    // Admin only actions
-                    [
-                        'actions' => ['dashboard', 'admin'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->role === 'admin';
-                        }
-                    ],
-                    // Regular user actions
-                    [
-                        'actions' => ['index', 'logout'],
-                        'allow' => true,
+                        'actions' => ['logout', 'index'],
                         'roles' => ['@'],
                     ],
                 ],
-                'denyCallback' => function ($rule, $action) {
-                    if (Yii::$app->user->isGuest) {
-                        return Yii::$app->response->redirect(['site/login']);
-                    } else {
-                        throw new \yii\web\ForbiddenHttpException('You are not allowed to perform this action.');
-                    }
-                }
             ],
             'verbs' => [
-                'class' => \yii\filters\VerbFilter::class,
+                'class' => \yii\filters\VerbFilter::className(),
                 'actions' => [
-                    'create-user' => ['GET', 'POST'],
+                    'logout' => ['post'],
                 ],
             ],
         ];
@@ -297,16 +275,18 @@ public function actionSignup($token = null)
      public function actionLogin()
      {
          if (!Yii::$app->user->isGuest) {
-             return $this->redirect(['/site/index']); // Already logged in users
+             return $this->redirect(['site/index']);
          }
 
          $model = new LoginForm();
          if ($model->load(Yii::$app->request->post()) && $model->login()) {
-             // After successful login, redirect to index page for all roles
-             return $this->redirect(['/site/index']);
+             // Check if this is first login
+             if (Yii::$app->user->identity->first_login == 1) {
+                 return $this->redirect(['site/first-login']);
+             }
+             return $this->goBack();
          }
 
-         $model->password = '';
          return $this->render('login', [
              'model' => $model,
          ]);
@@ -987,107 +967,156 @@ private function getStatusLabel($status)
     ][$status] ?? ucfirst($status);
 }
 
-public function actionCreateClient()
-{
-    // Check if user is admin
-    if (Yii::$app->user->isGuest || Yii::$app->user->identity->company_email !== 'ccosmas001@gmail.com') {
-        throw new ForbiddenHttpException('You are not authorized to perform this action.');
-    }
-
-    $model = new SignupForm();
-    // Set default role for clients
-    $model->role = 'client';
-
-    if ($model->load(Yii::$app->request->post())) {
-        if ($user = $model->signup()) {
-            Yii::$app->session->setFlash('success', 'Client account created successfully. Login credentials have been sent to ' . $user->company_email);
-            return $this->redirect(['admin']);
-        } else {
-            Yii::$app->session->setFlash('error', 'There was an error creating the client account.');
-        }
-    }
-
-    return $this->render('create-client', [
-        'model' => $model,
-    ]);
-}
-
+ 
 public function actionCreateUser()
 {
-    // Check if user is logged in and is admin
     if (Yii::$app->user->isGuest || Yii::$app->user->identity->role !== 'admin') {
-        Yii::$app->session->setFlash('error', 'Access denied. Only administrators can create new users.');
+        Yii::$app->session->setFlash('error', 'Access denied.');
         return $this->redirect(['site/index']);
     }
 
-    $model = new User();
-    $model->scenario = 'create'; // If you have a specific scenario for user creation
+    $model = new SignupForm();
 
     if ($model->load(Yii::$app->request->post())) {
-        // Set default values or additional processing
-        $model->auth_key = Yii::$app->security->generateRandomString();
-        $model->password_hash = Yii::$app->security->generatePasswordHash($model->password);
-        
-        if ($model->save()) {
+        // Convert selectedModules array to string before validation
+        if (isset($_POST['SignupForm']['selectedModules']) && is_array($_POST['SignupForm']['selectedModules'])) {
+            $model->selectedModules = implode(',', $_POST['SignupForm']['selectedModules']);
+        }
+
+        if ($model->signup()) {
             Yii::$app->session->setFlash('success', 'User created successfully.');
-            return $this->redirect(['site/admin']); // or wherever you want to redirect after success
+            return $this->refresh();
         }
     }
 
     return $this->render('create-user', [
-        'model' => $model,
+        'model' => $model
     ]);
 }
-
-/**
- * Check if required columns exist in the specified table
- * @param string $tableName
- * @param array $requiredColumns
- * @return array Missing columns
- */
-private function checkMissingColumns($tableName, $requiredColumns)
-{
-    $schema = Yii::$app->db->schema;
-    $tableSchema = $schema->getTableSchema($tableName);
+ 
+// private function checkMissingColumns($tableName, $requiredColumns)
+// {
+//     $schema = Yii::$app->db->schema;
+//     $tableSchema = $schema->getTableSchema($tableName);
     
-    if ($tableSchema === null) {
-        throw new \yii\base\Exception("Table '$tableName' does not exist!");
+//     if ($tableSchema === null) {
+//         throw new \yii\base\Exception("Table '$tableName' does not exist!");
+//     }
+
+//     $existingColumns = array_keys($tableSchema->columns);
+//     return array_diff($requiredColumns, $existingColumns);
+// }
+
+
+public function actionFirstLogin()
+{
+    // Prevent authenticated users from accessing this page
+    if (!Yii::$app->user->isGuest) {
+        return $this->goHome();
     }
 
-    $existingColumns = array_keys($tableSchema->columns);
-    return array_diff($requiredColumns, $existingColumns);
-}
+    $email = Yii::$app->request->get('email');
+    
+    if (!$email) {
+        throw new \yii\web\BadRequestHttpException('Email parameter is required.');
+    }
 
-public function actionFirstLogin($token)
-{
-    $user = User::findOne(['password_reset_token' => $token]);
+    // Find user by email
+    $user = User::findOne(['company_email' => $email]);
     
     if (!$user) {
-        Yii::error("Invalid token used: " . $token);
-        Yii::$app->session->setFlash('error', 'Invalid or expired password reset token.');
-        return $this->redirect(['site/login']);
+        throw new \yii\web\NotFoundHttpException('User not found.');
     }
 
-    $model = new FirstLoginForm();
-    $model->token = $token;
-
-    if ($model->load(Yii::$app->request->post())) {
-        try {
-            if ($model->changePassword()) {
-                Yii::$app->session->setFlash('success', 'Password changed successfully. Please login with your new password.');
-                return $this->redirect(['site/login']);
-            } else {
-                Yii::$app->session->setFlash('error', 'Failed to change password: ' . print_r($model->errors, true));
-            }
-        } catch (\Exception $e) {
-            Yii::error("Exception in first login: " . $e->getMessage());
-            Yii::$app->session->setFlash('error', 'An error occurred while changing your password.');
+    $model = new ChangePasswordForm();
+    
+    if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+        // Update password
+        $user->password_hash = Yii::$app->security->generatePasswordHash($model->newPassword);
+        $user->first_login = 0;
+        $user->updated_at = time();
+        
+        if ($user->save()) {
+            Yii::$app->session->setFlash('success', 'Password has been set successfully. Please login with your new password.');
+            return $this->redirect(['site/login']);
         }
     }
 
     return $this->render('first-login', [
         'model' => $model,
-        'user' => $user,
+        'email' => $email
+    ]);
+}
+
+// public function actionChangePassword()
+// {
+//     if (Yii::$app->user->isGuest) {
+//         return $this->redirect(['site/login']);
+//     }
+
+//     $user = Yii::$app->user->identity;
+//     $model = new ChangePasswordForm();
+
+//     if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+//         $user->password_hash = Yii::$app->security->generatePasswordHash($model->newPassword);
+//         $user->first_login = 0; // Mark as password changed
+        
+//         if ($user->save()) {
+//             Yii::$app->session->setFlash('success', 'Password changed successfully.');
+//             return $this->redirect(['site/index']);
+//         }
+//     }
+
+//     return $this->render('change-password', [
+//         'model' => $model
+//     ]);
+// }
+
+// public function actionSetPassword($company_email)
+// {
+//     $model = new SetPasswordForm();
+//     $model->company_email = $company_email;
+    
+//     if ($model->load(Yii::$app->request->post())) {
+//         if ($model->validate()) {
+//             if ($model->changePassword()) {
+//                 Yii::$app->session->setFlash('success', 'Password changed successfully. You can now login.');
+//                 return $this->redirect(['site/login']);
+//             }
+//         }
+//     }
+
+//     return $this->render('set-password', [
+//         'model' => $model
+//     ]);
+// }
+
+public function actionChangePassword()
+{
+    $email = Yii::$app->request->get('email');
+    
+    if (!$email) {
+        throw new \yii\web\BadRequestHttpException('Email parameter is required.');
+    }
+
+    // Find user by email
+    $user = User::findOne(['company_email' => $email]);
+    
+    if (!$user) {
+        throw new \yii\web\NotFoundHttpException('User not found.');
+    }
+
+    // Pass email to the model constructor
+    $model = new ChangePasswordForm($email);
+    
+    if ($model->load(Yii::$app->request->post()) && $model->changePassword()) {
+        Yii::$app->session->setFlash('success', 'Password has been changed successfully. Please login with your new password.');
+        return $this->redirect(['site/login']);
+    }
+
+    return $this->render('change-password', [
+        'model' => $model,
+        'email' => $email
     ]);
 }
 }

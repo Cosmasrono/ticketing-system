@@ -56,6 +56,7 @@ $config = [
             'enablePrettyUrl' => true,
             'showScriptName' => false,
             'rules' => [
+                'site/first-login' => 'site/first-login',
                 'admin/<id:\d+>' => 'site/admin',
                 'ticket/view/<id:\d+>' => 'ticket/view',
                 'developer/add-comment' => 'developer/add-comment',

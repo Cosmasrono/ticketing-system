@@ -35,10 +35,12 @@ class Ticket extends ActiveRecord
     {
         return [
             [
-                'class' => TimestampBehavior::class,
+                'class' => \yii\behaviors\TimestampBehavior::class,
                 'createdAtAttribute' => 'created_at',
                 'updatedAtAttribute' => false,
-                'value' => function() { return time(); },
+                'value' => function() { 
+                    return date('Y-m-d H:i:s');  // This will store exact current datetime
+                }
             ],
         ];
     }

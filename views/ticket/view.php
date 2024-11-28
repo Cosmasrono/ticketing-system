@@ -11,17 +11,17 @@ $this->title = 'Ticket #' . $model->id;
 $this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
 
-// Temporary debug code
-echo '<div style="background: #f5f5f5; padding: 10px; margin: 10px 0; font-family: monospace;">';
-echo "Ticket ID: " . $model->id . "<br>";
-echo "Created By: " . $model->created_by . "<br>";
+// // Temporary debug code
+// echo '<div style="background: #f5f5f5; padding: 10px; margin: 10px 0; font-family: monospace;">';
+// echo "Ticket ID: " . $model->id . "<br>";
+// echo "Created By: " . $model->created_by . "<br>";
 
-$creator = Yii::$app->db->createCommand("
-    SELECT * FROM user WHERE id = :user_id
-", [':user_id' => $model->created_by])->queryOne();
+// $creator = Yii::$app->db->createCommand("
+//     SELECT * FROM user WHERE id = :user_id
+// ", [':user_id' => $model->created_by])->queryOne();
 
-echo "Creator Data: <pre>" . print_r($creator, true) . "</pre>";
-echo '</div>';
+// echo "Creator Data: <pre>" . print_r($creator, true) . "</pre>";
+// echo '</div>';
 ?>
 <div class="ticket-view">
 

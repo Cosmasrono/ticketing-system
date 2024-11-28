@@ -19,16 +19,28 @@ class DeveloperController extends Controller
         return [
             'access' => [
                 'class' => AccessControl::class,
-                'only' => ['index', 'view'],
+                'only' => ['index', 'view', 'escalate'],
                 'rules' => [
                     [
                         'allow' => true,
-                        'actions' => ['index', 'view'],
+                        'actions' => ['index', 'view', 'escalate'],
                         'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
-                            // Allow both developers and admins
-                            $allowedRoles = ['developer', 'admin', 'superadmin'];
+                            // Only allow developers and superadmins, exclude admins
+                            $allowedRoles = ['developer', 'superadmin'];
                             return in_array(Yii::$app->user->identity->role, $allowedRoles);
+                        }
+                    ],
+                    [
+                        'actions' => ['escalate', 'view', 'index'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            // Allow developers to access these actions
+                            if (Yii::$app->user->identity->role === 'developer') {
+                                return true;
+                            }
+                            return false;
                         }
                     ],
                 ],

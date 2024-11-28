@@ -62,6 +62,33 @@ class TicketController extends Controller
             'Data Connection',
             'Other'
         ],
+        'USSD' => [
+            'USSD Crashes',
+            'USSD Not Working',
+            'Other'
+        ],
+        'Finance' => [
+            'Payment Issues',
+            'Account Management',
+            'Other'
+        ],
+        'Credit' => [
+            'Credit Issues',
+            'Account Management',
+            'Other'
+        ],
+        'General' => [
+            'General Issues',
+            'Other'
+        ],
+        'Admin and Security' => [
+            'Admin and Security Issues',
+            'Other'
+        ],
+        'HR' => [
+            'HR Issues',
+            'Other'
+        ],
     ];
 
     public function behaviors()
@@ -116,11 +143,13 @@ class TicketController extends Controller
                         'roles' => ['developer'],
                     ],
                     [
-                        'actions' => ['escalate'],
+                        'actions' => ['escalate', 'view', 'index'],
                         'allow' => true,
-                        'roles' => ['developer'],
+                        'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
-                            return true; // Allow all developers to access this action
+                            // Only allow developers and superadmins to escalate tickets
+                            $allowedRoles = ['developer', 'superadmin'];
+                            return in_array(Yii::$app->user->identity->role, $allowedRoles);
                         }
                     ],
                     // Rule for regular users - Added delete action
@@ -383,7 +412,17 @@ class TicketController extends Controller
                     'Update Problems',
                     'Account Issues',
                     'Other'
-                ]
+                ],
+                'USSD' => [
+                    'USSD Crashes',
+                    'USSD Not Working',
+                    'Other'
+                ],
+                'Finance' => [
+                    'Payment Issues',
+                    'Account Management',
+                    'Other'
+                ],  
             ];
 
             // Case-insensitive module matching
@@ -968,8 +1007,11 @@ class TicketController extends Controller
             $transaction = Yii::$app->db->beginTransaction();
             
             try {
-                // Update ticket
+                // Store the current developer's ID in escalated_to before changing status
+                $ticket->escalated_to = Yii::$app->user->id; // Store the ID of developer who is escalating
                 $ticket->status = 'escalated';
+                $ticket->assigned_to = null; // Clear the assigned developer since it's escalated
+                
                 $ticket->escalation_comment = $comment;
                 $ticket->escalated_at = new \yii\db\Expression('NOW()'); // If you have this column
                 $ticket->escalated_by = Yii::$app->user->id; // If you have this column

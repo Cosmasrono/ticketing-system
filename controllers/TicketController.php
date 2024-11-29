@@ -784,7 +784,11 @@ class TicketController extends Controller
                     throw new \Exception('Selected developer is not valid');
                 }
 
-                $ticket->assigned_to = $developerId;
+                $originalTicket = Ticket::findOne($ticket->id); // Get the original ticket
+                $ticket->escalated_to = $developerId;
+                $ticket->assigned_to = $developerId;    
+                $ticket->status = 'reassigned';         
+                $ticket->escalation_comment = $originalTicket->escalation_comment; // Get comment from original ticket
                 
                 if ($ticket->save(false)) {
                     // Check if it's an escalated ticket

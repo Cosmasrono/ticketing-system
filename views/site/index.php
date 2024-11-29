@@ -10,7 +10,7 @@ $this->title = 'Iansoft Dashboard';
         <div class="hero-content">
             <h1 class="hero-title">Welcome to Iansoft Ticketing System</h1>
             <p class="hero-subtitle">Streamline your support process with our efficient ticket management solution</p>
-            <?= Html::a('Get Started', ['ticket/create'], ['class' => 'btn btn-primary btn-lg animated-button']) ?>
+             
         </div>
         <div class="hero-image">
             <img src="https://media.istockphoto.com/id/1313917874/vector/project-management-software-come-with-a-ticketing-system-to-manage-to-do-list.jpg?s=612x612&w=0&k=20&c=Yy_cF2GZUPI8ZalIpsA8UrC2jBt7mrqC42XalTaFObQ=" alt="Ticketing System" class="img-fluid">

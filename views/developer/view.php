@@ -49,16 +49,25 @@ $this->params['breadcrumbs'][] = $this->title;
                 'format' => 'raw',
                 'label' => 'Escalation Comment',
                 'value' => function ($model) {
-                    if ($model->escalated_to === Yii::$app->user->id) {
-                        return Html::tag('div', 
-                            Html::encode($model->escalation_comment) . 
-                            '<br><small class="text-muted">Escalated by: ' . 
-                            Html::encode(User::findOne($model->escalated_by)->name ?? 'Unknown') . 
-                            '</small>',
+                    if ($model->assigned_to === Yii::$app->user->id) {
+                        $escalatedBy = User::findOne($model->escalated_by);
+                        if (!$escalatedBy) {
+                            return 'null';
+                        }
+                        
+                        $comment = Html::tag('div', 
+                            '<strong>Escalated by: ' . Html::encode($escalatedBy->name) . '</strong><br>' .
+                            '<div class="mt-2">' . Html::encode($model->escalation_comment) . '</div>',
                             ['class' => 'alert alert-warning']
                         );
+                        
+                        return Html::button('View', [
+                            'class' => 'btn btn-sm btn-info view-comment',
+                            'data-comment' => $comment,
+                            'onclick' => 'showComment(this)'
+                        ]);
                     }
-                    return '';  // Return empty if not escalated to this user
+                    return 'null';
                 },
             ],
             // company name
@@ -558,8 +567,61 @@ $(document).on('click', '.view-escalation', function() {
     $('#escalationModal .ticket-id').text('Ticket ID: ' + ticketId);
     $('#escalationModal').modal('show');
 });
-  </script>
+
+$('body').on('click', '[data-toggle="modal"]', function(e) {
+    e.preventDefault();
+    var comment = $(this).data('comment');
+    bootbox.dialog({
+        message: comment,
+        title: 'Escalation Comment',
+        buttons: {
+            close: {
+                label: 'Close',
+                className: 'btn-default'
+            }
+        }
+    });
+});
+
+function showComment(button) {
+    bootbox.dialog({
+        title: 'Escalation Comment',
+        message: $(button).data('comment'),
+        size: 'medium',
+        buttons: {
+            close: {
+                label: 'Close',
+                className: 'btn-secondary'
+            }
+        }
+    });
+}
+</script>
 
 <?php
 $this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
+?>
+
+<?php
+$this->registerJsFile('https://cdnjs.cloudflare.com/ajax/libs/bootbox.js/5.5.2/bootbox.min.js', [
+    'depends' => [\yii\web\JqueryAsset::class]
+]);
+
+// Then your existing JavaScript
+$js = <<<JS
+    function showComment(button) {
+        bootbox.dialog({
+            title: 'Escalation Comment',
+            message: $(button).data('comment'),
+            size: 'medium',
+            buttons: {
+                close: {
+                    label: 'Close',
+                    className: 'btn-secondary'
+                }
+            }
+        });
+    }
+JS;
+$this->registerJs($js);
 ?>

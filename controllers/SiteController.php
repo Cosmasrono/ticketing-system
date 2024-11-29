@@ -30,6 +30,7 @@ use yii\db\Expression;
 use app\models\FirstLoginForm;
 use app\models\ChangePasswordForm;
 use app\models\SetPasswordForm;
+use yii\db\Query;
 
  
 
@@ -877,75 +878,78 @@ public function actionDeveloperTickets()
     ]);
 }
 
-public function actionDashboard()
-{
-    if (Yii::$app->user->identity->role !== 'admin') {
-        Yii::$app->session->setFlash('error', 'Access denied.');
-        return $this->redirect(['site/index']);
-    }
+// public function actionDashboard()
+// {
+//     if (Yii::$app->user->identity->role !== 'admin') {
+//         Yii::$app->session->setFlash('error', 'Access denied.');
+//         return $this->redirect(['site/index']);
+//     }
 
-    // Get developer statistics
-    $developerStats = User::find()
-        ->select([
-            'user.id',
-            'user.name',
-            'COUNT(CASE WHEN ticket.status != "closed" THEN 1 END) as active_tickets',
-            'COUNT(CASE WHEN ticket.status = "closed" THEN 1 END) as completed_tickets',
-            'COUNT(ticket.id) as total_tickets'
-        ])
-        ->leftJoin('ticket', 'ticket.assigned_to = user.id')
-        ->where(['user.role' => 'developer'])
-        ->groupBy(['user.id', 'user.name'])
-        ->asArray()
-        ->all();
+//     // Get developer statistics
+//     $developerStats = User::find()
+//         ->select([
+//             'user.id',
+//             'user.name',
+//             'COUNT(CASE WHEN ticket.status != "closed" THEN 1 END) as active_tickets',
+//             'COUNT(CASE WHEN ticket.status = "closed" THEN 1 END) as completed_tickets',
+//             'COUNT(ticket.id) as total_tickets'
+//         ])
+//         ->leftJoin('ticket', 'ticket.assigned_to = user.id')
+//         ->where(['user.role' => 'developer'])
+//         ->groupBy(['user.id', 'user.name'])
+//         ->asArray()
+//         ->all();
 
-    // Get ticket statistics
-    $ticketStats = [
-        'total' => Ticket::find()->count(),
-        'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
-        'assigned' => Ticket::find()->where(['status' => 'assigned'])->count(),
-        'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
-    ];
+//     // Get ticket statistics
+//     $ticketStats = [
+//         'total' => Ticket::find()->count(),
+//         'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
+//         'assigned' => Ticket::find()->where(['status' => 'assigned'])->count(),
+//         'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
+//     ];
 
-    // Prepare data for the doughnut chart
-    $ticketStatusData = [
-        'Pending' => $ticketStats['pending'],
-        'Assigned' => $ticketStats['assigned'],
-        'Closed' => $ticketStats['closed'],
-    ];
+//     // Prepare data for the doughnut chart
+//     $ticketStatusData = [
+//         'Pending' => $ticketStats['pending'],
+//         'Assigned' => $ticketStats['assigned'],
+//         'Closed' => $ticketStats['closed'],
+//     ];
 
-    // Get recent tickets and activity
-    $recentTickets = Ticket::find()
-        ->orderBy(['created_at' => SORT_DESC])
-        ->limit(5)
-        ->all();
+//     // Get recent tickets and activity
+//     $recentTickets = Ticket::find()
+//         ->orderBy(['created_at' => SORT_DESC])
+//         ->limit(5)
+//         ->all();
 
-    // Get recent activity with developer info and escalation comments
-    $recentActivity = (new \yii\db\Query())
-        ->select([
-            'ticket.id as ticket_id',
-            'ticket.status',
-            'ticket.created_at as timestamp',
-            'assigned_user.name as developer',
-            'escalated_user.name as escalated_to',
-            'ticket_comments.comment as escalation_comment'
-        ])
-        ->from('ticket')
-        ->leftJoin('user assigned_user', 'ticket.assigned_to = assigned_user.id')
-        ->leftJoin('user escalated_user', 'ticket.escalated_to = escalated_user.id')
-        ->leftJoin('ticket_comments', 'ticket.id = ticket_comments.ticket_id AND ticket_comments.type = "escalation"')
-        ->orderBy(['ticket.created_at' => SORT_DESC])
-        ->limit(10)
-        ->all();
+//     // Get recent activity with developer info and escalation comments
+//     $recentActivity = (new Query())
+//         ->select([
+//             'ticket.id AS ticket_id',
+//             'ticket.status',
+//             'ticket.created_at AS timestamp',
+//             'assigned_user.name AS developer',
+//             'escalated_user.name AS escalated_to',
+//             'ticket.escalation_comment'
+//         ])
+//         ->from('ticket')
+//         ->leftJoin('user assigned_user', 'ticket.assigned_to = assigned_user.id')
+//         ->leftJoin('user escalated_user', 'ticket.escalated_to = escalated_user.id')
+//         ->orderBy(['ticket.created_at' => SORT_DESC])
+//         ->limit(10)
+//         ->all();
 
-    return $this->render('dashboard', [
-        'developerStats' => $developerStats,
-        'ticketStats' => $ticketStats,
-        'recentTickets' => $recentTickets,
-        'recentActivity' => $recentActivity,
-        'ticketStatusData' => $ticketStatusData,
-    ]);
-}
+//     // Get all users for status management
+//     $users = User::find()->all();
+
+//     return $this->render('dashboard', [
+//         'developerStats' => $developerStats,
+//         'ticketStats' => $ticketStats,
+//         'recentTickets' => $recentTickets,
+//         'recentActivity' => $recentActivity,
+//         'ticketStatusData' => $ticketStatusData,
+//         'users' => $users,
+//     ]);
+// }
 
 private function getStatusColor($status)
 {
@@ -1117,6 +1121,126 @@ public function actionChangePassword()
     return $this->render('change-password', [
         'model' => $model,
         'email' => $email
+    ]);
+}
+
+public function actionToggleUserStatus()
+{
+    Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+    
+    if (Yii::$app->user->identity->role !== 'admin') {
+        return [
+            'success' => false,
+            'message' => 'Access denied'
+        ];
+    }
+
+    $id = Yii::$app->request->post('id');
+    $user = User::findOne($id);
+    
+    if (!$user) {
+        return [
+            'success' => false,
+            'message' => 'User not found'
+        ];
+    }
+
+    try {
+        // Toggle between 10 (active) and 0 (inactive)
+        $user->status = ($user->status == 10) ? 0 : 10;
+        
+        if ($user->save()) {
+            return [
+                'success' => true,
+                'message' => 'User status updated successfully',
+                'newStatus' => $user->status
+            ];
+        }
+        
+        return [
+            'success' => false,
+            'message' => 'Failed to update status'
+        ];
+    } catch (\Exception $e) {
+        Yii::error('Error updating user status: ' . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Error occurred while updating status'
+        ];
+    }
+}
+
+public function actionDashboard()
+{
+    // Check admin access
+    if (Yii::$app->user->identity->role !== 'admin') {
+        Yii::$app->session->setFlash('error', 'Access denied.');
+        return $this->redirect(['site/index']);
+    }
+
+    // Get developer statistics
+    $developerStats = User::find()
+        ->select([
+            'user.id',
+            'user.name',
+            'COUNT(CASE WHEN ticket.status != "closed" THEN 1 END) as active_tickets',
+            'COUNT(CASE WHEN ticket.status = "closed" THEN 1 END) as completed_tickets',
+            'COUNT(ticket.id) as total_tickets'
+        ])
+        ->leftJoin('ticket', 'ticket.assigned_to = user.id')
+        ->where(['user.role' => 'developer'])
+        ->groupBy(['user.id', 'user.name'])
+        ->asArray()
+        ->all();
+
+    // Get ticket statistics
+    $ticketStats = [
+        'total' => Ticket::find()->count(),
+        'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
+        'assigned' => Ticket::find()->where(['status' => 'assigned'])->count(),
+        'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
+    ];
+
+    // Prepare data for the doughnut chart
+    $ticketStatusData = [
+        'Pending' => $ticketStats['pending'],
+        'Assigned' => $ticketStats['assigned'],
+        'Closed' => $ticketStats['closed'],
+    ];
+
+    // Get recent tickets
+    $recentTickets = Ticket::find()
+        ->orderBy(['created_at' => SORT_DESC])
+        ->limit(5)
+        ->all();
+
+    // Get recent activity with developer info
+    $recentActivity = (new Query())
+        ->select([
+            'ticket.id AS ticket_id',
+            'ticket.status',
+            'ticket.created_at AS timestamp',
+            'assigned_user.name AS developer',
+            'escalated_user.name AS escalated_to',
+            'ticket.escalation_comment'
+        ])
+        ->from('ticket')
+        ->leftJoin('user assigned_user', 'ticket.assigned_to = assigned_user.id')
+        ->leftJoin('user escalated_user', 'ticket.escalated_to = escalated_user.id')
+        ->orderBy(['ticket.created_at' => SORT_DESC])
+        ->limit(10)
+        ->all();
+
+    // Get all users for status management
+    $users = User::find()->all();
+
+    return $this->render('dashboard', [
+        'developerStats' => $developerStats,
+        'ticketStats' => $ticketStats,
+        'recentTickets' => $recentTickets,
+        'recentActivity' => $recentActivity,
+        'ticketStatusData' => $ticketStatusData,
+        'users' => $users,
     ]);
 }
 }

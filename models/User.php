@@ -764,6 +764,14 @@ public function verify($token, $companyEmail)
     //     // Show HR module content
     // }
 
-     
+    public function beforeLogin($event)
+    {
+        if ($this->status === 'inactive') {
+            $event->isValid = false;
+            Yii::$app->session->setFlash('error', 'Your account has been deactivated. Please contact support.');
+        }
+        return parent::beforeLogin($event);
+    }
+
 }
 

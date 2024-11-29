@@ -137,8 +137,18 @@ JqueryAsset::register($this);
     main {
         margin-top: 20px;
     }
+
+    .navbar-logo {
+        max-height: 40px;
+        width: auto;
+        margin-right: 10px;
+    }
+
+    .navbar-brand {
+        display: flex;
+        align-items: center;
+    }
     </style>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 </head>
  
@@ -147,9 +157,13 @@ JqueryAsset::register($this);
 <div class="wrap">
     <div class="container">
         <nav id="w0" role="navigation">
+
+        <!-- logo  -->
+       
             <div class="container">
                 <?php
                 NavBar::begin([
+                    'brandLabel' => Html::img('https://www.iansoftltd.com/assets/img/logo.jpg', ['alt'=>'Logo', 'class'=>'navbar-logo', 'style' => 'height: 40px;']),
                     'brandUrl' => Yii::$app->homeUrl,
                     'options' => ['class' => 'navbar-expand-md navbar-dark fixed-top', 'style' => 'background-color: #FF8C00;']
                 ]);
@@ -169,6 +183,8 @@ JqueryAsset::register($this);
                     } else {
                         // Show all menu items for other roles
                         $menuItems = [
+
+                            
                             ['label' => 'Home', 'url' => ['/site/index']],
                             ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 
                              'url' => ['/ticket/create'],
@@ -234,6 +250,7 @@ JqueryAsset::register($this);
 </div>
 
 <?php $this->endBody() ?>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 </body>
 </html>
 <?php $this->endPage() ?>

@@ -1,6 +1,7 @@
 <?php
 use yii\helpers\Html;
 use yii\helpers\Url;
+use yii\web\JqueryAsset;
 
 $this->title = 'Help Desk Analytics Dashboard';
 
@@ -17,6 +18,9 @@ function getStatusColor($status) {
     ];
     return $colors[strtolower($status)] ?? 'bg-secondary';
 }
+
+// Register jQuery if not already registered
+$this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11');
 ?>
 
 <div class="dashboard-container">
@@ -235,20 +239,103 @@ function getStatusColor($status) {
                         <div class="timeline-marker <?= getStatusColor($activity['status']) ?>"></div>
                         <div class="timeline-content">
                             <div class="d-flex justify-content-between">
-                                <h6 class="mb-1">Ticket #<?= Html::encode($activity['ticket_id']) ?></h6>
+                                <h6 class="mb-1">
+                                    <a href="<?= Url::to(['ticket/view', 'id' => $activity['ticket_id']]) ?>">
+                                        Ticket #<?= Html::encode($activity['ticket_id']) ?>
+                                    </a>
+                                </h6>
                                 <small class="text-muted">
-                                    <?= Yii::$app->formatter->asRelativeTime($activity['timestamp']) ?>
+                                    <?= Yii::$app->formatter->asDatetime($activity['timestamp']) ?>
                                 </small>
                             </div>
-                            <p class="mb-0">
-                                <span class="badge <?= getStatusColor($activity['status']) ?>">
-                                    <?= Html::encode(ucfirst($activity['status'])) ?>
-                                </span>
-                                by <?= Html::encode($activity['developer']) ?>
-                            </p>
+                            <div class="activity-details">
+                                <p class="mb-2">
+                                    Status: <span class="badge <?= getStatusColor($activity['status']) ?>">
+                                        <?= Html::encode(ucfirst($activity['status'])) ?>
+                                    </span>
+                                </p>
+                                <?php if ($activity['developer']): ?>
+                                    <p class="mb-2">
+                                        Assigned to: <strong><?= Html::encode($activity['developer']) ?></strong>
+                                    </p>
+                                <?php endif; ?>
+                                <?php if ($activity['escalated_to']): ?>
+                                    <p class="mb-2">
+                                        Escalated to: <strong><?= Html::encode($activity['escalated_to']) ?></strong>
+                                    </p>
+                                <?php endif; ?>
+                                <?php if (!empty($activity['escalation_comment'])): ?>
+                                    <p class="mb-0 text-muted">
+                                        <i class="fas fa-comment-alt"></i> 
+                                        <?= Html::encode($activity['escalation_comment']) ?>
+                                    </p>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </div>
                 <?php endforeach; ?>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Status Management Table -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">User Status Management</h6>
+            <span class="badge bg-primary"><?= count($users) ?> Total Users</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Company</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($users as $user): ?>
+                            <tr>
+                                <td><?= Html::encode($user->name) ?></td>
+                                <td>
+                                    <span class="badge <?= $user->role === 'developer' ? 'bg-info' : 'bg-primary' ?>">
+                                        <?= Html::encode(ucfirst($user->role)) ?>
+                                    </span>
+                                </td>
+                                <td><?= Html::encode($user->company_name) ?></td>
+                                <td>
+                                    <span class="badge <?= $user->status == 10 ? 'bg-success' : 'bg-danger' ?>">
+                                        <?= $user->status == 10 ? 'Active' : 'Inactive' ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php if ($user->status == 10): ?>
+                                        <?= Html::button(
+                                            '<i class="fas fa-ban"></i> Deactivate',
+                                            [
+                                                'class' => 'btn btn-sm btn-danger',
+                                                'onclick' => 'toggleUserStatus(' . $user->id . ')',
+                                                'data-status' => $user->status
+                                            ]
+                                        ) ?>
+                                    <?php else: ?>
+                                        <?= Html::button(
+                                            '<i class="fas fa-check"></i> Activate',
+                                            [
+                                                'class' => 'btn btn-sm btn-success',
+                                                'onclick' => 'toggleUserStatus(' . $user->id . ')',
+                                                'data-status' => $user->status
+                                            ]
+                                        ) ?>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -330,6 +417,56 @@ $this->registerJs("
     // Initialize Ticket Status Chart
     new Chart(document.getElementById('ticketStatusChart'), " . json_encode($chartConfig) . ");
 ");
+
+// Add this JavaScript block at the bottom of your dashboard.php file
+$this->registerJs("
+    window.toggleUserStatus = function(userId) {
+        Swal.fire({
+            title: 'Are you sure?',
+            text: 'Do you want to change this user\'s status?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, change it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '" . Url::to(['site/toggle-user-status']) . "',
+                    type: 'POST',
+                    data: {
+                        id: userId,
+                        _csrf: yii.getCsrfToken()
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            Swal.fire({
+                                title: 'Success!',
+                                text: response.message,
+                                icon: 'success'
+                            }).then(() => {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire(
+                                'Error!',
+                                response.message,
+                                'error'
+                            );
+                        }
+                    },
+                    error: function() {
+                        Swal.fire(
+                            'Error!',
+                            'An error occurred while processing your request',
+                            'error'
+                        );
+                    }
+                });
+            }
+        });
+    };
+", \yii\web\View::POS_END);
 ?>
 
 <style>

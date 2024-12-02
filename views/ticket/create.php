@@ -63,15 +63,10 @@ $modulesList = array_combine($userModules, $userModules);
                         'placeholder' => 'Please provide detailed description of the issue...'
                     ]) ?>
 
-                    <?= $form->field($model, 'screenshot', [
-                        'options' => ['class' => 'form-group mb-3']
-                    ])->fileInput([
+                    <?= $form->field($model, 'screenshot')->fileInput([
                         'accept' => 'image/*',
-                        'class' => 'form-control',
-                        'id' => 'customFile'
-                    ])->hint('<small class="text-muted">Supported formats: JPG, PNG, GIF (Max 2MB)</small>') ?>
-
-                    <?= $form->field($model, 'screenshot_base64')->hiddenInput()->label(false) ?>
+                        'class' => 'form-control'
+                    ])->hint('Max file size: 5MB. Allowed extensions: png, jpg, jpeg, gif') ?>
 
                     <div class="form-group text-center">
                         <?= Html::submitButton('Create Ticket', [
@@ -197,20 +192,21 @@ $(document).ready(function() {
     });
 
     // File upload handler
-    $('input[type="file"]').change(function() {
-        var file = this.files[0];
-        if (file) {
-            if (file.size > 2 * 1024 * 1024) {
-                alert('File size must not exceed 2MB');
-                this.value = '';
-                return;
-            }
-            var reader = new FileReader();
-            reader.onloadend = function() {
-                $('#ticket-screenshot_base64').val(reader.result.split(',')[1]);
-            }
-            reader.readAsDataURL(file);
+    document.querySelector('input[type="file"]').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        
+        // Check file size (5MB limit)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File size must not exceed 5MB');
+            this.value = ''; // Clear the file input
+            return;
         }
+    });
+
+    // Remove or update the form submit handler since we're no longer using base64
+    document.querySelector('form').addEventListener('submit', function(e) {
+        // Add any validation if needed
     });
 });
 JS;

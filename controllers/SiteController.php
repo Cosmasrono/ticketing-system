@@ -409,6 +409,12 @@ public function actionDeveloperDashboard()
 
 public function actionAdmin()
 {
+    // First check if user is logged in
+    if (Yii::$app->user->isGuest) {
+        return $this->redirect(['site/login']);
+    }
+
+    // Then check if logged-in user has admin role
     if (Yii::$app->user->identity->role !== 'admin') {
         Yii::$app->session->setFlash('error', 'You do not have permission to access the admin area.');
         return $this->redirect(['/site/index']);
@@ -450,40 +456,32 @@ public function actionAdmin()
 public function actionRequestPasswordReset()
 {
     $model = new PasswordResetRequestForm();
+
     if ($model->load(Yii::$app->request->post()) && $model->validate()) {
         if ($model->sendEmail()) {
-            Yii::$app->session->setFlash('success', 'Check your company email for further instructions.');
+            Yii::$app->session->setFlash('success', 'Check your email for further instructions.');
             return $this->goHome();
         }
-        Yii::$app->session->setFlash('error', 'Sorry, we are unable to reset password for the provided company email address.');
+
+        Yii::$app->session->setFlash('error', 'Sorry, we are unable to reset password for the provided email.');
     }
 
-    return $this->render('requestPasswordResetToken', [
+    return $this->render('requestPasswordReset', [
         'model' => $model,
     ]);
 }
 
 public function actionResetPassword($token)
 {
-    Yii::info("Reset password action called with token: " . $token);
-
     try {
         $model = new ResetPasswordForm($token);
     } catch (InvalidArgumentException $e) {
-        Yii::error("Reset password form creation failed: " . $e->getMessage());
         throw new BadRequestHttpException($e->getMessage());
     }
 
-    if ($model->load(Yii::$app->request->post())) {
-        Yii::info("Form loaded with POST data");
-        
-        if ($model->validate() && $model->resetPassword()) {
-            Yii::info("Password reset successful");
-            Yii::$app->session->setFlash('success', 'New password saved.');
-            return $this->goHome();
-        } else {
-            Yii::error("Password reset failed. Validation errors: " . json_encode($model->errors));
-        }
+    if ($model->load(Yii::$app->request->post()) && $model->validate() && $model->resetPassword()) {
+        Yii::$app->session->setFlash('success', 'New password saved.');
+        return $this->goHome();
     }
 
     return $this->render('resetPassword', [
@@ -1242,5 +1240,60 @@ public function actionDashboard()
         'ticketStatusData' => $ticketStatusData,
         'users' => $users,
     ]);
+}
+
+public function actionToggleStatus()
+{
+    // Clear any existing output buffers
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    
+    Yii::$app->response->format = Response::FORMAT_JSON;
+    Yii::$app->response->headers->set('Content-Type', 'application/json; charset=UTF-8');
+    
+    try {
+        $id = Yii::$app->request->post('id');
+        
+        if (!$id) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'User ID is required'
+            ]);
+        }
+
+        $user = User::findOne($id);
+        if (!$user) {
+            return $this->asJson([
+                'success' => false,
+                'message' => 'User not found'
+            ]);
+        }
+
+        $user->status = ($user->status == 10) ? 0 : 10;
+        
+        if ($user->save(false)) {
+            $statusText = $user->status == 10 ? 'activated' : 'deactivated';
+            return $this->asJson([
+                'success' => true,
+                'message' => "User successfully {$statusText}",
+                'newStatus' => $user->status,
+                'userId' => $user->id
+            ]);
+        }
+
+        return $this->asJson([
+            'success' => false,
+            'message' => 'Failed to update user status'
+        ]);
+
+    } catch (\Exception $e) {
+        Yii::error('Error toggling user status: ' . $e->getMessage());
+        return $this->asJson([
+            'success' => false,
+            'message' => 'An error occurred while updating user status'
+        ]);
+        
+    }
 }
 }

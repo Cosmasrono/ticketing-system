@@ -21,11 +21,93 @@ function getStatusColor($status) {
 
 // Register jQuery if not already registered
 $this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11');
+$this->registerJsFile('https://code.jquery.com/jquery-3.6.0.min.js', ['position' => \yii\web\View::POS_HEAD]);
+
+// Register the JavaScript in POS_HEAD to ensure it's available before DOM elements
+$this->registerJs("
+    window.toggleUserStatus = function(userId) {
+        Swal.fire({
+            title: 'Are you sure?',
+            text: 'Do you want to change this user\'s status?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, change it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                $.ajax({
+                    url: '" . Url::to(['/site/toggle-status']) . "',
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        id: userId,
+                        _csrf: yii.getCsrfToken()
+                    },
+                    beforeSend: function() {
+                        // Clear any previous output
+                        console.clear();
+                    },
+                    success: function(response) {
+                        try {
+                            if (response && response.success) {
+                                Swal.fire({
+                                    title: 'Success!',
+                                    text: response.message,
+                                    icon: 'success'
+                                }).then(() => {
+                                    window.location.reload();
+                                });
+                            } else {
+                                throw new Error(response.message || 'Unknown error');
+                            }
+                        } catch (e) {
+                            console.error('Response parsing error:', e);
+                            Swal.fire({
+                                title: 'Error!',
+                                text: e.message,
+                                icon: 'error'
+                            });
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Ajax error:', {xhr, status, error});
+                        let errorMessage = 'An error occurred while processing your request';
+                        
+                        try {
+                            // Try to get response text if it exists
+                            const response = xhr.responseText;
+                            if (response) {
+                                // Remove any debug output before JSON
+                                const jsonStart = response.indexOf('{');
+                                if (jsonStart >= 0) {
+                                    const cleanJson = response.substring(jsonStart);
+                                    const parsed = JSON.parse(cleanJson);
+                                    if (parsed.message) {
+                                        errorMessage = parsed.message;
+                                    }
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Error parsing response:', e);
+                        }
+
+                        Swal.fire({
+                            title: 'Error!',
+                            text: errorMessage,
+                            icon: 'error'
+                        });
+                    }
+                });
+            }
+        });
+    };
+", \yii\web\View::POS_HEAD);
 ?>
 
 <div class="dashboard-container">
     <!-- Summary Cards Row -->
-    <div class="row mb-4">
+    <!-- <div class="row mb-4">
         <div class="col-xl-3 col-md-6">
             <div class="card border-left-primary shadow h-100">
                 <div class="card-body">
@@ -88,7 +170,7 @@ $this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11');
                     </div>
                 </div>
             </div>
-        </div>
+        </div> -->
     </div>
 
     <!-- Developer Performance Section -->
@@ -317,7 +399,7 @@ $this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11');
                                             '<i class="fas fa-ban"></i> Deactivate',
                                             [
                                                 'class' => 'btn btn-sm btn-danger',
-                                                'onclick' => 'toggleUserStatus(' . $user->id . ')',
+                                                'onclick' => "window.toggleUserStatus({$user->id})",
                                                 'data-status' => $user->status
                                             ]
                                         ) ?>
@@ -326,7 +408,7 @@ $this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11');
                                             '<i class="fas fa-check"></i> Activate',
                                             [
                                                 'class' => 'btn btn-sm btn-success',
-                                                'onclick' => 'toggleUserStatus(' . $user->id . ')',
+                                                'onclick' => "window.toggleUserStatus({$user->id})",
                                                 'data-status' => $user->status
                                             ]
                                         ) ?>
@@ -417,56 +499,6 @@ $this->registerJs("
     // Initialize Ticket Status Chart
     new Chart(document.getElementById('ticketStatusChart'), " . json_encode($chartConfig) . ");
 ");
-
-// Add this JavaScript block at the bottom of your dashboard.php file
-$this->registerJs("
-    window.toggleUserStatus = function(userId) {
-        Swal.fire({
-            title: 'Are you sure?',
-            text: 'Do you want to change this user\'s status?',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Yes, change it!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                $.ajax({
-                    url: '" . Url::to(['site/toggle-user-status']) . "',
-                    type: 'POST',
-                    data: {
-                        id: userId,
-                        _csrf: yii.getCsrfToken()
-                    },
-                    success: function(response) {
-                        if (response.success) {
-                            Swal.fire({
-                                title: 'Success!',
-                                text: response.message,
-                                icon: 'success'
-                            }).then(() => {
-                                location.reload();
-                            });
-                        } else {
-                            Swal.fire(
-                                'Error!',
-                                response.message,
-                                'error'
-                            );
-                        }
-                    },
-                    error: function() {
-                        Swal.fire(
-                            'Error!',
-                            'An error occurred while processing your request',
-                            'error'
-                        );
-                    }
-                });
-            }
-        });
-    };
-", \yii\web\View::POS_END);
 ?>
 
 <style>

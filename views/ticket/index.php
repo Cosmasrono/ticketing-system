@@ -46,17 +46,19 @@ $this->params['breadcrumbs'][] = $this->title;
                 }
             ],
             [
-                'attribute' => 'screenshot',
+                'attribute' => 'screenshot_base64',
                 'format' => 'raw',
                 'value' => function ($model) {
-                    if ($model->screenshot) {
-                        return Html::img('data:image/png;base64,' . $model->screenshot, [
-                            'alt' => 'Screenshot',
-                            'style' => 'max-width: 100px; max-height: 100px;'
-                        ]);
+                    if (!empty($model->screenshot_base64)) {
+                        $mimeType = mime_content_type('data://application/octet-stream;base64,' . base64_encode($model->screenshot_base64));
+                        $imgSrc = sprintf('data:%s;base64,%s', $mimeType, base64_encode($model->screenshot_base64));
+                        return '<img src="' . Html::encode($imgSrc) . '" alt="Ticket Screenshot" class="ticket-screenshot" loading="lazy" />';
+                    } else {
+                        return '<span class="text-muted">No screenshot</span>';
                     }
-                    return '<span class="text-muted">No screenshot</span>';
                 },
+                'label' => 'Screenshot',
+                'contentOptions' => ['class' => 'text-center'],
             ],
             [
                 'attribute' => 'created_at',
@@ -76,7 +78,7 @@ $this->params['breadcrumbs'][] = $this->title;
                         ]);
                     },
                     'close' => function ($url, $model, $key) {
-                        if ($model->status !== 'closed' && $model->created_by == Yii::$app->user->id) {
+                        if ($model->status !== 'pending' && $model->created_by == Yii::$app->user->id) {
                             return Html::button('Close', [
                                 'class' => 'btn btn-danger btn-sm close-ticket',
                                 'data-id' => $model->id,
@@ -112,6 +114,12 @@ $this->params['breadcrumbs'][] = $this->title;
     font-size: 12px;
     line-height: 1.5;
     border-radius: 3px;
+}
+
+.ticket-screenshot {
+    max-width: 100%;
+    height: auto;
+    display: block;
 }
 </style>
 

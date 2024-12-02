@@ -8,6 +8,7 @@ $db = require __DIR__ . '/db.php';
 
 $config = [
     'id' => 'basic',
+    'name' => 'Iansoft',
     'basePath' => dirname(__DIR__),
     'bootstrap' => [
         'log',
@@ -118,6 +119,7 @@ $config = [
         //     'class' => 'app\modules\admin\Module',
         // ],
     ],
+    'defaultRoute' => 'site/index',
 ];
 
 // Temporarily enable debug module

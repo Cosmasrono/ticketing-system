@@ -22,7 +22,8 @@ class SignupForm extends Model
             ['company_email', 'unique', 'targetClass' => '\app\models\User', 'message' => 'This email address has already been taken.'],
             ['password', 'string', 'min' => 6],
             ['name', 'string', 'min' => 2, 'max' => 255],
-            ['company_name', 'string', 'max' => 255],
+            ['company_name', 'string'],
+            ['company_name', 'trim'],
             ['role', 'in', 'range' => ['admin', 'developer', 'user']],
             ['selectedModules', 'safe'],
         ];
@@ -34,9 +35,14 @@ class SignupForm extends Model
         }
         
         $user = new User();
+        echo "Debug values:<br>";
+        echo "Form company_name: " . $this->company_name . "<br>";
+        
         $user->name = $this->name;
         $user->company_email = $this->company_email;
         $user->company_name = $this->company_name;
+        
+        echo "User model company_name before save: " . $user->company_name . "<br>";
         $user->role = $this->role;
 
         // Handle modules based on role

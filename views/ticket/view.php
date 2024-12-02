@@ -11,17 +11,7 @@ $this->title = 'Ticket #' . $model->id;
 $this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
 
-// // Temporary debug code
-// echo '<div style="background: #f5f5f5; padding: 10px; margin: 10px 0; font-family: monospace;">';
-// echo "Ticket ID: " . $model->id . "<br>";
-// echo "Created By: " . $model->created_by . "<br>";
-
-// $creator = Yii::$app->db->createCommand("
-//     SELECT * FROM user WHERE id = :user_id
-// ", [':user_id' => $model->created_by])->queryOne();
-
-// echo "Creator Data: <pre>" . print_r($creator, true) . "</pre>";
-// echo '</div>';
+ 
 ?>
 <div class="ticket-view">
 
@@ -54,35 +44,6 @@ $this->params['breadcrumbs'][] = $this->title;
         'model' => $model,
         'attributes' => [
             'id',
-            [
-                'attribute' => 'company_name',
-                'label' => 'Company',
-                'value' => function ($model) {
-                    // Get creator's email from the debug data we know exists
-                    $creator = Yii::$app->db->createCommand("
-                        SELECT company_email 
-                        FROM user 
-                        WHERE id = :user_id
-                    ", [':user_id' => $model->created_by])->queryOne();
-
-                    if ($creator && !empty($creator['company_email'])) {
-                        $email = $creator['company_email'];
-                        // Extract domain and create company name
-                        $domain = explode('@', $email)[1];
-                        $companyName = ucwords(str_replace(['.com', '.org', '.net'], '', $domain));
-                        
-                        return Html::encode($companyName) . ' <small class="text-muted">(' . Html::encode($email) . ')</small>';
-                    }
-
-                    // Fallback to existing company_name if available
-                    if (!empty($model->company_name)) {
-                        return Html::encode($model->company_name);
-                    }
-
-                    return '<span class="text-muted">Not Available</span>';
-                },
-                'format' => 'raw',
-            ],
             'module',
             'issue',
             'description:ntext',
@@ -92,20 +53,25 @@ $this->params['breadcrumbs'][] = $this->title;
                 'attribute' => 'screenshot',
                 'format' => 'raw',
                 'value' => function ($model) {
-                    if ($model->screenshot) {
-                        return Html::img('data:image/png;base64,' . $model->screenshot, [
-                            'class' => 'img-responsive',
-                            'style' => 'max-width:800px; margin:10px 0; border:1px solid #ddd; box-shadow: 0 0 10px rgba(0,0,0,0.1);'
+                    if (!empty($model->screenshot)) {
+                        return Html::img($model->getScreenshotUrl(), [
+                            'class' => 'img-fluid', // Responsive image
+                            'style' => 'max-width: 100%; height: auto;',
+                            'alt' => 'Ticket Screenshot'
                         ]);
-                    } else {
-                        return '<span class="not-set">(not set)</span>';
                     }
+                    return '<span class="text-muted">No screenshot available</span>';
                 },
-                'labelOptions' => ['class' => 'h4'], // Makes the label bigger
-                'contentOptions' => ['class' => 'text-center'], // Centers the image
             ],
         ],
     ]) ?>
+
+    <?php if ($model->screenshot): ?>
+        <div class="form-group">
+            <label>Screenshot:</label>
+            <img src="<?= $model->getScreenshotUrl() ?>" alt="Ticket Screenshot" class="img-fluid">
+        </div>
+    <?php endif; ?>
 
 </div>
 

@@ -75,6 +75,12 @@ $this->params['breadcrumbs'][] = $this->title;
                         ]) ?>
                     </div>
 
+                    <div class="text-center mt-3">
+                        <?= Html::a('Forgot Password?', ['site/request-password-reset'], [
+                            'class' => 'text-muted text-decoration-none'
+                        ]) ?>
+                    </div>
+
                     <?php ActiveForm::end(); ?>
                 </div>
             </div>
@@ -85,11 +91,7 @@ $this->params['breadcrumbs'][] = $this->title;
                 </div>
             <?php endif; ?>
 
-            <?php if (Yii::$app->session->hasFlash('success')): ?>
-                <div class="alert alert-success mt-3">
-                    <?= Yii::$app->session->getFlash('success') ?>
-                </div>
-            <?php endif; ?>
+    
         </div>
     </div>
 </div>
@@ -114,6 +116,9 @@ $css = <<<CSS
     }
     .alert {
         margin-bottom: 20px;
+    }
+    .text-decoration-none:hover {
+        text-decoration: underline !important;
     }
 CSS;
 $this->registerCss($css);

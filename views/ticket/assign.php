@@ -5,6 +5,95 @@ use yii\helpers\Html;
 use yii\widgets\ActiveForm;
 ?>
 
+<style>
+.assign-form {
+    padding: 25px;
+    border-radius: 8px;
+    background: #fff8f3;  /* Light orange background */
+    border: 1px solid #ffd3b6;
+}
+
+.form-control {
+    border-color: #ff9966;
+    background-color: #fff;
+}
+
+.form-control:focus {
+    border-color: #ff7733;
+    box-shadow: 0 0 0 0.2rem rgba(255, 153, 102, 0.25);
+}
+
+.btn-primary {
+    background-color: #ff7733 !important;  /* Orange primary button */
+    border-color: #ff6600 !important;
+    color: white !important;
+}
+
+.btn-primary:hover {
+    background-color: #ff6600 !important;
+    border-color: #ff5500 !important;
+}
+
+.btn-primary:disabled {
+    background-color: #ffaa80 !important;
+    border-color: #ff9966 !important;
+}
+
+.btn-secondary {
+    background-color: #f8f9fa;
+    border-color: #ff9966;
+    color: #ff7733;
+}
+
+.btn-secondary:hover {
+    background-color: #ffe6d9;
+    border-color: #ff7733;
+    color: #ff6600;
+}
+
+.alert-info {
+    background-color: #fff3e6;
+    border-color: #ffd9b3;
+    color: #cc5200;
+}
+
+.form-label {
+    color: #cc5200;
+    font-weight: 600;
+}
+
+select.form-control {
+    border-radius: 6px;
+    padding: 10px;
+    border-color: #ffd3b6;
+}
+
+select.form-control:focus {
+    border-color: #ff7733;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.mt-3 {
+    margin-top: 1.5rem !important;
+}
+
+/* Style for the dropdown arrow */
+select.form-control {
+    background-image: linear-gradient(45deg, transparent 50%, #ff7733 50%), 
+                      linear-gradient(135deg, #ff7733 50%, transparent 50%);
+    background-position: calc(100% - 20px) calc(1em + 2px),
+                         calc(100% - 15px) calc(1em + 2px);
+    background-size: 5px 5px,
+                    5px 5px;
+    background-repeat: no-repeat;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+</style>
+
 <div class="assign-form">
     <?php $form = ActiveForm::begin([
         'id' => 'assign-form',

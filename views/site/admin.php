@@ -391,24 +391,45 @@ function cancelTicket(button) {
     
     if (confirm('Are you sure you want to cancel this ticket?')) {
         $.ajax({
-            url: '<?= Url::to(["/ticket/cancel"]) ?>',  // Fixed URL to point to TicketController
+            url: '<?= Url::to(["/ticket/cancel"]) ?>',
             type: 'POST',
             data: {
                 id: id,
-                _csrf: yii.getCsrfToken()
+                // Use the correct CSRF token from Yii
+                '<?= Yii::$app->request->csrfParam ?>': '<?= Yii::$app->request->csrfToken ?>'
             },
             dataType: 'json',
+            beforeSend: function() {
+                showLoading();
+            },
             success: function(response) {
+                hideLoading();
                 if (response.success) {
-                    alert(response.message);
-                    window.location.reload();
+                    Swal.fire({
+                        title: 'Success!',
+                        text: response.message,
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        window.location.reload();
+                    });
                 } else {
-                    alert(response.message || 'Failed to cancel ticket');
+                    Swal.fire({
+                        title: 'Error!',
+                        text: response.message || 'Failed to cancel ticket',
+                        icon: 'error'
+                    });
                 }
             },
             error: function(xhr, status, error) {
+                hideLoading();
                 console.error('Error:', error);
-                alert('An error occurred while cancelling the ticket.');
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'An error occurred while cancelling the ticket.',
+                    icon: 'error'
+                });
             }
         });
     }
@@ -640,6 +661,93 @@ body {
 .assign-button {
     transition: all 0.3s ease;
 }
+
+/* Ticket Icon Styles */
+.ticket-icon-container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    width: 100px;
+    height: 60px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.ticket-icon {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    animation: floatTicket 6s ease-in-out infinite;
+}
+
+.ticket-body {
+    background: #ff8c00;
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+    position: relative;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.ticket-hole {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: white;
+    border-radius: 50%;
+    left: 10px;
+}
+
+.ticket-hole:nth-child(1) { top: 10px; }
+.ticket-hole:nth-child(2) { top: 50%; transform: translateY(-50%); }
+.ticket-hole:nth-child(3) { bottom: 10px; }
+
+.ticket-text {
+    position: absolute;
+    right: 10px;
+    height: 8px;
+    background: rgba(255,255,255,0.7);
+    border-radius: 4px;
+}
+
+.ticket-text:nth-child(4) {
+    width: 40%;
+    top: 15px;
+}
+
+.ticket-text:nth-child(5) {
+    width: 60%;
+    bottom: 15px;
+}
+
+@keyframes floatTicket {
+    0%, 100% {
+        transform: translateY(0) rotate(0deg);
+    }
+    50% {
+        transform: translateY(-20px) rotate(5deg);
+    }
+}
+
+/* Add a subtle glow effect */
+.ticket-body::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.2), transparent);
+    border-radius: 8px;
+    animation: glowPulse 2s ease-in-out infinite;
+}
+
+@keyframes glowPulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+}
 </style>
+
+ 
 
 

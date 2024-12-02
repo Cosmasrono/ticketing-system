@@ -5,7 +5,7 @@ namespace app\models;
 use Yii;
 use yii\base\Model;
 use app\models\User;
-use app\models\Client; // Add this line to import the Client model
+use app\models\Client;
 
 class LoginForm extends Model
 {
@@ -58,7 +58,7 @@ class LoginForm extends Model
             }
 
             if ($user->status !== 10) {
-                $this->addError($attribute, 'Please set your password using the link sent to your email.');
+                $this->addError($attribute, 'This account has been deactivated.');
                 return;
             }
 
@@ -71,10 +71,13 @@ class LoginForm extends Model
     public function login()
     {
         if ($this->validate()) {
-            Yii::debug("Login validation passed");
-            return Yii::$app->user->login($this->getUser(), $this->rememberMe ? 3600*24*30 : 0);
+            $user = $this->getUser();
+            if ($user && $user->status == 10) {
+                return Yii::$app->user->login($user, $this->rememberMe ? 3600*24*30 : 0);
+            } else {
+                $this->addError('company_email', 'Account is inactive or not found.');
+            }
         }
-        Yii::debug("Login validation failed: " . print_r($this->errors, true));
         return false;
     }
 

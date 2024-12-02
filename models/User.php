@@ -67,6 +67,7 @@ class User extends ActiveRecord implements IdentityInterface
             ['password', 'required', 'on' => 'create'],
             ['password', 'string', 'min' => 6],
             ['company_name', 'string'],
+            ['company_name', 'trim'],
             ['status', 'default', 'value' => self::STATUS_INACTIVE],
             ['status', 'in', 'range' => [
                 self::STATUS_INACTIVE,
@@ -116,21 +117,16 @@ class User extends ActiveRecord implements IdentityInterface
 
      public function beforeSave($insert)
      {
-         if (parent::beforeSave($insert)) {
-             if ($this->isNewRecord && $this->password) {
-                 $this->setPassword($this->password);
-                 $this->generateAuthKey();
-             }
-             // Extract company name from email domain
-             if ($this->company_email) {
-                 $domain = substr(strrchr($this->company_email, "@"), 1);
-                 // Remove .com, .org etc and convert to proper case
-                 $company = ucwords(strtolower(preg_replace('/\.[^.]*$/', '', $domain)));
-                 $this->company_name = $company;
-             }
-             return true;
+         if (!parent::beforeSave($insert)) {
+             return false;
          }
-         return false;
+         
+         // Remove any debug output
+         if (ob_get_level() > 0) {
+             ob_clean();
+         }
+         
+         return true;
      }
  
     //  public function afterSave($insert, $changedAttributes)
@@ -771,6 +767,12 @@ public function verify($token, $companyEmail)
             Yii::$app->session->setFlash('error', 'Your account has been deactivated. Please contact support.');
         }
         return parent::beforeLogin($event);
+    }
+
+    public function setCompanyName($value)
+    {
+        echo "Setting company name to: " . $value . "<br>";
+        $this->company_name = $value;
     }
 
 }

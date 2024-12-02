@@ -49,7 +49,7 @@ class AdminController extends Controller
         $dataProvider = new ActiveDataProvider([
             'query' => $query,
             'pagination' => [
-                'pageSize' => 10,
+                'pageSize' => 30,
             ],
             'sort' => [
                 'defaultOrder' => [

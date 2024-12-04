@@ -31,6 +31,8 @@ use yii\queue\Queue;
 use app\jobs\SendTicketAssignmentEmail;
 use app\models\Notification;
 use yii\web\UploadedFile;
+use yii\helpers\FileHelper;
+use Cloudinary\Cloudinary;
  
  
  
@@ -265,6 +267,11 @@ class TicketController extends Controller
                             return true; // Allow other roles
                         }
                     ],
+                    [
+                        'actions' => ['upload-to-cloudinary'],
+                        'allow' => true,
+                        'roles' => ['@'], // @ means authenticated users
+                    ],
                 ],
                 // 'denyCallback' => function ($rule, $action) {
                 //     Yii::$app->session->setFlash('error', 'You are not authorized to perform this action.');
@@ -282,6 +289,7 @@ class TicketController extends Controller
                     'cancel' => ['POST'],
                     'reopen' => ['POST'],
                     'get-issues' => ['post'],
+                    'upload-to-cloudinary' => ['POST'],
                 ],
             ],
             'corsFilter' => [
@@ -866,27 +874,23 @@ class TicketController extends Controller
 
     public function actionAssign($id)
     {
-        // Set JSON response format for AJAX requests
+        Yii::info('actionAssign called for ticket ID: ' . $id);
+
         if (Yii::$app->request->isAjax) {
             Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         }
 
-        // Get developers first
+        // Get developers
         $developers = User::find()
             ->where(['role' => User::ROLE_DEVELOPER])
             ->andWhere(['status' => 10])
             ->all();
             
-
         if (empty($developers)) {
-            if (Yii::$app->request->isAjax) {
-                return [
-                    'success' => false,
-                    'message' => 'No developers available for assignment.'
-                ];
-            }
-            Yii::$app->session->setFlash('error', 'No developers available for assignment.');
-            return $this->redirect(['index']);
+            return [
+                'success' => false,
+                'message' => 'No developers available for assignment.'
+            ];
         }
 
         $ticket = Ticket::findOne($id);
@@ -899,62 +903,40 @@ class TicketController extends Controller
             try {
                 $developerId = Yii::$app->request->post('Ticket')['assigned_to'] ?? null;
                 
-                // Validate developer exists in our fetched list
-                $developerExists = false;
+                // Validate developer exists
+                $selectedDeveloper = null;
                 foreach ($developers as $developer) {
                     if ($developer->id == $developerId) {
-                        $developerExists = true;
+                        $selectedDeveloper = $developer;
                         break;
                     }
                 }
 
-                if (!$developerExists) {
+                if (!$selectedDeveloper) {
                     throw new \Exception('Selected developer is not valid');
                 }
 
-                $originalTicket = Ticket::findOne($ticket->id); // Get the original ticket
-                $ticket->escalated_to = $developerId;
-                $ticket->assigned_to = $developerId;    
-                $ticket->status = 'reassigned';         
-                $ticket->escalation_comment = $originalTicket->escalation_comment; // Get comment from original ticket
-                
-                // Only change status if it was escalated
-                if ($originalTicket->status === 'escalated') {
+                // Update ticket based on current status
+                if ($ticket->status === 'escalated') {
                     $ticket->status = 'reassigned';
-                    $message = 'Ticket reassigned successfully';
-                } else {
-                    $message = 'Ticket assigned successfully';
+                    $message = 'Ticket has been reassigned successfully';
+                } elseif ($ticket->status === 'approved') {
+                    $message = 'Ticket has been assigned successfully';
                 }
-                
+
+                // Update assignment
+                $ticket->assigned_to = $developerId;
+                $ticket->escalated_to = $developerId;
+
                 if ($ticket->save(false)) {
                     $transaction->commit();
                     
                     // Send email notification
-                    try {
-                        $emailSent = Yii::$app->mailer->compose('assignmentNotification', [
-                            'developer_name' => $developer->name,  // Using name
-                            'ticket_id' => $ticket->id,
-                            'company_name' => $ticket->company_name,
-                            'description' => $ticket->description,
-                            'module' => $ticket->module,
-                            'issue' => $ticket->issue
-                        ])
-                        ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->params['senderName']])
-                        ->setTo([$developer->company_email => $developer->name])  // Using name in recipient
-                        ->setSubject("Ticket Assignment #{$ticket->id} - {$ticket->company_name}")
-                        ->send();
-
-                        if (!$emailSent) {
-                            Yii::error('Failed to send email notification to developer: ' . $developer->name);
-                        }
-                    } catch (\Exception $e) {
-                        Yii::error('Email sending failed for developer ' . $developer->name . ': ' . $e->getMessage());
-                        // Continue execution even if email fails
-                    }
+                    $this->sendEmailNotification($ticket, $selectedDeveloper, 'assign');
 
                     return [
                         'success' => true,
-                        'message' => $message,
+                        'message' => $message ?? null,
                         'newStatus' => $ticket->status,
                         'ticketId' => $ticket->id
                     ];
@@ -966,8 +948,7 @@ class TicketController extends Controller
                 $transaction->rollBack();
                 return [
                     'success' => false,
-                    'message' => ($ticket->status === 'escalated' ? 'Failed to reassign' : 'Failed to assign') . 
-                                ' developer: ' . $e->getMessage()
+                    'message' => 'Operation failed: ' . $e->getMessage()
                 ];
             }
         }
@@ -975,7 +956,7 @@ class TicketController extends Controller
         // For non-AJAX requests, render the form
         return $this->render('assign', [
             'ticket' => $ticket,
-            'developers' => $developers
+            'developers' => ArrayHelper::map($developers, 'id', 'name')
         ]);
     }
 
@@ -1470,171 +1451,126 @@ class TicketController extends Controller
         }
     }
 
-    private function sendEmailNotification($to, $ticket, $reason, $recipientType)
+    private function sendEmailNotification($model, $type = 'create')
     {
         try {
-            $subject = "Ticket #{$ticket->id} Has Been Reopened";
-            
-            $emailContent = $this->renderPartial('//mail/ticket-reopen', [
-                'ticket' => $ticket,
-                'reason' => $reason,
-                'recipientType' => $recipientType,
-                'viewUrl' => Yii::$app->urlManager->createAbsoluteUrl(['ticket/view', 'id' => $ticket->id])
-            ]);
+            switch ($type) {
+                case 'create':
+                    // Send notification to admin for new ticket
+                    return Yii::$app->mailer->compose()
+                        ->setTo(Yii::$app->params['adminEmail'])
+                        ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name . ' robot'])
+                        ->setSubject('New Ticket Created: #' . $model->id . ' - ' . $model->company_name)
+                        ->setTextBody("A new ticket has been created.\n\n" .
+                            "Details:\n\n" .
+                            "Company: {$model->company_name}\n" .
+                            "Module: {$model->module}\n" .
+                            "Issue: {$model->issue}\n" .
+                            "Description: {$model->description}\n\n" .
+                            "Please review the ticket.")
+                        ->send();
 
-            $sent = Yii::$app->mailer->compose()
-                ->setHtmlBody($emailContent)
-                ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name])
-                ->setTo($to)
-                ->setSubject($subject)
-                ->send();
+                case 'assign':
+                    // Get the developer
+                    $developer = User::findOne($model->assigned_to);
+                    if (!$developer) {
+                        throw new \Exception('Developer not found');
+                    }
 
-            if ($sent) {
-                Yii::info("Reopen notification email sent to $to", 'ticket');
-            } else {
-                Yii::error("Failed to send reopen notification to $to", 'ticket');
+                    return Yii::$app->mailer->compose('assignmentNotification', [
+                        'developer_name' => $developer->name,
+                        'ticket_id' => $model->id,
+                        'company_name' => $model->company_name,
+                        'description' => $model->description,
+                        'module' => $model->module,
+                        'issue' => $model->issue,
+                        'status' => $model->status
+                    ])
+                    ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->params['senderName']])
+                    ->setTo([$developer->company_email => $developer->name])
+                    ->setSubject("Ticket " . ucfirst($model->status) . " #{$model->id} - {$model->company_name}")
+                    ->send();
+
+                default:
+                    throw new \Exception('Invalid notification type');
             }
-
         } catch (\Exception $e) {
-            Yii::error("Error sending email to $to: " . $e->getMessage(), 'ticket');
+            Yii::error('Failed to send email notification: ' . $e->getMessage());
+            return false;
         }
     }
 
-    public function actionCreate()
-    {
-        $model = new Ticket();
-        $user = Yii::$app->user->identity;
 
-        if ($this->request->isPost) {
-            Yii::info('POST Data: ' . print_r($this->request->post(), true), 'ticket_creation');
 
-            if ($model->load($this->request->post())) {
-                // Handle file upload
-                $model->uploadedFile = UploadedFile::getInstance($model, 'uploadedFile');
-                
-                // Set other attributes
-                $model->created_at = date('Y-m-d H:i:s');
-                $model->created_by = $user->id;
-                $model->company_name = $user->company_name;
-                $model->company_email = $user->company_email;
-                $model->status = Ticket::STATUS_PENDING;
-                $model->module = $model->selectedModule;
+  public function actionCreate()
+{
+    $model = new Ticket();
+    $user = Yii::$app->user->identity; // Get the current logged-in user
 
-                // Handle file upload and convert to base64
-                $uploadedFile = UploadedFile::getInstance($model, 'screenshot');
-                if ($uploadedFile) {
-                    try {
-                        // Log file information
-                        Yii::info('Processing uploaded file: ' . print_r([
-                            'name' => $uploadedFile->name,
-                            'type' => $uploadedFile->type,
-                            'size' => $uploadedFile->size,
-                        ], true), 'ticket_creation');
+    if ($model->load(Yii::$app->request->post())) {
+        // Set other attributes
+        $model->created_at = date('Y-m-d H:i:s');
+        $model->created_by = $user->id;
+        $model->company_name = $user->company_name;
+        $model->company_email = $user->company_email;
+        $model->status = Ticket::STATUS_PENDING;
+        $model->module = $model->selectedModule;
 
-                        // Read file content and convert to base64
-                        $fileContent = file_get_contents($uploadedFile->tempName);
-                        if ($fileContent === false) {
-                            throw new \Exception('Could not read uploaded file');
-                        }
-
-                        // Get MIME type
-                        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                        $mimeType = finfo_file($finfo, $uploadedFile->tempName);
-                        finfo_close($finfo);
-
-                        // Create base64 string with data URI scheme
-                        $base64Content = 'data:' . $mimeType . ';base64,' . base64_encode($fileContent);
-                        
-                        // Store base64 string
-                        $model->screenshot = $base64Content;
-
-                        Yii::info('File successfully converted to base64', 'ticket_creation');
-                    } catch (\Exception $e) {
-                        Yii::error('File processing error: ' . $e->getMessage(), 'ticket_creation');
-                        $model->addError('screenshot', 'Error processing uploaded file');
-                    }
+        // Check if screenshotUrl is set and is a valid Cloudinary URL
+        if (!empty($model->screenshotUrl)) {
+            try {
+                // Verify it's a Cloudinary URL
+                if (strpos($model->screenshotUrl, Yii::$app->params['cloudinary']['cloud_name']) === false) {
+                    throw new \Exception('Invalid screenshot URL format');
                 }
 
-                // Log model attributes before save
-                Yii::info('Model Attributes Before Save: ' . print_r($model->attributes, true), 'ticket_creation');
+                // Optional: Verify the image exists on Cloudinary
+                $cloudinary = new Cloudinary([
+                    'cloud' => [
+                        'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
+                        'api_key' => Yii::$app->params['cloudinary']['api_key'],
+                        'api_secret' => Yii::$app->params['cloudinary']['api_secret']
+                    ]
+                ]);
+
+                // Extract public_id from URL
+                preg_match('/\/v\d+\/(.+)\.\w+$/', $model->screenshotUrl, $matches);
+                if (isset($matches[1])) {
+                    $publicId = $matches[1];
+                    // Verify image exists
+                    $cloudinary->adminApi()->asset($publicId);
+                    Yii::info('Screenshot verified on Cloudinary: ' . $model->screenshotUrl, __METHOD__);
+                }
 
                 if ($model->save()) {
-                    Yii::info('Ticket created successfully. ID: ' . $model->id, 'ticket_creation');
-                    
-                    // Send email notification
-                    try {
-                        $this->sendTicketNotification($model, $user);
-                        Yii::info('Notification email sent successfully', 'ticket_creation');
-                    } catch (\Exception $e) {
-                        Yii::error('Failed to send notification email: ' . $e->getMessage(), 'ticket_creation');
-                    }
+                    // Send email notification to admin
+                    $this->sendEmailNotification($model, 'create');
 
-                    Yii::$app->session->setFlash('success', 'Ticket created successfully.');
-                    return $this->redirect(['index']);
-                } else {
-                    // Detailed error logging
-                    Yii::error('Ticket save failed: ' . print_r($model->errors, true), 'ticket_creation');
-                    Yii::$app->session->setFlash('error', 'Failed to create ticket. ' . implode(', ', $model->firstErrors));
+                    Yii::$app->session->setFlash('success', 'Ticket created successfully with screenshot.');
+                    return $this->redirect(['view', 'id' => $model->id]);
                 }
-            } else {
-                // Log model load failure
-                Yii::error('Model load failed: ' . print_r($model->errors, true), 'ticket_creation');
+            } catch (\Exception $e) {
+                Yii::error('Cloudinary verification failed: ' . $e->getMessage(), __METHOD__);
+                $model->addError('screenshotUrl', 'Failed to verify screenshot: ' . $e->getMessage());
+            }
+        } else {
+            // No screenshot provided, just save the ticket
+            if ($model->save()) {
+                // Send email notification to admin
+                $this->sendEmailNotification($model, 'create');
+
+                Yii::$app->session->setFlash('success', 'Ticket created successfully.');
+                return $this->redirect(['view', 'id' => $model->id]);
             }
         }
-
-        // Get user's assigned modules for the dropdown
-        $userModules = array_map('trim', explode(',', $user->selectedModules));
-        $modulesList = array_combine($userModules, $userModules);
-
-        return $this->render('create', [
-            'model' => $model,
-            'modulesList' => $modulesList,
-        ]);
     }
 
-    // Helper method to get image URL from base64
-    private function getImageUrl($base64String)
-    {
-        if (empty($base64String)) {
-            return null;
-        }
-        
-        // Determine image type from base64 content
-        $finfo = finfo_open();
-        $binary = base64_decode($base64String);
-        $mimeType = finfo_buffer($finfo, $binary, FILEINFO_MIME_TYPE);
-        finfo_close($finfo);
-        
-        return 'data:' . $mimeType . ';base64,' . $base64String;
-    }
+    return $this->render('create', [
+        'model' => $model,
+    ]);
+}
 
-    // Helper method for email notification
-    private function sendTicketNotification($model, $user)
-    {
-        $htmlContent = $this->renderPartial('@app/mail/ticketNotification', [
-            'username' => $user->username,
-            'company_name' => $model->company_name,
-            'description' => $model->description,
-            'ticketId' => $model->id,
-            'module' => $model->selectedModule,
-            'issue' => $model->issue
-        ]);
 
-        $emailSent = Yii::$app->mailer->compose()
-            ->setFrom([Yii::$app->params['senderEmail'] => 'Ticket System'])
-            ->setTo([Yii::$app->params['adminEmail'] => 'Admin'])
-            ->setReplyTo([$user->company_email => $user->username])
-            ->setSubject("New Ticket #{$model->id} - {$model->company_name} - {$model->selectedModule}")
-            ->setHtmlBody($htmlContent)
-            ->send();
-
-        Yii::$app->session->setFlash(
-            $emailSent ? 'success' : 'warning',
-            $emailSent 
-                ? 'Ticket created successfully and email notification sent.'
-                : 'Ticket created but email notification failed.'
-        );
-    }
 
     public function actionAssigned()
     {
@@ -1648,8 +1584,115 @@ class TicketController extends Controller
         ]);
     }
 
-}
+    public function actionViewImage($id)
+    {
+        $model = Ticket::findOne($id);
+        if ($model && $model->screenshot) {
+            return $this->renderPartial('_image', [
+                'base64Image' => 'data:image/jpeg;base64,' . $model->screenshot
+            ]);
+        }
+        return 'No image available';
+    }
 
+    public function actionUploadToCloudinary()
+    {
+        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        
+        try {
+            if (!isset($_FILES['file'])) {
+                return [
+                    'success' => false,
+                    'message' => 'No file uploaded'
+                ];
+            }
+
+            $file = $_FILES['file'];
+            
+            // Validate file size (5MB limit)
+            if ($file['size'] > 5 * 1024 * 1024) {
+                return [
+                    'success' => false,
+                    'message' => 'File size must not exceed 5MB'
+                ];
+            }
+
+            // Validate file type
+            $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+            if (!in_array($file['type'], $allowedTypes)) {
+                return [
+                    'success' => false,
+                    'message' => 'Only JPG, PNG and GIF files are allowed'
+                ];
+            }
+
+            $cloudinary = new Cloudinary([
+                'cloud' => [
+                    'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
+                    'api_key' => Yii::$app->params['cloudinary']['api_key'],
+                    'api_secret' => Yii::$app->params['cloudinary']['api_secret']
+                ]
+            ]);
+
+            $response = $cloudinary->uploadApi()->upload(
+                $file['tmp_name'],
+                [
+                    'folder' => 'tickets',
+                    'resource_type' => 'image'
+                ]
+            );
+
+            return [
+                'success' => true,
+                'url' => $response['secure_url'],
+                'public_id' => $response['public_id']
+            ];
+
+        } catch (\Exception $e) {
+            \Yii::error('Cloudinary upload error: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => 'Upload failed: ' . $e->getMessage()
+            ];
+        }
+    }
+
+    public function actionUpload()
+    {
+        try {
+            if (!isset($_FILES['file'])) {
+                return $this->asJson(['error' => 'No file uploaded']);
+            }
+
+            $cloudinary = new Cloudinary([
+                'cloud' => [
+                    'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
+                    'api_key' => Yii::$app->params['cloudinary']['api_key'],
+                    'api_secret' => Yii::$app->params['cloudinary']['api_secret']
+                ]
+            ]);
+
+            $response = $cloudinary->uploadApi()->upload(
+                $_FILES['file']['tmp_name'],
+                ['folder' => 'tickets'] // Optional: specify folder
+            );
+
+            return $this->asJson([
+                'success' => true,
+                'url' => $response->getSecurePath()
+            ]);
+
+        } catch (\Exception $e) {
+            return $this->asJson([
+                'success' => false,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
+
+   
+
+}
 
 
 

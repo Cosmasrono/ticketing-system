@@ -46,13 +46,15 @@ $this->params['breadcrumbs'][] = $this->title;
                 }
             ],
             [
-                'attribute' => 'screenshot_base64',
+                'attribute' => 'screenshotUrl',
                 'format' => 'raw',
                 'value' => function ($model) {
-                    if (!empty($model->screenshot_base64)) {
-                        $mimeType = mime_content_type('data://application/octet-stream;base64,' . base64_encode($model->screenshot_base64));
-                        $imgSrc = sprintf('data:%s;base64,%s', $mimeType, base64_encode($model->screenshot_base64));
-                        return '<img src="' . Html::encode($imgSrc) . '" alt="Ticket Screenshot" class="ticket-screenshot" loading="lazy" />';
+                    if (!empty($model->screenshotUrl)) {
+                        return Html::button('<i class="fas fa-eye"></i> View', [
+                            'class' => 'btn btn-orange btn-xs view-screenshot',
+                            'data-src' => $model->screenshotUrl,
+                            'title' => 'View Screenshot'
+                        ]);
                     } else {
                         return '<span class="text-muted">No screenshot</span>';
                     }
@@ -78,18 +80,18 @@ $this->params['breadcrumbs'][] = $this->title;
                         ]);
                     },
                     'close' => function ($url, $model, $key) {
-                        if ($model->status !== 'pending' && $model->created_by == Yii::$app->user->id) {
-                            return Html::button('Close', [
-                                'class' => 'btn btn-danger btn-sm close-ticket',
+                        if ($model->status !== 'closed') {
+                            return Html::button('<i class="fas fa-times-circle"></i> Close', [
+                                'class' => 'btn btn-warning btn-xs close-ticket',
                                 'data-id' => $model->id,
                                 'type' => 'button',
                                 'title' => 'Close this ticket'
                             ]);
                         }
-                        return '';
+                        return '<span class="badge bg-secondary">Closed</span>';
                     },
                 ],
-                'contentOptions' => ['style' => 'min-width:150px;'],
+                'contentOptions' => ['style' => 'min-width:200px;'],
             ],
         ],
     ]); ?>
@@ -121,6 +123,69 @@ $this->params['breadcrumbs'][] = $this->title;
     height: auto;
     display: block;
 }
+
+.btn-orange {
+    background-color: #ff9800; /* Orangish color */
+    border-color: #ff9800;
+    color: #fff;
+}
+
+.btn-orange:hover {
+    background-color: #e68900; /* Darker shade on hover */
+    border-color: #e68900;
+}
+
+.btn-warning {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: #000;
+}
+
+.btn-warning:hover {
+    background-color: #e0a800;
+    border-color: #d39e00;
+    color: #000;
+}
+
+.close-ticket {
+    margin-left: 5px;
+}
+
+.badge.bg-secondary {
+    font-size: 11px;
+    padding: 4px 8px;
+}
+
+.swal-image-custom {
+    max-width: 100%;
+    max-height: 70vh; /* Limit height to 70% of viewport height */
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    margin: 0 auto;
+}
+
+.swal2-popup {
+    padding: 1em !important;
+}
+
+.swal2-content {
+    padding: 0 !important;
+}
+
+/* Optional: Add a subtle border and shadow to the image */
+.swal-image-custom {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Ensure modal is not too tall on smaller screens */
+@media (max-height: 768px) {
+    .swal-image-custom {
+        max-height: 60vh;
+    }
+}
 </style>
 
 <?php
@@ -129,82 +194,117 @@ $this->registerJs("
         $(document).on('click', '.close-ticket', function(e) {
             e.preventDefault();
             const ticketId = $(this).data('id');
-            if (ticketId) {
-                closeTicket(ticketId);
-            }
-        });
-    });
+            const button = $(this);
+            
+            Swal.fire({
+                title: 'Close Ticket',
+                text: 'Are you sure you want to close this ticket?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ffc107',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Yes, close it!',
+                cancelButtonText: 'Cancel'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({
+                        title: 'Processing...',
+                        text: 'Please wait while we close the ticket',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
 
-    function closeTicket(ticketId) {
-        Swal.fire({
-            title: 'Close Ticket',
-            text: 'Are you sure you want to close this ticket?',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, close it!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                Swal.fire({
-                    title: 'Processing...',
-                    text: 'Please wait',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
+                    $.ajax({
+                        url: '" . Yii::$app->urlManager->createUrl(['ticket/close']) . "',
+                        type: 'POST',
+                        data: {
+                            id: ticketId,
+                            _csrf: '" . Yii::$app->request->csrfToken . "'
+                        },
+                        dataType: 'json'
+                    })
+                    .done(function(response) {
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Ticket Closed!',
+                                text: 'The ticket has been successfully closed.',
+                                showConfirmButton: false,
+                                timer: 1500
+                            }).then(() => {
+                                button.replaceWith('<span class=\"badge bg-secondary\">Closed</span>');
+                                button.closest('tr').find('td:nth-child(5)').html(
+                                    '<span class=\"badge bg-secondary\">closed</span>'
+                                );
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message || 'Failed to close ticket'
+                            });
+                        }
+                    })
+                    .fail(function(jqXHR) {
+                        let errorMessage = 'An error occurred while closing the ticket.';
+                        try {
+                            const response = JSON.parse(jqXHR.responseText);
+                            if (response.message) {
+                                errorMessage = response.message;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing response:', e);
+                        }
 
-                $.ajax({
-                    url: '" . Yii::$app->urlManager->createUrl(['ticket/close']) . "',
-                    type: 'POST',
-                    data: {
-                        id: ticketId,
-                        _csrf: '" . Yii::$app->request->csrfToken . "'
-                    },
-                    dataType: 'json'
-                })
-                .done(function(response) {
-                    if (response.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success!',
-                            text: response.message,
-                            showConfirmButton: false,
-                            timer: 1500
-                        }).then(() => {
-                            location.reload();
-                        });
-                    } else {
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
-                            text: response.message || 'Failed to close ticket'
+                            text: errorMessage
                         });
-                    }
-                })
-                .fail(function(jqXHR) {
-                    let errorMessage = 'An error occurred while closing the ticket.';
-                    try {
-                        const response = JSON.parse(jqXHR.responseText);
-                        if (response.message) {
-                            errorMessage = response.message;
-                        }
-                    } catch (e) {
-                        console.error('Error parsing response:', e);
-                    }
-
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: errorMessage
                     });
-                });
-            }
+                }
+            });
+        });
+    });
+
+    function showFullImage(src) {
+        Swal.fire({
+            imageUrl: src,
+            imageAlt: 'Full size screenshot',
+            showCloseButton: true,
+            showConfirmButton: false,
+            width: '80%',
+            padding: '1em',
+            background: '#fff',
+            backdrop: `
+                rgba(0,0,123,0.4)
+                url('/images/nyan-cat.gif')
+                left top
+                no-repeat
+            `
         });
     }
+
+    $(document).on('click', '.view-screenshot', function() {
+        const imageUrl = $(this).data('src');
+        Swal.fire({
+            imageUrl: imageUrl,
+            imageAlt: 'Screenshot',
+            width: '60%',
+            showCloseButton: true,
+            showConfirmButton: false,
+            customClass: {
+                image: 'swal-image-custom'
+            }
+        });
+    });
 ");
 ?>
 
 <!-- Add SweetAlert2 CDN -->
 <?php $this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11', ['position' => \yii\web\View::POS_HEAD]); ?>
+
+<!-- Add Font Awesome for the eye icon -->
+<?php $this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css'); ?>

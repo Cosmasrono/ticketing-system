@@ -50,14 +50,14 @@ $this->params['breadcrumbs'][] = $this->title;
             'status',
             'created_at:datetime',
             [
-                'attribute' => 'screenshot',
+                'attribute' => 'screenshotUrl',
                 'format' => 'raw',
                 'value' => function ($model) {
-                    if (!empty($model->screenshot)) {
-                        return Html::img($model->getScreenshotUrl(), [
-                            'class' => 'img-fluid', // Responsive image
-                            'style' => 'max-width: 100%; height: auto;',
-                            'alt' => 'Ticket Screenshot'
+                    if (!empty($model->screenshotUrl)) {
+                        return Html::button('View Screenshot', [
+                            'class' => 'btn btn-info btn-sm view-screenshot',
+                            'data-src' => $model->screenshotUrl,
+                            'title' => 'View Screenshot'
                         ]);
                     }
                     return '<span class="text-muted">No screenshot available</span>';
@@ -66,34 +66,55 @@ $this->params['breadcrumbs'][] = $this->title;
         ],
     ]) ?>
 
-    <?php if ($model->screenshot): ?>
-        <div class="form-group">
-            <label>Screenshot:</label>
-            <img src="<?= $model->getScreenshotUrl() ?>" alt="Ticket Screenshot" class="img-fluid">
-        </div>
-    <?php endif; ?>
-
 </div>
 
 <?php
-$script = <<<JS
-function initiateClose() {
-    if (!confirm('Are you sure you want to close this ticket?')) {
-        return;
-    }
+// Register Font Awesome
+$this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
 
-    $('#closeCountdown').show();
-    let timeLeft = 60; // 1 minute
-    
-    let countdownTimer = setInterval(function() {
-        timeLeft--;
-        $('#countdown').text(timeLeft);
-        
-        if (timeLeft <= 0) {
-            clearInterval(countdownTimer);
-            closeTicket();
+// Register SweetAlert2
+$this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11', ['position' => \yii\web\View::POS_HEAD]);
+
+$script = <<<JS
+$(document).on('click', '.view-screenshot', function() {
+    const imageUrl = $(this).data('src');
+    Swal.fire({
+        imageUrl: imageUrl,
+        imageAlt: 'Screenshot',
+        width: '60%',
+        showCloseButton: true,
+        showConfirmButton: false,
+        customClass: {
+            image: 'swal-image-custom'
         }
-    }, 1000);
+    });
+});
+
+function initiateClose() {
+    Swal.fire({
+        title: 'Close Ticket',
+        text: 'Are you sure you want to close this ticket?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, close it!'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $('#closeCountdown').show();
+            let timeLeft = 60;
+            
+            let countdownTimer = setInterval(function() {
+                timeLeft--;
+                $('#countdown').text(timeLeft);
+                
+                if (timeLeft <= 0) {
+                    clearInterval(countdownTimer);
+                    closeTicket();
+                }
+            }, 1000);
+        }
+    });
 }
 
 function closeTicket() {
@@ -101,20 +122,54 @@ function closeTicket() {
         url: '/ticket/close',
         type: 'POST',
         data: { 
-            id: {$model->id}
+            id: {$model->id},
+            _csrf: yii.getCsrfToken()
         },
         success: function(response) {
             if (response.success) {
-                location.reload();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Success!',
+                    text: 'Ticket has been closed.',
+                    showConfirmButton: false,
+                    timer: 1500
+                }).then(() => {
+                    location.reload();
+                });
             } else {
-                alert(response.message);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: response.message || 'Failed to close ticket'
+                });
             }
         },
         error: function() {
-            alert('An error occurred');
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'An error occurred while closing the ticket'
+            });
         }
     });
 }
 JS;
 $this->registerJs($script);
 ?>
+
+<style>
+.swal-image-custom {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+}
+
+.swal2-popup {
+    padding: 1em;
+}
+
+.view-screenshot {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+</style>

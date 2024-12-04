@@ -30,7 +30,8 @@
         "nyholm/psr7": "^1.8",
         "symfony/sendinblue-mailer": "^6.0",
         "yiisoft/yii2-queue": "^2.3",
-        "sendinblue/api-v3-sdk": "^8.4"
+        "sendinblue/api-v3-sdk": "^8.4",
+        "cloudinary/cloudinary_php": "^2.14"
     },
     "require-dev": {
         "yiisoft/yii2-debug": "^2.1",

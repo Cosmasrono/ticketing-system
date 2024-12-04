@@ -28,8 +28,12 @@ class Ticket extends ActiveRecord
     /**
      * @var UploadedFile
      */
-    public $imageFile;
+     public $selectedModule;
+    public $screenshot;
     public $uploadedFile;
+    public $imageFile;
+    public $screenshot_url;
+ 
  
     public static function tableName()
     {
@@ -52,37 +56,69 @@ class Ticket extends ActiveRecord
             ],
         ];
     }
-
     public function rules()
     {
         return [
+            // Remove duplicate rules
             [['selectedModule', 'issue', 'description'], 'required'],
-            ['screenshot', 'string'], // For base64 data
-             [['created_at'], 'safe'],
+            [['description', 'screenshot'], 'string'],
+            [['created_at'], 'safe'],
             [['created_by'], 'integer'],
             [['selectedModule', 'issue', 'status'], 'string', 'max' => 255],
             [['status'], 'string'],
             [['approved_at'], 'safe'],
-            // [['approved_by'], 'integer'],
             [['escalation_comment'], 'string'],
             [['assigned_to'], 'integer'],
+            
+            // Escalation rule
             [['escalated_to'], 'required', 'when' => function($model) {
                 return $model->status === 'reassigned';
             }, 'whenClient' => "function (attribute, value) {
                 return $('#ticket-status').val() === 'reassigned';
             }"],
-            ['uploadedFile', 'file', 
-                'skipOnEmpty' => true, 
-                'extensions' => ['png', 'jpg', 'jpeg', 'gif'],
-                'maxSize' => 5 * 1024 * 1024, // 5MB limit
-                'maxFiles' => 1,
-                'mimeTypes' => ['image/jpeg', 'image/png', 'image/gif'],
-                'wrongMimeType' => 'Only JPEG, PNG and GIF images are allowed.',
-                'tooBig' => 'The file was larger than 5MB. Please upload a smaller file.',
-            ],
-            [['screenshot'], 'file', 'skipOnEmpty' => true, 'extensions' => 'png, jpg, jpeg, gif', 'maxSize' => 5*1024*1024],
-        ];
+            
+            [['status'], 'string', 'max' => 20],
+            [['company_name', 'company_email', 'module', 'issue'], 'string', 'max' => 255],
+            
+            // Screenshot validation (remove duplicates)
+            ['screenshot', 'string'],
+            ['screenshot', 'validateScreenshot', 'skipOnEmpty' => true],
+            [['uploadedFile'], 'file', 'skipOnEmpty' => true, 'extensions' => 'png, jpg, jpeg, gif'],
+            [['imageFile'], 'file', 
+            'skipOnEmpty' => true, 
+            'extensions' => ['png', 'jpg', 'jpeg', 'gif'],
+            'maxSize' => 5 * 1024 * 1024, // 5MB
+            'mimeTypes' => ['image/jpeg', 'image/png', 'image/gif']
+        ],
+        
+        ['screenshotUrl', 'string'],
+        ['screenshot', 'file', 'skipOnEmpty' => true, 'extensions' => 'png, jpg, jpeg, gif', 'maxSize' => 5*1024*1024],
+        ['screenshotUrl', 'url'],
+        ['screenshotUrl', 'validateCloudinaryUrl'],
+    ];
     }
+    
+    // Add this method to your model
+    public function validateScreenshot($attribute, $params)
+    {
+        if (!empty($this->$attribute)) {
+            // More permissive regex for base64 validation
+            if (!preg_match('/^data:image\/[a-zA-Z]+;base64,/', $this->$attribute)) {
+                $this->addError($attribute, 'Invalid screenshot format');
+                return;
+            }
+    
+            // Size validation
+            $base64 = preg_replace('/^data:image\/[a-zA-Z]+;base64,/', '', $this->$attribute);
+            $base64 = str_replace(' ', '+', $base64);
+            $imageSize = strlen(base64_decode($base64));
+            
+            if ($imageSize > 5 * 1024 * 1024) { // 5MB limit
+                $this->addError($attribute, 'Screenshot is too large (max 5MB)');
+            }
+        }
+    }
+    
 
     public function attributeLabels()
     {
@@ -90,8 +126,9 @@ class Ticket extends ActiveRecord
             'selectedModule' => 'Select Module',
             'issue' => 'Select Issue',
             'description' => 'Description',
-            'screenshot' => 'Screenshot',
-            'screenshot_base64' => 'Screenshot Base64',
+            
+            
+            
             'status' => 'Status',
             'created_at' => 'Created At',
             'updated_at' => 'Updated At',
@@ -99,10 +136,67 @@ class Ticket extends ActiveRecord
             'updated_by' => 'Updated By',
             'escalation_comment' => 'Escalation Comment',
             'assigned_to' => 'Assigned To',
+            'screenshot' => 'Screenshot',
         ];
     }
 
-  
+     
+    // // Custom screenshot validation method
+    // public function validateScreenshot($attribute, $params)
+    // {
+    //     if (!empty($this->$attribute)) {
+    //         // Validate base64 format
+    //         if (!preg_match('/^data:image\/(png|jpe?g|gif);base64,/', $this->$attribute)) {
+    //             $this->addError($attribute, 'Invalid screenshot format');
+    //         }
+
+    //         // Optional: Additional size validation
+    //         $base64 = str_replace('data:image/png;base64,', '', $this->$attribute);
+    //         $base64 = str_replace(' ', '+', $base64);
+    //         $imageSize = strlen(base64_decode($base64));
+            
+    //         if ($imageSize > 5 * 1024 * 1024) { // 5MB limit
+    //             $this->addError($attribute, 'Screenshot is too large');
+    //         }
+    //     }
+    // }
+
+    // Optional: Method to get image from base64
+    public function getScreenshotImage()
+    {
+        return $this->screenshot ? $this->screenshot : null;
+    }
+
+    
+    public function beforeSave($insert)
+    {
+        if (!parent::beforeSave($insert)) {
+            return false;
+        }
+
+        // Log the screenshot data
+        Yii::debug('Screenshot in beforeSave: ' . (empty($this->screenshot) ? 'empty' : 'has data'));
+        if (!empty($this->screenshot)) {
+            Yii::debug('Screenshot length: ' . strlen($this->screenshot));
+            Yii::debug('Screenshot preview: ' . substr($this->screenshot, 0, 100));
+        }
+
+        return true;
+    }
+
+    public function afterSave($insert, $changedAttributes)
+    {
+        parent::afterSave($insert, $changedAttributes);
+        
+        // Debug saved data
+        Yii::debug('Ticket saved. Screenshot length in DB: ' . 
+            (empty($this->screenshot) ? '0' : strlen($this->screenshot)));
+        
+        // Keep your existing logging
+        Yii::info("afterSave called for ticket {$this->id}. Changed attributes: " . json_encode($changedAttributes));
+
+        // Your custom logic here
+    }
 
     public function getUser()
     {
@@ -174,15 +268,6 @@ class Ticket extends ActiveRecord
 
    
     
-
-    public function afterSave($insert, $changedAttributes)
-    {
-        parent::afterSave($insert, $changedAttributes);
-
-        Yii::info("afterSave called for ticket {$this->id}. Changed attributes: " . json_encode($changedAttributes));
-
-        // Your custom logic here
-    }
 
     public function getAssignedUser()
     {
@@ -310,19 +395,17 @@ class Ticket extends ActiveRecord
 
     public function attributes()
     {
-        return array_merge(parent::attributes(), ['updated_at', 'assigned_to', 'screenshot_base64']);
+        $baseAttributes = parent::attributes();
+        return array_merge($baseAttributes, ['updated_at', 'assigned_to', 'screenshot', 'screenshotUrl']);
     }
 
     public function beforeValidate()
     {
-        if (!parent::beforeValidate()) {
-            return false;
+        if (parent::beforeValidate()) {
+            $this->imageFile = UploadedFile::getInstance($this, 'imageFile');
+            return true;
         }
-
-        $this->created_at = $this->ensureInteger($this->created_at);
-        $this->closed_at = $this->ensureInteger($this->closed_at, true);
-
-        return true;
+        return false;
     }
 
     private function ensureInteger($value, $allowNull = false)
@@ -427,63 +510,41 @@ class Ticket extends ActiveRecord
         return null;
     }
 
-    // public function beforeSave($insert)
-    // {
-    //     if (!parent::beforeSave($insert)) {
-    //         return false;
-    //     }
 
-    //     try {
-    //         // Debug logging
-    //         Yii::debug("Screenshot base64 data length: " . strlen($this->screenshot_base64), 'ticket');
+
+
+
+   
+
+// public function validateBase64Image($attribute, $params)
+// {
+//     if (!empty($this->$attribute)) {
+//         // Check if it's a valid base64 encoded image
+//         if (!preg_match('/^data:image\/(png|jpe?g|gif);base64,/', $this->$attribute)) {
+//             $this->addError($attribute, 'Invalid image format');
+//         }
+//     }
+// }
+
+// public function beforeSave($insert)
+// {
+//     if (parent::beforeSave($insert)) {
+//         if ($this->uploadedFile instanceof UploadedFile) {
+//             $fileName = 'ticket_' . time() . '_' . uniqid() . '.' . $this->uploadedFile->extension;
+//             $uploadPath = Yii::getAlias('@webroot/uploads/screenshots/');
             
-    //         // Clean up base64 data if it's empty
-    //         if (empty($this->screenshot_base64)) {
-    //             $this->screenshot_base64 = null;
-    //         }
-
-    //         // No need for file operations - just store the base64 string directly
-    //         if (!empty($this->screenshot_base64)) {
-    //             // Extract image data
-    //             if (preg_match('/^data:image\/(\w+);base64,/', $this->screenshot_base64)) {
-    //                 // Extract image data
-    //                 list($type, $data) = explode(';', $this->screenshot_base64);
-    //                 list(, $data) = explode(',', $data);
-    //                 list(, $type) = explode(':', $type);
-    //                 list(, $extension) = explode('/', $type);
-
-    //                 // Generate filename
-    //                 $filename = 'ticket_' . uniqid() . '.' . $extension;
-                    
-    //                 // Save path
-    //                 $uploadPath = Yii::getAlias('@webroot/uploads/tickets/');
-                    
-    //                 // Create directory if it doesn't exist
-    //                 if (!file_exists($uploadPath)) {
-    //                     if (!mkdir($uploadPath, 0777, true)) {
-    //                         Yii::error('Failed to create upload directory');
-    //                         return false;
-    //                     }
-    //                 }
-
-    //                 // Save file
-    //                 if (file_put_contents($uploadPath . $filename, base64_decode($data))) {
-    //                     $this->screenshot = $filename;  // Save filename to database
-    //                     Yii::debug('Image saved successfully: ' . $filename);
-    //                 } else {
-    //                     Yii::error('Failed to save image file');
-    //                     return false;
-    //                 }
-    //             }
-    //         }
-
-    //         return true;
-    //     } catch (\Exception $e) {
-    //         Yii::error('Error in beforeSave: ' . $e->getMessage());
-        //     return false;
-        // }   
-    
-
+//             if (!is_dir($uploadPath)) {
+//                 FileHelper::createDirectory($uploadPath, 0777, true);
+//             }
+            
+//             if ($this->uploadedFile->saveAs($uploadPath . $fileName)) {
+//                 $this->screenshot = $fileName;
+//             }
+//         }
+//         return true;
+//     }
+//     return false;
+// }
     public function getLocalCreatedAt()
     {
         if ($this->created_at) {
@@ -513,9 +574,7 @@ class Ticket extends ActiveRecord
             'Not Closed';
     }
 
-    public $selectedModule;
-    public $screenshot;
-    public $screenshot_base64;
+ 
 
     public static function getModulesList()
     {
@@ -555,225 +614,66 @@ class Ticket extends ActiveRecord
         return $this->hasOne(User::class, ['id' => 'escalated_by']);
     }
 
-    // public function beforeSave($insert)
-    // {
-    //     if (!parent::beforeSave($insert)) {
-    //         return false;
-    //     }
-
-    //     Yii::debug("beforeSave check:", 'ticket');
-    //     Yii::debug([
-    //         'has_base64' => !empty($this->screenshot_base64),
-    //         'base64_length' => strlen($this->screenshot_base64)
-    //     ], 'ticket');
-
-    //     return true;
-    // }
-
-    public function getScreenshotImage()
+    // Add this method to handle the file upload
+    public function upload()
     {
-        if (empty($this->screenshot_base64)) {
-            return null;
+        if (!$this->validate()) {
+            return false;
         }
-        
-        // Add the data URI prefix if it's missing
-        if (strpos($this->screenshot_base64, 'data:image') === false) {
-            return 'data:image/jpeg;base64,' . $this->screenshot_base64;
-        }
-        
-        return $this->screenshot_base64;
-    }
-
-    // Add validation method for base64 image
-    public function validateBase64Image($attribute, $params)
-    {
-        if (empty($this->$attribute)) {
-            return;
-        }
-
-        // Check if it's a valid base64 string
-        if (!preg_match('/^data:image\/(png|jpeg|jpg|gif);base64,/', $this->$attribute)) {
-            $this->addError($attribute, 'Invalid image format');
-            return;
-        }
-
-        // Get file size in bytes
-        $base64_size = strlen(base64_decode(explode(',', $this->$attribute)[1]));
-        
-        // Check file size (e.g., 5MB limit)
-        if ($base64_size > 5 * 1024 * 1024) {
-            $this->addError($attribute, 'Image file size should not exceed 5MB');
-            return;
-        }
-    }
-
-    // Method to save base64 image
-    public function saveBase64Image()
-    {
-        if (empty($this->screenshot_base64)) {
-            Yii::error('No base64 data available');
-            return true;
-        }
-
-        try {
-            // Debug output
-            Yii::debug('Starting base64 image save');
-            
-            // Extract image data
-            if (!preg_match('/^data:image\/(\w+);base64,/', $this->screenshot_base64)) {
-                Yii::error('Invalid base64 image format');
+    
+        if ($this->imageFile) {
+            try {
+                $fileName = 'ticket_' . time() . '_' . uniqid() . '.' . $this->imageFile->extension;
+                $uploadPath = Yii::getAlias('@webroot/uploads/tickets/');
+                
+                if (!is_dir($uploadPath)) {
+                    FileHelper::createDirectory($uploadPath, 0777, true);
+                }
+                
+                if ($this->imageFile->saveAs($uploadPath . $fileName)) {
+                    $this->screenshot = $fileName;
+                    return true;
+                }
+            } catch (\Exception $e) {
+                Yii::error('Upload failed: ' . $e->getMessage());
                 return false;
             }
-
-            // Extract image data
-            list($type, $data) = explode(';', $this->screenshot_base64);
-            list(, $data) = explode(',', $data);
-            list(, $type) = explode(':', $type);
-            list(, $extension) = explode('/', $type);
-
-            // Generate filename
-            $filename = 'ticket_' . uniqid() . '.' . $extension;
+        }
+        
+        return true;
+    }
+    // Update beforeSave to ensure screenshot is handled properly
+    // public function beforeSave($insert)
+    // {
+    //     if (parent::beforeSave($insert)) {
+    //         // If screenshot is empty string, set to null
+    //         if ($this->screenshot === '') {
+    //             $this->screenshot = null;
+    //         }
             
-            // Save path
-            $uploadPath = Yii::getAlias('@webroot/uploads/tickets/');
+    //         // Debug the screenshot value
+    //         Yii::debug('Screenshot before save: ' . (is_null($this->screenshot) ? 'null' : 'has data'));
             
-            // Create directory if it doesn't exist
-            if (!file_exists($uploadPath)) {
-                if (!mkdir($uploadPath, 0777, true)) {
-                    Yii::error('Failed to create upload directory');
-                    return false;
-                }
-            }
+    //         return true;
+    //     }
+    //     return false;
+    // }
 
-            // Save file
-            if (file_put_contents($uploadPath . $filename, base64_decode($data))) {
-                $this->screenshot = $filename;  // Save filename to database
-                Yii::debug('Image saved successfully: ' . $filename);
-                return true;
+    public function validateCloudinaryUrl($attribute, $params)
+    {
+        if (!empty($this->$attribute)) {
+            $cloudName = Yii::$app->params['cloudinary']['cloud_name'];
+            if (strpos($this->$attribute, $cloudName) === false) {
+                $this->addError($attribute, 'Invalid screenshot URL format');
             }
-
-            Yii::error('Failed to save image file');
-            return false;
-        } catch (\Exception $e) {
-            Yii::error('Error saving base64 image: ' . $e->getMessage());
-            return false;
         }
     }
 
-    // public function beforeSave($insert)
-    // {
-    //     if (!parent::beforeSave($insert)) {
-    //         return false;
-    //     }
-
-    //     // Debug logging
-    //     Yii::debug("Screenshot base64 data length: " . strlen($this->screenshot_base64), 'ticket');
-        
-    //     // Clean up base64 data if it's empty
-    //     if (empty($this->screenshot_base64)) {
-    //         $this->screenshot_base64 = null;
-    //     }
-
-    //     return true;
-    // }
-
-    // Helper method to get the image URL
     public function getScreenshotUrl()
     {
-        if (empty($this->screenshot)) {
-            return null;
-        }
-
-        // If the screenshot already includes the data URI scheme, return it as is
-        if (strpos($this->screenshot, 'data:image/') === 0) {
-            return $this->screenshot;
-        }
-
-        // Otherwise, add the data URI scheme
-        try {
-            // Determine image type
-            $finfo = finfo_open();
-            $binary = base64_decode($this->screenshot);
-            $mimeType = finfo_buffer($finfo, $binary, FILEINFO_MIME_TYPE);
-            finfo_close($finfo);
-
-            return 'data:' . $mimeType . ';base64,' . $this->screenshot;
-        } catch (\Exception $e) {
-            Yii::error('Error getting screenshot URL: ' . $e->getMessage());
-            return null;
-        }
+        return $this->screenshot_url; // Assuming this is stored in the database
     }
 
-    // public function beforeSave($insert)
-    // {
-    //     if (!parent::beforeSave($insert)) {
-    //         return false;
-    //     }
-
-    //     try {
-    //         // If screenshot is a base64 string, keep it as is
-    //         if (is_string($this->screenshot) && base64_decode($this->screenshot, true)) {
-    //             return true;
-    //         }
-
-    //         // If screenshot is an UploadedFile instance, convert to base64
-    //         if ($this->screenshot instanceof UploadedFile) {
-    //             $fileContent = file_get_contents($this->screenshot->tempName);
-    //             if ($fileContent === false) {
-    //                 throw new \Exception('Could not read uploaded file');
-    //             }
-                
-    //             $this->screenshot = base64_encode($fileContent);
-    //             return true;
-    //         }
-
-    //         return true;
-
-    //     } catch (\Exception $e) {
-    //         Yii::error('Screenshot save error: ' . $e->getMessage());
-    //         return false;
-    //     }
-    // }
-
-    public function beforeSave($insert)
-    {
-        if (!parent::beforeSave($insert)) {
-            return false;
-        }
-
-        try {
-            // Handle file upload
-            if ($this->uploadedFile instanceof UploadedFile) {
-                Yii::info('Processing uploaded file in beforeSave', 'ticket');
-                
-                // Read file content
-                $fileContent = file_get_contents($this->uploadedFile->tempName);
-                if ($fileContent === false) {
-                    throw new \Exception('Could not read uploaded file');
-                }
-
-                // Convert to base64 and store
-                $this->screenshot = base64_encode($fileContent);
-                Yii::info('File converted to base64 successfully', 'ticket');
-            }
-
-            return true;
-
-        } catch (\Exception $e) {
-            Yii::error('Screenshot save error: ' . $e->getMessage(), 'ticket');
-            return false;
-        }
+  
     }
 
-    // Add this validation method
-    public function validateScreenshot($attribute, $params)
-    {
-        if ($this->$attribute instanceof UploadedFile) {
-            // Additional validation if needed
-            $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-            if (!in_array($this->$attribute->type, $allowedTypes)) {
-                $this->addError($attribute, 'Only JPG, PNG and GIF files are allowed.');
-            }
-        }
-    }
-}

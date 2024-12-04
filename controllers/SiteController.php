@@ -120,6 +120,38 @@ class SiteController extends Controller
     // }
 
 
+    // public function actionUploadScreenshot($ticketId)
+    // {
+    //     Yii::$app->response->format = Response::FORMAT_JSON;
+
+    //     if (Yii::$app->request->isPost) {
+    //         $base64String = Yii::$app->request->post('image');
+
+    //         // Remove the prefix from the base64 string
+    //         $base64String = preg_replace('/^data:image\/\w+;base64,/', '', $base64String);
+    //         $base64String = str_replace(' ', '+', $base64String); // Replace spaces with pluses
+
+    //         // Decode the base64 string
+    //         $imageData = base64_decode($base64String);
+
+    //         // Find the ticket model by ID
+    //         $ticket = Ticket::findOne($ticketId);
+    //         if ($ticket) {
+    //             $ticket->screenshot_base64 = $base64String; // Store the base64 string directly
+    //             if ($ticket->save()) {
+    //                 return ['status' => 'success', 'message' => 'Screenshot uploaded successfully!'];
+    //             } else {
+    //                 return ['status' => 'error', 'message' => 'Failed to save the screenshot.'];
+    //             }
+    //         } else {
+    //             return ['status' => 'error', 'message' => 'Ticket not found.'];
+    //         }
+    //     }
+
+    //     return ['status' => 'error', 'message' => 'Invalid request.'];
+    // }
+
+
     public function actionIndex()
     {
         Yii::debug('Accessing index action');

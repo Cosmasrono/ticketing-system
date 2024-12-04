@@ -25,6 +25,15 @@ $config = [
             'enableCsrfValidation' => true,
             // 'enableCsrfCookie' => true,
         ],
+
+     
+    'cloudinary' => [
+        'class' => 'app\components\CloudinaryComponent',
+        'cloud_name' => 'dscbboswt',
+        'api_key' => '165833264188614',
+        'api_secret' => 'LfgHbl18_gohlTycrjr3OdQvEWE',
+    ],
+ 
         'cache' => [
             'class' => 'yii\caching\FileCache',
         ],
@@ -73,6 +82,7 @@ $config = [
                 'ticket/close' => 'ticket/close',
                 'change-password' => 'site/change-password',
                 'create-user' => 'site/create-user',
+                'ticket/upload-to-cloudinary' => 'ticket/upload-to-cloudinary',
             ],
         ],
         'session' => [
@@ -110,6 +120,16 @@ $config = [
                     }
                 ],
                 // ... other rules ...
+            ],
+        ],
+        'assetManager' => [
+            'bundles' => [
+                'yii\web\JqueryAsset' => [
+                    'sourcePath' => null,
+                    'js' => [
+                        'https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
+                    ]
+                ],
             ],
         ],
     ],

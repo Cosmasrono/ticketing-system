@@ -97,10 +97,10 @@ $this->params['breadcrumbs'][] = $this->title;
                 'label' => 'Screenshot',
                 'contentOptions' => ['class' => 'text-center'],
                 'value' => function ($model) {
-                    if ($model->screenshot_base64) {
-                        return Html::a('View', '#', [
+                    if ($model->screenshot_url) {
+                        return Html::a('View', $model->screenshot_url, [
                             'class' => 'btn btn-info btn-sm view-screenshot',
-                            'data-screenshot' => $model->screenshot_base64,
+                            'target' => '_blank', // Opens the image in a new tab
                         ]);
                     }
                     return '<span class="text-muted">(no screenshot)</span>';

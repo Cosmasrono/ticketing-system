@@ -80,16 +80,7 @@ class Ticket extends ActiveRecord
             [['status'], 'string', 'max' => 20],
             [['company_name', 'company_email', 'module', 'issue'], 'string', 'max' => 255],
             
-            // Screenshot validation (remove duplicates)
-            ['screenshot', 'string'],
-            ['screenshot', 'validateScreenshot', 'skipOnEmpty' => true],
-            [['uploadedFile'], 'file', 'skipOnEmpty' => true, 'extensions' => 'png, jpg, jpeg, gif'],
-            [['imageFile'], 'file', 
-            'skipOnEmpty' => true, 
-            'extensions' => ['png', 'jpg', 'jpeg', 'gif'],
-            'maxSize' => 5 * 1024 * 1024, // 5MB
-            'mimeTypes' => ['image/jpeg', 'image/png', 'image/gif']
-        ],
+
         
         ['screenshotUrl', 'string'],
         ['screenshot', 'file', 'skipOnEmpty' => true, 'extensions' => 'png, jpg, jpeg, gif', 'maxSize' => 5*1024*1024],

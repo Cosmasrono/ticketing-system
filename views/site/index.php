@@ -14,12 +14,14 @@ $this->title = 'Iansoft - Help Desk Solutions';
                 <div class="glowing-text">
                     <h1 class="hero-title typewriter">Iansoft Smart Help Desk</h1>
                     <div class="dynamic-text">
-                        <span class="txt-rotate" data-period="2000" 
-                              data-rotate='[ "Intelligent Solutions", "24/7 Support", "Real-time Tracking", "Smart Analytics" ]'>
-                        </span>
+                          <span class="txt-rotate" style="color:white" 
+                                data-period="2000" 
+                                    data-rotate='[ "Intelligent Solutions", "24/7 Support", "Real-time Tracking", "Smart Analytics" ]'>
+                        </span>                  
+
                     </div>
                 </div>
-                <p class="hero-subtitle">Transform your support operations with AI-powered ticketing system</p>
+                <p class="hero-subtitle">Transform your support operations with our ticketing system</p>
                 <div class="interactive-stats">
                     <div class="stat-counter" data-target="99">0%</div>
                     <span>Customer Satisfaction</span>
@@ -410,7 +412,37 @@ $this->title = 'Iansoft - Help Desk Solutions';
     </div>
 </section>
 
+<!-- Social Media Section -->
+<section class="social-media-section text-center">
+    <div class="container">
+        <h2 class="section-title">Connect with Us</h2>
+        <div class="social-icons">
+            <a href="https://www.linkedin.com/search/results/all/?fetchDeterministicClustersOnly=true&heroEntityKey=urn%3Ali%3Aorganization%3A13281915&keywords=iansoft%20technologies%20ltd&origin=RICH_QUERY_SUGGESTION&position=0&searchId=19b5cb35-217b-4e89-aa3c-028b8614b2f1&sid=5Ie&spellCorrectionEnabled=false" target="_blank" class="social-icon">
+                <i class="fab fa-linkedin"></i>
+            </a>
+            <a href="https://www.whatsapp.com" target="_blank" class="social-icon">
+                <i class="fab fa-whatsapp"></i>
+            </a>
+            <a href="https://www.facebook.com" target="_blank" class="social-icon">
+                <i class="fab fa-facebook"></i>
+            </a>
+            <a href="https://www.twitter.com" target="_blank" class="social-icon">
+                <i class="fab fa-twitter"></i>
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- footer -->
+ 
+
 <style>
+
+
+.txt-rotate {
+    color: #FF8C00; /* Dark orangish color */
+}
+
 :root {
     --primary-color: #ff6b35;
     --secondary-color: #f7882f;
@@ -430,12 +462,12 @@ $this->title = 'Iansoft - Help Desk Solutions';
 
 .overlay {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.2);
-}
+    top: 50%;
+    margin-right: 2cm;
+    padding-right: 2cm;
+
+    /* z-index:1; */
+ }
 
 .hero-image-wrapper {
     position: relative;
@@ -630,7 +662,7 @@ $this->title = 'Iansoft - Help Desk Solutions';
         rgba(247,136,47,0.1)
     );
     border-radius: 20px;
-    z-index: 2;
+    
 }
 
 /* Add a glowing effect */
@@ -1017,14 +1049,17 @@ html {
     100% { transform: translate(0, -0px); }
 }
 
-/* Particle Background */
-#particles-js {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    z-index: 1;
-}
+ 
+    
 
+    /* developer,admin closng th ticket */
+    /* comments and feedback */
+    /* ticjet automation */
+    /* cliant creatinn */
+    /* profile  */
+    /* developer collaboration */
+
+    /* reports  */
 /* Glowing Text Effect */
 .glowing-text {
     text-shadow: 0 0 10px rgba(255,255,255,0.8),
@@ -1522,6 +1557,30 @@ html {
     100% {
         box-shadow: 0 0 0 0 rgba(255,107,53,0);
     }
+}
+
+/* Social Media Section Styling */
+.social-media-section {
+    padding: 40px 0;
+    background-color: var(--light-color);
+}
+
+.social-icons {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.social-icon {
+    font-size: 2rem;
+    color: var(--primary-color);
+    transition: color 0.3s ease, transform 0.3s ease;
+}
+
+.social-icon:hover {
+    color: var(--secondary-color);
+    transform: scale(1.1);
 }
 </style>
 

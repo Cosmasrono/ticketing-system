@@ -160,67 +160,70 @@ JqueryAsset::register($this);
         <!-- logo  -->
        
             <div class="container">
-                <?php
-                NavBar::begin([
-                    'brandLabel' => Html::img('https://www.iansoftltd.com/assets/img/logo.jpg', ['alt'=>'Logo', 'class'=>'navbar-logo', 'style' => 'height: 40px;']),
-                    'brandUrl' => Yii::$app->homeUrl,
-                    'options' => ['class' => 'navbar-expand-md navbar-dark fixed-top', 'style' => 'background-color: #FF8C00;']
-                ]);
+        
+            <?php
+NavBar::begin([
+    'brandLabel' => Html::img('https://www.iansoftltd.com/assets/img/logo.jpg', ['alt'=>'Logo', 'class'=>'navbar-logo']),
+    'brandUrl' => Yii::$app->homeUrl,
+    'options' => ['class' => 'navbar-expand-md navbar-dark fixed-top', 'style' => 'background-color: #FF8C00;']
+]);
 
-                // Initialize menuItems as an empty array
-                $menuItems = [];
+// Initialize menuItems as an empty array
+$menuItems = [];
 
-                if (!Yii::$app->user->isGuest) {
-                    if (Yii::$app->user->identity->role === 'developer') {
-                        // Show only these items for developers
-                        $menuItems = [
-                            ['label' => 'Home', 'url' => ['/site/index']],
-                            ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
-                             'url' => ['/developer/view'],
-                             'encode' => false],
-                        ];
-                    } else {
-                        // Show all menu items for other roles
-                        $menuItems = [
+// Check if the user is logged in
+if (!Yii::$app->user->isGuest) {
+    // User is logged in; display appropriate menu items based on role
+    if (Yii::$app->user->identity->role === 'developer') {
+        $menuItems = [
+            ['label' => 'Home', 'url' => ['/site/index']], // Routes to site/index
+            ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
+             'url' => ['/developer/view'],
+             'encode' => false],
+        ];
+    } else {
+        $menuItems = [
+            ['label' => 'Home', 'url' => ['/site/index']], // Routes to site/index
+            ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 
+             'url' => ['/ticket/create'],
+             'encode' => false],
+            ['label' => '<i class="fas fa-list"></i> View Tickets', 
+             'url' => ['/ticket/index'],
+             'encode' => false],
+            ['label' => '<i class="fas fa-cog"></i> Admin Panel', 
+             'url' => ['/site/admin'],
+             'encode' => false],
+            ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
+             'url' => ['/developer/view'],
+             'encode' => false],
+        ];
 
-                            
-                            ['label' => 'Home', 'url' => ['/site/index']],
-                            ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 
-                             'url' => ['/ticket/create'],
-                             'encode' => false],
-                            ['label' => '<i class="fas fa-list"></i> View Tickets', 
-                             'url' => ['/ticket/index'],
-                             'encode' => false],
-                            ['label' => '<i class="fas fa-cog"></i> Admin Panel', 
-                             'url' => ['/site/admin'],
-                             'encode' => false],
-                            ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
-                             'url' => ['/developer/view'],
-                             'encode' => false],
-                        ];
-                    }
+        // Add logout button
+        $menuItems[] = '<li>'
+            . Html::beginForm(['/site/logout'], 'post', ['class' => 'd-flex'])
+            . Html::submitButton(
+                'Logout (' . Yii::$app->user->identity->company_name . ')',
+                ['class' => 'btn btn-link logout text-decoration-none']
+            )
+            . Html::endForm()
+            . '</li>';
+    }
+} else {
+    // User is not logged in; show only Home and Login
+    $menuItems = [
+        ['label' => 'Home', 'url' => ['/site/index']], // Routes to site/index
+        ['label' => 'Login', 'url' => ['/site/login']],
+    ];
+}
 
-                    // Add logout button for all logged-in users
-                    $menuItems[] = '<li>'
-                        . Html::beginForm(['/site/logout'], 'post', ['class' => 'd-flex'])
-                        . Html::submitButton(
-                            'Logout (' . Yii::$app->user->identity->company_name . ')',
-                            ['class' => 'btn btn-link logout text-decoration-none']
-                        )
-                        . Html::endForm()
-                        . '</li>';
-                } else {
-                    // Add login item for guests
-                    $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
-                }
+echo Nav::widget([
+    'options' => ['class' => 'navbar-nav navbar-right'],
+    'items' => $menuItems,
+]);
 
-                echo Nav::widget([
-                    'options' => ['class' => 'navbar-nav navbar-right'],
-                    'items' => $menuItems,
-                ]);
+NavBar::end();
+?>
 
-                NavBar::end();
-                ?>
             </div>
         </nav>
         
@@ -241,7 +244,7 @@ JqueryAsset::register($this);
             <div class="container">
                 <div class="row ">
                     <div class="col-md-6 text-center text-md-start">&copy; Iansoft Technologies <?= date('Y') ?></div>
-                    <div class="col-md-6 text-center text-md-end"><?= Yii::powered() ?></div>
+                    <div class="col-md-6 text-center text-md-end"> @nebtech technologies</div>
                 </div>
             </div>
         </footer>

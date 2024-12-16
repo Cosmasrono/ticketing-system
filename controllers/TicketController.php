@@ -916,11 +916,15 @@ class TicketController extends Controller
                     throw new \Exception('Selected developer is not valid');
                 }
 
+                // Initialize message variable
+                $message = '';
+
                 // Update ticket based on current status
-                if ($ticket->status === 'escalated') {
+                if ($ticket->status === 'escalated' || $ticket->status === 'reassigned') {
                     $ticket->status = 'reassigned';
                     $message = 'Ticket has been reassigned successfully';
-                } elseif ($ticket->status === 'approved') {
+                } else {
+                    $ticket->status = 'assigned';
                     $message = 'Ticket has been assigned successfully';
                 }
 
@@ -931,15 +935,44 @@ class TicketController extends Controller
                 if ($ticket->save(false)) {
                     $transaction->commit();
                     
-                    // Send email notification
-                    $this->sendEmailNotification($ticket, $selectedDeveloper, 'assign');
+                    //   Send email notification
+                    try {
+                        $emailSent = Yii::$app->mailer->compose('assignmentNotification', [
+                            'developer_name' => $developer->name,  // Using name
+                            'ticket_id' => $ticket->id,
+                            'company_name' => $ticket->company_name,
+                            'description' => $ticket->description,
+                            'module' => $ticket->module,
+                            'issue' => $ticket->issue
+                        ])
+                        ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->params['senderName']])
+                        ->setTo([$developer->company_email => $developer->name])  // Using name in recipient
+                        ->setSubject("Ticket Assignment #{$ticket->id} - {$ticket->company_name}")
+                        ->send();
 
-                    return [
-                        'success' => true,
-                        'message' => $message ?? null,
-                        'newStatus' => $ticket->status,
-                        'ticketId' => $ticket->id
-                    ];
+                        if (!$emailSent) {
+                            Yii::error('Failed to send email notification to developer: ' . $developer->name);
+                        }
+                     } catch (\Exception $e) {
+                        Yii::error('Email sending failed for developer ' . $developer->name . ': ' . $e->getMessage());
+                        // Continue execution even if email fails
+                    }
+
+                        return [
+                            'success' => true,
+                            'message' => $message . ' and notification sent',
+                            'newStatus' => $ticket->status,
+                            'ticketId' => $ticket->id
+                        ];
+                    // } catch (\Exception $e) {
+                    //     Yii::error("Failed to send email: " . $e->getMessage());
+                    //     return [
+                    //         'success' => true,
+                    //         'message' => $message . ' but email notification failed',
+                    //         'newStatus' => $ticket->status,
+                    //         'ticketId' => $ticket->id
+                    //     ];
+                    // }
                 }
                 
                 throw new \Exception('Failed to save ticket');

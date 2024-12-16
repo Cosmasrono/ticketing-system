@@ -46,7 +46,19 @@ class SiteController extends Controller
                 'class' => \yii\filters\AccessControl::className(),
                 'only' => ['logout', 'index', /* other actions that need auth */],
                 'rules' => [
+
                     [
+                        'actions' => ['index', 'login'], // Allow guests to access index and login
+                        'allow' => true,
+                        'roles' => ['?'], // '?' means guest
+                    ],
+                    [
+                        'actions' => ['logout'],
+                        'allow' => true,
+                        'roles' => ['@'], // '@' means authenticated user
+                    ],
+                    [
+
                         'allow' => true,
                         'actions' => ['login', 'change-password', 'signup'],
                         'roles' => ['?'],

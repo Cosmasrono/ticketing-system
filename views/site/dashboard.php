@@ -5,6 +5,7 @@ use yii\web\JqueryAsset;
 
 $this->title = 'Help Desk Analytics Dashboard';
 
+
 // Add this helper function at the top of your view file
 function getStatusColor($status) {
     $colors = [
@@ -106,6 +107,13 @@ $this->registerJs("
 ?>
 
 <div class="dashboard-container">
+
+<div class="dashboard-container">
+    <h1 class="h3 mb-4 text-gray-800">Help Desk Analytics Dashboard</h1>
+    <!-- Summary Cards Row -->
+    ...
+</div>
+
     <!-- Summary Cards Row -->
     <!-- <div class="row mb-4">
         <div class="col-xl-3 col-md-6">
@@ -171,6 +179,68 @@ $this->registerJs("
                 </div>
             </div>
         </div> -->
+    </div>
+
+
+     <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">User Status Management</h6>
+            <span class="badge bg-primary"><?= count($users) ?> Total Users</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover">
+                    <thead class="bg-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Company</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($users as $user): ?>
+                            <tr>
+                                <td><?= Html::encode($user->name) ?></td>
+                                <td>
+                                    <span class="badge <?= $user->role === 'developer' ? 'bg-info' : 'bg-primary' ?>">
+                                        <?= Html::encode(ucfirst($user->role)) ?>
+                                    </span>
+                                </td>
+                                <td><?= Html::encode($user->company_name) ?></td>
+                                <td>
+                                    <span class="badge <?= $user->status == 10 ? 'bg-success' : 'bg-danger' ?>">
+                                        <?= $user->status == 10 ? 'Active' : 'Inactive' ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <?php if ($user->status == 10): ?>
+                                        <?= Html::button(
+                                            '<i class="fas fa-ban"></i> Deactivate',
+                                            [
+                                                'class' => 'btn btn-sm btn-danger',
+                                                'onclick' => "window.toggleUserStatus({$user->id})",
+                                                'data-status' => $user->status
+                                            ]
+                                        ) ?>
+                                    <?php else: ?>
+                                        <?= Html::button(
+                                            '<i class="fas fa-check"></i> Activate',
+                                            [
+                                                'class' => 'btn btn-sm btn-success',
+                                                'onclick' => "window.toggleUserStatus({$user->id})",
+                                                'data-status' => $user->status
+                                            ]
+                                        ) ?>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Developer Performance Section -->
@@ -361,66 +431,7 @@ $this->registerJs("
     </div>
 
     <!-- User Status Management Table -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3 d-flex justify-content-between align-items-center">
-            <h6 class="m-0 font-weight-bold text-primary">User Status Management</h6>
-            <span class="badge bg-primary"><?= count($users) ?> Total Users</span>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-bordered table-hover">
-                    <thead class="bg-light">
-                        <tr>
-                            <th>Name</th>
-                            <th>Role</th>
-                            <th>Company</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($users as $user): ?>
-                            <tr>
-                                <td><?= Html::encode($user->name) ?></td>
-                                <td>
-                                    <span class="badge <?= $user->role === 'developer' ? 'bg-info' : 'bg-primary' ?>">
-                                        <?= Html::encode(ucfirst($user->role)) ?>
-                                    </span>
-                                </td>
-                                <td><?= Html::encode($user->company_name) ?></td>
-                                <td>
-                                    <span class="badge <?= $user->status == 10 ? 'bg-success' : 'bg-danger' ?>">
-                                        <?= $user->status == 10 ? 'Active' : 'Inactive' ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <?php if ($user->status == 10): ?>
-                                        <?= Html::button(
-                                            '<i class="fas fa-ban"></i> Deactivate',
-                                            [
-                                                'class' => 'btn btn-sm btn-danger',
-                                                'onclick' => "window.toggleUserStatus({$user->id})",
-                                                'data-status' => $user->status
-                                            ]
-                                        ) ?>
-                                    <?php else: ?>
-                                        <?= Html::button(
-                                            '<i class="fas fa-check"></i> Activate',
-                                            [
-                                                'class' => 'btn btn-sm btn-success',
-                                                'onclick' => "window.toggleUserStatus({$user->id})",
-                                                'data-status' => $user->status
-                                            ]
-                                        ) ?>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
+   
 
     <!-- Recent Tickets -->
     <div class="card">

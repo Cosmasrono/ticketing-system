@@ -201,7 +201,7 @@ $clientCount = Client::find()->count();
             ],
             [
                 'class' => 'yii\grid\ActionColumn',
-    'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel}</div>',
+    'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel} {close}</div>',
     'buttons' => [
         'approve' => function ($url, $model, $key) {
             $isDisabled = $model->status === Ticket::STATUS_APPROVED ||
@@ -291,6 +291,21 @@ $clientCount = Client::find()->count();
                             'title' => $tooltipText ?: 'Cancel ticket',
                         ]);
                     },
+
+                    // add admin  to close the ticket 
+
+                  'close' => function ($url, $model, $key) {
+    if ($model->status !== 'closed') {
+        return Html::button('<i class="fas fa-times-circle"></i> Close', [
+            'class' => 'btn btn-warning btn-xs close-ticket',
+            'data-id' => $model->id,
+            'type' => 'button',
+            'title' => 'Close this ticket'
+        ]);
+    }
+    return '<span class="badge bg-secondary">Closed</span>';
+},
+
                 ],
             ],
         ],
@@ -499,6 +514,45 @@ function reopenTicket(ticketId) {
         });
     }
 }
+
+function closeTicket(ticketId) {
+    if (confirm('Are you sure you want to close this ticket?')) {
+        $.ajax({
+            url: '<?= \yii\helpers\Url::to(['ticket/close']) ?>',
+            type: 'POST',
+            data: {
+                id: ticketId,
+                _csrf: '<?= Yii::$app->request->csrfToken ?>'
+            },
+            dataType: 'json',
+            beforeSend: function() {
+                showLoading();
+            },
+            success: function(response) {
+                hideLoading();
+                if (response.success) {
+                    Swal.fire({
+                        title: 'Success!',
+                        text: 'Ticket closed successfully.',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        location.reload(); // Reload to update the ticket list
+                    });
+                } else {
+                    alert('Failed to close ticket: ' + response.message);
+                }
+            },
+            error: function(xhr, status, error) {
+                hideLoading();
+                console.error('Ajax error:', { status: status, error: error });
+                alert('An error occurred while processing your request. Check console for details.');
+            }
+        });
+    }
+}
+
 
 $('#assign-form').on('beforeSubmit', function(e) {
     e.preventDefault();

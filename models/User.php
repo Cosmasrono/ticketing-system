@@ -7,6 +7,9 @@ use Yii;
 use yii\db\ActiveRecord;
 use yii\web\IdentityInterface;
 use app\models\Admin;
+use app\models\Client;
+use app\models\Company;
+ 
 
 class User extends ActiveRecord implements IdentityInterface
 {
@@ -15,9 +18,15 @@ class User extends ActiveRecord implements IdentityInterface
     public $module;
     public $issue;
     public $description;
-    public $old_password;
+    public $temporary_password;
     public $new_password;
     public $confirm_password;
+    public $password_repeat;
+    public $start_date;
+    public $end_date;
+    public $modules;
+    // public $email_verified_at;
+    public $company_email;
 
 
     const SCENARIO_SIGNUP = 'signup';
@@ -25,16 +34,27 @@ class User extends ActiveRecord implements IdentityInterface
     public function scenarios()
     {
         $scenarios = parent::scenarios();
-        $scenarios[self::SCENARIO_SIGNUP] = ['name', 'company_email', 'company_name', 'password', 'role'];
+        $scenarios[self::SCENARIO_SIGNUP] = ['company_name', 'company_email', 'password', 'role'];
         return $scenarios;
     }
 
-    // Role constants
-    const ROLE_USER = 'user';
-    const ROLE_ADMIN = 'admin';
-    const ROLE_DEVELOPER = 'developer';
-    const ROLE_SUPER_ADMIN = 'superadmin';
- 
+    // Role constants// Replace role constants
+const ROLE_USER = 2;
+const ROLE_ADMIN = 1; 
+const ROLE_DEVELOPER = 3;
+const ROLE_SUPER_ADMIN = 4;
+
+// Add role check method
+public function isUser()
+{
+    return (int)$this->role === self::ROLE_USER;
+}
+
+// Check for admin/super_admin
+// public function isAdminOrSuper() 
+// {
+//     return in_array((int)$this->role, [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN]);
+// }
 
     // Status constants
     const STATUS_INACTIVE = 0;
@@ -56,32 +76,13 @@ class User extends ActiveRecord implements IdentityInterface
     public function rules()
     {
         return [
-            [['name', 'company_email', 'company_name', 'role'], 'required'],
-            [['status', 'created_at', 'updated_at', 'first_login'], 'integer'],
-            [['module'], 'safe'],
-            [['name', 'company_email', 'company_name'], 'string', 'max' => 255],
-            [['role'], 'string', 'max' => 50],
-            [['company_email'], 'unique'],
-            ['is_password_reset', 'boolean'],
-            ['role', 'string'],
-            ['password', 'required', 'on' => 'create'],
-            ['password', 'string', 'min' => 6],
-            ['company_name', 'string'],
-            ['company_name', 'trim'],
-            ['status', 'default', 'value' => self::STATUS_INACTIVE],
-            ['status', 'in', 'range' => [
-                self::STATUS_INACTIVE,
-                self::STATUS_ACTIVE,
-                self::STATUS_DELETED,
-                self::STATUS_UNVERIFIED
-            ]],
+            [['name', 'company_name', 'company_email'], 'required'],
+            [['name', 'company_name', 'company_email'], 'string', 'max' => 255],
+            ['company_email', 'email'],
+            ['company_email', 'unique'],
+            ['modules', 'safe'],
+            [['email_verified_at'], 'safe'],
             ['password_reset_token', 'string', 'max' => 255],
-            [['old_password', 'new_password', 'confirm_password'], 'string', 'min' => 6],
-            ['confirm_password', 'compare', 'compareAttribute' => 'new_password'],
-            ['role', 'in', 'range' => ['admin', 'developer', 'user']],
-            [['module'], 'string'],
-            [['selectedModules'], 'string'],
-            ['selectedModule', 'string'],
         ];
     }
 
@@ -94,7 +95,7 @@ class User extends ActiveRecord implements IdentityInterface
     {
         return [
             'id' => 'ID',
-            'name' => 'Name',
+            'name' => 'Full Name',
             'company_email' => 'Company Email',
             'company_name' => 'Company Name',
             'password_hash' => 'Password Hash',
@@ -105,6 +106,9 @@ class User extends ActiveRecord implements IdentityInterface
             'module' => 'Modules',
             'selectedModules' => 'Selected Modules',
             'selectedModule' => 'Selected Module',
+            'start_date' => 'Start Date',
+            'end_date' => 'End Date',
+            'email_verified_at' => 'Email Verified At',
         ];
     }
 
@@ -113,7 +117,10 @@ class User extends ActiveRecord implements IdentityInterface
      */
  
 
-
+     public function isSuperAdmin()
+     {
+         return $this->role === 'super_admin';
+     }
 
      public function beforeSave($insert)
      {
@@ -195,10 +202,10 @@ class User extends ActiveRecord implements IdentityInterface
      * @return static|null
      */
   
-     public function getTickets()
-     {
-         return $this->hasMany(Ticket::class, ['user_id' => 'id']);
-     }
+    public function getTickets(): \yii\db\ActiveQuery
+    {
+        return $this->hasMany(Ticket::class, ['user_id' => 'id']);
+    }
 
     public static function findByCompanyEmail($companyEmail)
     {
@@ -357,28 +364,22 @@ class User extends ActiveRecord implements IdentityInterface
      * Checks if the user is an admin.
      * @return bool whether the user is an admin
      */
-    public function getIsAdmin()
-    {
-        // Replace this with your actual logic to determine if a user is an admin
-        // For example, if you have a 'role' column in your user table:
-        return $this->role === 'admin';
+    // public function getIsAdmin()
+    // {
+    //     return $this->role === 'admin';
+    // }
 
-        // Or if you have a separate 'is_admin' column:
-        // return (bool) $this->is_admin;
-
-        // Or if you're using RBAC:
-        // return \Yii::$app->authManager->checkAccess($this->id, 'admin');
-    }
     public static function findByPasswordResetToken($token)
     {
         if (!static::isPasswordResetTokenValid($token)) {
-            return null;
+            return false;
         }
 
-        return static::findOne([
+        $user = static::findOne([
             'password_reset_token' => $token,
             'first_login' => 1,
         ]);
+        return $user !== null;
     }
     public static function isPasswordResetTokenValid($token)
     {
@@ -450,7 +451,7 @@ class User extends ActiveRecord implements IdentityInterface
     
 public function verify($token, $companyEmail)
 {
-    Yii::info("Verifying user: ID = {$this->id}, Email = {$this->email}, Company Email = {$companyEmail}, Current Status = {$this->status}");
+    Yii::info("Verifying user: ID = {$this->id}, Email = {$this->company_email}, Company Email = {$companyEmail}, Current Status = {$this->status}");
 
     $user = self::findByVerificationToken($token, $companyEmail);
     
@@ -596,18 +597,7 @@ public function verify($token, $companyEmail)
 
     public function getRoleName()
     {
-        switch ($this->role) {
-            case 'superadmin':
-                return 'Super Admin';
-            case 'admin':
-                return 'Admin';
-            case 'developer':
-                return 'Developer';
-            case 'user':
-                return 'User';
-            default:
-                return 'Unknown Role';
-        }
+        return $this->role === self::ROLE_ADMIN ? 'Admin' : 'User';
     }
 
     public function getRole()
@@ -655,10 +645,10 @@ public function verify($token, $companyEmail)
     /**
      * Check if user is super admin
      */
-    public function isSuperAdmin()
-    {
-        return $this->role === 'super_admin';  // Adjust this based on how your role is stored
-    }
+    // public function isSuperAdmin()
+    // {
+    //     return $this->role === 'superadmin';
+    // }
 
     /**
      * Check if user is admin or super admin
@@ -773,6 +763,64 @@ public function verify($token, $companyEmail)
     {
         echo "Setting company name to: " . $value . "<br>";
         $this->company_name = $value;
+    }
+
+    public function isAdminOrSuper()
+    {
+        return in_array((int)$this->role, [self::ROLE_ADMIN, self::ROLE_SUPER_ADMIN]);
+    }
+
+    public function getIsAdmin()
+    {
+        return $this->role === 'admin';
+    }
+
+    public function getIsSuperAdmin()
+    {
+        return $this->role === 'superadmin';
+    }
+
+    /**
+     * Get list of roles for dropdown
+     */
+    public static function getRoleList()
+    {
+        return [
+            self::ROLE_ADMIN => 'Admin',
+            self::ROLE_USER => 'User',
+        ];
+    }
+
+    public function validatePasswordResetToken($token)
+    {
+        if (empty($token) || $token !== $this->password_reset_token) {
+            return false;
+        }
+
+        $timestamp = (int) substr($this->password_reset_token, strrpos($this->password_reset_token, '_') + 1);
+        $expire = Yii::$app->params['user.passwordResetTokenExpire'];
+        
+        return $timestamp + $expire >= time();
+    }
+
+    // Add this relation method
+    public function getProfile()
+    {
+        return $this->hasOne(UserProfile::class, ['user_id' => 'id']);
+    }
+
+    // Add this method to see all available attributes
+    public function safeAttributes()
+    {
+        return [
+            'name',
+            'company_email',
+            'company_name',
+            'role',
+            'status',
+            'modules'
+            // ... any other attributes
+        ];
     }
 
 }

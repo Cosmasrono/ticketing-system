@@ -33,6 +33,7 @@ use app\models\Notification;
 use yii\web\UploadedFile;
 use yii\helpers\FileHelper;
 use Cloudinary\Cloudinary;
+use app\models\Company;
  
  
  
@@ -92,191 +93,50 @@ class TicketController extends Controller
             'Other'
         ],
     ];
-
     public function behaviors()
     {
         return [
             'access' => [
                 'class' => \yii\filters\AccessControl::className(),
+                'only' => ['approve', 'cancel', 'assign'], // Include ticket management actions
                 'rules' => [
+                    // Authenticated user access
                     [
-                        'actions' => ['index', 'create', 'view', 'update', 'delete', 'close'],
+                        'actions' => ['approve', 'cancel', 'assign'],
                         'allow' => true,
                         'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
-                            if (Yii::$app->user->identity->role === 'admin') {
-                                Yii::$app->session->setFlash('error', 'Administrators do not have access to tickets.');
-                                Yii::$app->response->redirect(['/site/admin'])->send();
-                                return false;
-                            }
-                            return true;
+                            // Allow roles admin, super_admin, and roles 1 and 4
+                            return in_array((int)Yii::$app->user->identity->role, [1, 4]) || 
+                                   Yii::$app->user->identity->role === 'admin' || 
+                                   Yii::$app->user->identity->role === 'super_admin';
                         },
                         'denyCallback' => function ($rule, $action) {
-                            throw new \yii\web\ForbiddenHttpException('You are not allowed to access this page.');
+                            Yii::$app->session->setFlash('error', 'Only authorized users can access tickets.');
+                            return Yii::$app->response->redirect(['/site/index']);
                         }
                     ],
-                    [
-                        'actions' => ['get-issues'],
-                        'allow' => true,
-                        'roles' => ['@'], // Allow authenticated users
-                    ],
-                    [
-                        'actions' => ['create', 'view', 'index'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                    ],
-                    [
-                        'actions' => ['update', 'delete', 'assign', 'admin'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            return in_array(Yii::$app->user->identity->role, ['admin', 'superadmin']);
-                        }
-                    ],
-                    [
-                        'actions' => ['cancel'],
-                        'allow' => true,
-                        'roles' => ['@'],  // Allow authenticated users
-                    ],
-
-                    [
-                        'actions' => ['close', 'view'],
-                        'allow' => true,
-                        'roles' => ['developer'],
-                    ],
-                    [
-                        'actions' => ['escalate', 'view', 'index'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            // Only allow developers and superadmins to escalate tickets
-                            $allowedRoles = ['developer', 'superadmin'];
-                            return in_array(Yii::$app->user->identity->role, $allowedRoles);
-                        }
-                    ],
-                    // Rule for regular users - Added delete action
-                    [
-                        'actions' => ['create', 'view', 'index', 'delete', 'reopen'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            if (Yii::$app->user->identity->role === 'user') {
-                                if (in_array($action->id, ['delete', 'reopen'])) {
-                                    $ticketId = Yii::$app->request->get('id') ?? Yii::$app->request->post('id');
-                                    $ticket = Ticket::findOne($ticketId);
-                                    return $ticket && $ticket->created_by === Yii::$app->user->id;
-                                }
-                                return true;
-                            }
-                            return false;
-                        }
-                    ],
-                    // Rule for admin and superadmin
-                    [
-                        'actions' => ['approve', 'update', 'delete', 'assign', 'admin', 'view', 'index'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            return in_array(Yii::$app->user->identity->role, ['admin', 'superadmin']);
-                        }
-                    ],
-                    // Rule for developers
-                    [
-                        'actions' => ['view', 'index','close'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->role === 'developer';
-                        }
-                    ],
+                    
+                    // Developer Access
                     [
                         'actions' => ['close'],
                         'allow' => true,
-                        'roles' => ['developer'], // Allow developers to close tickets
+                        'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
-                            // Additional check to ensure developer can only close their assigned tickets
+                            $isDevRole = (int)Yii::$app->user->identity->role === User::ROLE_DEVELOPER;
                             $ticketId = Yii::$app->request->post('id');
                             $ticket = Ticket::findOne($ticketId);
-                            return $ticket && $ticket->assigned_to === Yii::$app->user->id;
+                            return $isDevRole && $ticket && $ticket->assigned_to === Yii::$app->user->id;
                         }
                     ],
+    
+                    // API Endpoints
                     [
-                        'actions' => ['reopen'],
-                        'allow' => true,
-                        'roles' => ['@'], // Allow authenticated users
-                    ],
-                    // Rule for developers to view assigned tickets
-                    [
-                        'actions' => ['view', 'index'],
+                        'actions' => ['get-issues'],
                         'allow' => true,
                         'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            if (Yii::$app->user->identity->role === 'developer') {
-                                if ($action->id === 'view') {
-                                    $ticketId = Yii::$app->request->get('id');
-                                    $ticket = Ticket::findOne($ticketId);
-                                    return $ticket && $ticket->assigned_to === Yii::$app->user->id;
-                                }
-                                // For index action, the filtering will be done in the action itself
-                                return true;
-                            }
-                            return false;
-                        }
-                    ],
-                    // Rule for developers to view their dashboard
-                    [
-                        'actions' => ['developer/view', 'view', 'index'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->role === 'developer';
-                        }
-                    ],
-                    [
-                        'actions' => ['delete'],
-                        'allow' => true,
-                        'roles' => ['@'], // @ means authenticated users
-                        'matchCallback' => function ($rule, $action) {
-                            $id = Yii::$app->request->get('id');
-                            $ticket = $this->findModel($id);
-                            $user = Yii::$app->user->identity;
-                            
-                            // Allow if user owns the ticket
-                            return $ticket->created_by === $user->id;
-                        }
-                    ],
-                    [
-                        'actions' => ['assigned'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->role === 'developer';
-                        }
-                    ],
-                    [
-                        'actions' => ['view'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            $user = Yii::$app->user->identity;
-                            if ($user->role === 'developer') {
-                                $ticketId = Yii::$app->request->get('id');
-                                $ticket = $this->findModel($ticketId);
-                                return $ticket->assigned_to == $user->id;
-                            }
-                            return true; // Allow other roles
-                        }
-                    ],
-                    [
-                        'actions' => ['upload-to-cloudinary'],
-                        'allow' => true,
-                        'roles' => ['@'], // @ means authenticated users
-                    ],
+                    ]
                 ],
-                // 'denyCallback' => function ($rule, $action) {
-                //     Yii::$app->session->setFlash('error', 'You are not authorized to perform this action.');
-                //     return $this->redirect(['site/index']);
-                // }
             ],
             'verbs' => [
                 'class' => \yii\filters\VerbFilter::className(),
@@ -288,50 +148,63 @@ class TicketController extends Controller
                     'escalate' => ['POST'],
                     'cancel' => ['POST'],
                     'reopen' => ['POST'],
-                    'get-issues' => ['post'],
+                    'get-issues' => ['POST'],
                     'upload-to-cloudinary' => ['POST'],
                 ],
             ],
-            'corsFilter' => [
-                'class' => \yii\filters\Cors::className(),
-            ],
         ];
     }
-
+    public function actions()
+{
+    return [
+        'error' => [
+            'class' => 'yii\web\ErrorAction',
+            'view' => '@app/views/site/error'
+        ],
+    ];
+}
     public function beforeAction($action)
-    {
-        if (!parent::beforeAction($action)) {
-            return false;
-        }
-
-        // Check if the action is 'close'
-        if ($action->id === 'close') {
-            // Allow only the ticket creator to close the ticket
-            $ticketId = Yii::$app->request->post('id');
-            $ticket = Ticket::findOne($ticketId);
-
-            if (!$ticket || $ticket->created_by !== Yii::$app->user->id) {
-                throw new \yii\web\ForbiddenHttpException('You are not allowed to close this ticket.');
-            }
-        }
-
-        return true;
+{
+    if (!parent::beforeAction($action)) {
+        return false;
     }
+
+    // Check if user is a super admin and restrict access
+    if (!Yii::$app->user->isGuest && Yii::$app->user->identity->role === 'superadmin') {
+        Yii::$app->session->setFlash('error', 'Super administrators cannot create or view tickets.');
+        return $this->redirect(['site/index']); // Redirect to index or wherever appropriate
+    }
+
+    // Additional check for closing tickets
+    if ($action->id === 'close') {
+        $ticketId = Yii::$app->request->post('id');
+        $ticket = Ticket::findOne($ticketId);
+
+        if (!$ticket || $ticket->created_by !== Yii::$app->user->id) {
+            throw new \yii\web\ForbiddenHttpException('You are not allowed to close this ticket.');
+        }
+    }
+
+    return true;
+}
+
 
     public function actionIndex()
     {
         $query = Ticket::find()
-            ->where(['created_by' => Yii::$app->user->id]); // Show only tickets created by current user
+            ->select(['ticket.*', 'user.company_name'])
+            ->leftJoin('user', 'user.id = ticket.user_id')
+            ->where(['ticket.user_id' => Yii::$app->user->id]);
 
         $dataProvider = new ActiveDataProvider([
             'query' => $query,
             'sort' => [
                 'defaultOrder' => [
-                    'created_at' => SORT_DESC, // Latest tickets first
+                    'created_at' => SORT_DESC,
                 ]
             ],
             'pagination' => [
-                'pageSize' => 10, // Number of tickets per page
+                'pageSize' => 10,
             ],
         ]);
 
@@ -523,17 +396,17 @@ class TicketController extends Controller
         ]);
     }
 
-    private function getInvitationModule()
-    {
-        $user = Yii::$app->user->identity;
-        if ($user) {
-            $invitation = Invitation::findOne(['company_email' => $user->company_email]);
-            if ($invitation) {
-                return $invitation->module;
-            }
-        }
-        return null;
-    }
+    // private function getInvitationModule()
+    // {
+    //     $user = Yii::$app->user->identity;
+    //     if ($user) {
+    //         $invitation = Invitation::findOne(['company_email' => $user->company_email]);
+    //         if ($invitation) {
+    //             return $invitation->module;
+    //         }
+    //     }
+    //     return null;
+    // }
 
     private function updateCompanyEmail($companyEmail)
     {
@@ -555,6 +428,7 @@ class TicketController extends Controller
 
     public function actionApprove()
     {
+        
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
         
         try {
@@ -872,127 +746,6 @@ class TicketController extends Controller
 
 
 
-    public function actionAssign($id)
-    {
-        Yii::info('actionAssign called for ticket ID: ' . $id);
-
-        if (Yii::$app->request->isAjax) {
-            Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-        }
-
-        // Get developers
-        $developers = User::find()
-            ->where(['role' => User::ROLE_DEVELOPER])
-            ->andWhere(['status' => 10])
-            ->all();
-            
-        if (empty($developers)) {
-            return [
-                'success' => false,
-                'message' => 'No developers available for assignment.'
-            ];
-        }
-
-        $ticket = Ticket::findOne($id);
-        if (!$ticket) {
-            throw new NotFoundHttpException('The requested ticket does not exist.');
-        }
-
-        if (Yii::$app->request->isAjax && Yii::$app->request->isPost) {
-            $transaction = Yii::$app->db->beginTransaction();
-            try {
-                $developerId = Yii::$app->request->post('Ticket')['assigned_to'] ?? null;
-                
-                // Validate developer exists
-                $selectedDeveloper = null;
-                foreach ($developers as $developer) {
-                    if ($developer->id == $developerId) {
-                        $selectedDeveloper = $developer;
-                        break;
-                    }
-                }
-
-                if (!$selectedDeveloper) {
-                    throw new \Exception('Selected developer is not valid');
-                }
-
-                // Initialize message variable
-                $message = '';
-
-                // Update ticket based on current status
-                if ($ticket->status === 'escalated' || $ticket->status === 'reassigned') {
-                    $ticket->status = 'reassigned';
-                    $message = 'Ticket has been reassigned successfully';
-                } else {
-                    $ticket->status = 'assigned';
-                    $message = 'Ticket has been assigned successfully';
-                }
-
-                // Update assignment
-                $ticket->assigned_to = $developerId;
-                $ticket->escalated_to = $developerId;
-
-                if ($ticket->save(false)) {
-                    $transaction->commit();
-                    
-                    //   Send email notification
-                    try {
-                        $emailSent = Yii::$app->mailer->compose('assignmentNotification', [
-                            'developer_name' => $developer->name,  // Using name
-                            'ticket_id' => $ticket->id,
-                            'company_name' => $ticket->company_name,
-                            'description' => $ticket->description,
-                            'module' => $ticket->module,
-                            'issue' => $ticket->issue
-                        ])
-                        ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->params['senderName']])
-                        ->setTo([$developer->company_email => $developer->name])  // Using name in recipient
-                        ->setSubject("Ticket Assignment #{$ticket->id} - {$ticket->company_name}")
-                        ->send();
-
-                        if (!$emailSent) {
-                            Yii::error('Failed to send email notification to developer: ' . $developer->name);
-                        }
-                     } catch (\Exception $e) {
-                        Yii::error('Email sending failed for developer ' . $developer->name . ': ' . $e->getMessage());
-                        // Continue execution even if email fails
-                    }
-
-                        return [
-                            'success' => true,
-                            'message' => $message . ' and notification sent',
-                            'newStatus' => $ticket->status,
-                            'ticketId' => $ticket->id
-                        ];
-                    // } catch (\Exception $e) {
-                    //     Yii::error("Failed to send email: " . $e->getMessage());
-                    //     return [
-                    //         'success' => true,
-                    //         'message' => $message . ' but email notification failed',
-                    //         'newStatus' => $ticket->status,
-                    //         'ticketId' => $ticket->id
-                    //     ];
-                    // }
-                }
-                
-                throw new \Exception('Failed to save ticket');
-                
-            } catch (\Exception $e) {
-                $transaction->rollBack();
-                return [
-                    'success' => false,
-                    'message' => 'Operation failed: ' . $e->getMessage()
-                ];
-            }
-        }
-
-        // For non-AJAX requests, render the form
-        return $this->render('assign', [
-            'ticket' => $ticket,
-            'developers' => ArrayHelper::map($developers, 'id', 'name')
-        ]);
-    }
-
     private function getDevelopers()
     {
         $developers = User::find()->where(['role' => 'developer'])->all();
@@ -1234,6 +987,7 @@ class TicketController extends Controller
         return $this->asJson($result);
     }
 
+
     public function actionAdmin()
     {
         // Get current user's role
@@ -1259,8 +1013,11 @@ class TicketController extends Controller
             'dataProvider' => $dataProvider,
         ]);
     }
+  
 
-    public function actionClose()
+
+
+public function actionClose()
     {
         Yii::$app->response->format = Response::FORMAT_JSON;
         
@@ -1535,74 +1292,254 @@ class TicketController extends Controller
 
 
 
-  public function actionCreate()
+//   public function actionCreate()
+// {
+//     if (Yii::$app->user->identity->role == 1 || Yii::$app->user->identity->role == 'admin') {
+//         Yii::$app->session->setFlash('error', 'Administrators cannot create tickets. Please use a regular user account.');
+//         return $this->redirect(['/site/index']);
+//     }
+
+//     $model = new Ticket();
+
+//     // Get current user's company modules and update user's selectedModules
+//     $userCompany = Company::findOne(['company_email' => Yii::$app->user->identity->company_email]);
+    
+//     if ($userCompany) {
+//         // Update the user's selectedModules with company modules
+//         $user = User::findOne(Yii::$app->user->id);
+        
+//         // If user's selectedModules is empty, get modules from company table
+//         $companyModules = $userCompany->modules;
+        
+//         if ($user && empty($user->selectedModules)) {
+//             $user->selectedModules = json_encode($companyModules);
+//             $user->save(false);
+//         }
+        
+//         // Always use company modules for the dropdown
+//         $companyModules = is_array($companyModules) ? $companyModules : [];
+//     } else {
+//         $companyModules = [];
+//     }
+
+//     if ($model->load(Yii::$app->request->post())) {
+//         // Set company-related data
+//         $model->company_name = $userCompany->company_name;
+//         $model->company_email = $userCompany->company_email;
+//         $model->created_by = Yii::$app->user->id;
+//         $model->created_at = date('Y-m-d H:i:s');
+//         $model->created_by = $user->id;
+//         $model->company_name = $user->company_name;
+//         $model->company_email = $user->company_email;
+//         $model->status = Ticket::STATUS_PENDING;
+//         $model->module = $model->selectedModule;
+
+//         // Check if screenshotUrl is set and is a valid Cloudinary URL
+//         if (!empty($model->screenshotUrl)) {
+//             try {
+//                 // Verify it's a Cloudinary URL
+//                 if (strpos($model->screenshotUrl, Yii::$app->params['cloudinary']['cloud_name']) === false) {
+//                     throw new \Exception('Invalid screenshot URL format');
+//                 }
+
+//                 // Optional: Verify the image exists on Cloudinary
+//                 $cloudinary = new Cloudinary([
+//                     'cloud' => [
+//                         'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
+//                         'api_key' => Yii::$app->params['cloudinary']['api_key'],
+//                         'api_secret' => Yii::$app->params['cloudinary']['api_secret']
+//                     ]
+//                 ]);
+
+//                 // Extract public_id from URL
+//                 preg_match('/\/v\d+\/(.+)\.\w+$/', $model->screenshotUrl, $matches);
+//                 if (isset($matches[1])) {
+//                     $publicId = $matches[1];
+//                     // Verify image exists
+//                     $cloudinary->adminApi()->asset($publicId);
+//                     Yii::info('Screenshot verified on Cloudinary: ' . $model->screenshotUrl, __METHOD__);
+//                 }
+
+//                 if ($model->save()) {
+//                     // Send email notification to admin
+//                     $this->sendEmailNotification($model, 'create');
+
+//                     Yii::$app->session->setFlash('success', 'Ticket created successfully with screenshot.');
+//                     return $this->redirect(['view', 'id' => $model->id]);
+//                 }
+//             } catch (\Exception $e) {
+//                 Yii::error('Cloudinary verification failed: ' . $e->getMessage(), __METHOD__);
+//                 $model->addError('screenshotUrl', 'Failed to verify screenshot: ' . $e->getMessage());
+//             }
+//         } else {
+//             // No screenshot provided, just save the ticket
+//             if ($model->save()) {
+//                 // Send email notification to admin
+//                 $this->sendEmailNotification($model, 'create');
+
+//                 Yii::$app->session->setFlash('success', 'Ticket created successfully.');
+//                 return $this->redirect(['view', 'id' => $model->id]);
+//             }
+//         }
+//     }
+
+//     return $this->render('create', [
+//         'model' => $model,
+//         'companyModules' => array_combine($companyModules, $companyModules) // For dropdown
+//     ]);
+// }
+
+
+
+public function actionCreate()
 {
+    // Check if the user is logged in
+    if (Yii::$app->user->isGuest) {
+        throw new \yii\web\ForbiddenHttpException('You are not allowed to perform this action.');
+    }
+
     $model = new Ticket();
-    $user = Yii::$app->user->identity; // Get the current logged-in user
+    
+    // Get current user's company email
+    $userCompanyEmail = Yii::$app->user->identity->company_email;
 
-    if ($model->load(Yii::$app->request->post())) {
-        // Set other attributes
-        $model->created_at = date('Y-m-d H:i:s');
-        $model->created_by = $user->id;
-        $model->company_name = $user->company_name;
-        $model->company_email = $user->company_email;
-        $model->status = Ticket::STATUS_PENDING;
-        $model->module = $model->selectedModule;
+    // Check if the user is in the company table
+    $companyData = Yii::$app->db->createCommand('
+        SELECT * 
+        FROM company 
+        WHERE company_email = :company_email
+    ')
+    ->bindValue(':company_email', $userCompanyEmail)
+    ->queryOne();
 
-        // Check if screenshotUrl is set and is a valid Cloudinary URL
-        if (!empty($model->screenshotUrl)) {
-            try {
-                // Verify it's a Cloudinary URL
-                if (strpos($model->screenshotUrl, Yii::$app->params['cloudinary']['cloud_name']) === false) {
-                    throw new \Exception('Invalid screenshot URL format');
-                }
+    // If the user is not found in the company table, log them out
+    if ($companyData === false) {
+        Yii::$app->user->logout(); // Log out the user
+        Yii::$app->session->setFlash('error', 'You are not associated with any company. Please contact support.'); // Optional message
+        return $this->redirect(['site/login']); // Redirect to login page
+    }
 
-                // Optional: Verify the image exists on Cloudinary
-                $cloudinary = new Cloudinary([
-                    'cloud' => [
-                        'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
-                        'api_key' => Yii::$app->params['cloudinary']['api_key'],
-                        'api_secret' => Yii::$app->params['cloudinary']['api_secret']
-                    ]
+    // Initialize availableModules
+    $availableModules = []; // Ensure this is initialized
+
+    // Fetch selected modules from the user table
+    $userId = Yii::$app->user->id;
+    $userData = Yii::$app->db->createCommand('
+        SELECT selectedmodules 
+        FROM user 
+        WHERE id = :user_id
+    ')
+    ->bindValue(':user_id', $userId)
+    ->queryOne();
+
+    // Convert selected modules string to array and clean it
+    if (!empty($userData['selectedmodules'])) {
+        $availableModules = array_map('trim', explode(',', $userData['selectedmodules']));
+    }
+
+    // Define module issues
+    $moduleIssues = [
+        'DASH' => [
+            'Login Issues',
+            'Dashboard Not Loading',
+            'Data Not Showing',
+            'Performance Issues',
+            'Report Generation Failed'
+        ],
+        'FIN' => [
+            'Payment Processing Error',
+            'Transaction Failed',
+            'Balance Discrepancy',
+            'Report Generation Error',
+            'Reconciliation Issues'
+        ],
+        'MEMBERS' => [
+            'Member Registration Failed',
+            'Profile Update Issues',
+            'Access Denied',
+            'Data Sync Problems',
+            'Member Search Not Working'
+        ],
+        'MOBILE' => [
+            'App Crashes',
+            'Login Failed',
+            'Transaction Error',
+            'Data Loading Issues',
+            'Connection Problems'
+        ],
+        'HR' => [
+            'Payroll Processing Error',
+            'Leave Management Issues',
+            'Employee Data Error',
+            'Report Generation Failed',
+            'Access Rights Problem'
+        ]
+    ];
+
+    // Handle POST request for ticket creation
+    if (Yii::$app->request->isPost) {
+        $post = Yii::$app->request->post('Ticket');
+        
+        try {
+            // Initialize Cloudinary
+            $cloudinary = new Cloudinary([
+                'cloud' => [
+                    'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
+                    'api_key' => Yii::$app->params['cloudinary']['api_key'],
+                    'api_secret' => Yii::$app->params['cloudinary']['api_secret']
+                ]
+            ]);
+
+            // Handle screenshot upload
+            $screenshotUrl = null;
+            if (isset($_FILES['Ticket']) && !empty($_FILES['Ticket']['name']['screenshot'])) {
+                $tempFile = $_FILES['Ticket']['tmp_name']['screenshot'];
+                
+                // Upload to Cloudinary
+                $result = $cloudinary->uploadApi()->upload($tempFile, [
+                    'folder' => 'tickets',
+                    'resource_type' => 'auto'
                 ]);
-
-                // Extract public_id from URL
-                preg_match('/\/v\d+\/(.+)\.\w+$/', $model->screenshotUrl, $matches);
-                if (isset($matches[1])) {
-                    $publicId = $matches[1];
-                    // Verify image exists
-                    $cloudinary->adminApi()->asset($publicId);
-                    Yii::info('Screenshot verified on Cloudinary: ' . $model->screenshotUrl, __METHOD__);
+                
+                if (isset($result['secure_url'])) {
+                    $screenshotUrl = $result['secure_url'];
                 }
-
-                if ($model->save()) {
-                    // Send email notification to admin
-                    $this->sendEmailNotification($model, 'create');
-
-                    Yii::$app->session->setFlash('success', 'Ticket created successfully with screenshot.');
-                    return $this->redirect(['view', 'id' => $model->id]);
-                }
-            } catch (\Exception $e) {
-                Yii::error('Cloudinary verification failed: ' . $e->getMessage(), __METHOD__);
-                $model->addError('screenshotUrl', 'Failed to verify screenshot: ' . $e->getMessage());
             }
-        } else {
-            // No screenshot provided, just save the ticket
-            if ($model->save()) {
-                // Send email notification to admin
-                $this->sendEmailNotification($model, 'create');
 
-                Yii::$app->session->setFlash('success', 'Ticket created successfully.');
-                return $this->redirect(['view', 'id' => $model->id]);
+            // Create database command with screenshot URL
+            $command = Yii::$app->db->createCommand()->insert('ticket', [
+                'user_id' => Yii::$app->user->id,
+                'company_name' => Yii::$app->user->identity->company_name,
+                'company_email' => Yii::$app->user->identity->company_email,
+                'module' => $post['module'],
+                'issue' => $post['issue'],
+                'description' => $post['description'],
+                'severity_level' => $post['severity_level'],
+                'status' => 'pending',
+                'created_at' => date('Y-m-d H:i:s'),
+                'screenshotUrl' => $screenshotUrl,  // Add the Cloudinary URL
+                'voice_note_url' => $post['voice_note_url'] // Add the voice note URL
+            ]);
+
+            if ($command->execute()) {
+                Yii::$app->session->setFlash('success', 'Ticket saved to database successfully with screenshot and voice note.');
+                return $this->redirect(['view', 'id' => Yii::$app->db->lastInsertID]);
+            } else {
+                Yii::error('Failed to execute database command');
+                Yii::$app->session->setFlash('error', 'Failed to save ticket: Database error');
             }
+        } catch (\Exception $e) {
+            Yii::error('Error: ' . $e->getMessage());
+            Yii::$app->session->setFlash('error', 'Failed to save ticket: ' . $e->getMessage());
         }
     }
 
     return $this->render('create', [
         'model' => $model,
+        'companyModules' => $availableModules,
+        'moduleIssues' => $moduleIssues
     ]);
 }
-
 
 
     public function actionAssigned()
@@ -1712,7 +1649,7 @@ class TicketController extends Controller
 
             return $this->asJson([
                 'success' => true,
-                'url' => $response->getSecurePath()
+                'url' => $response['secure_url']
             ]);
 
         } catch (\Exception $e) {
@@ -1723,7 +1660,83 @@ class TicketController extends Controller
         }
     }
 
-   
+    protected function getModuleIssues()
+    {
+        return [
+            'DASH' => [
+                'Loading Issues' => 'Dashboard Loading Issues',
+                'Data Not Updating' => 'Dashboard Data Not Updating',
+                'Widget Problems' => 'Dashboard Widget Problems',
+                'Performance Issues' => 'Dashboard Performance Issues',
+                'Access Problems' => 'Dashboard Access Problems'
+            ],
+            'BI' => [
+                'Report Loading' => 'Power BI Report Loading Issues',
+                'Data Refresh' => 'Data Refresh Problems',
+                'Visualization Error' => 'Visualization Errors',
+                'Export Issues' => 'Export Problems',
+                'Connection Error' => 'Data Connection Issues'
+            ],
+            'REPORTS' => [
+                'Generation Failed' => 'Report Generation Failed',
+                'Download Issues' => 'Report Download Issues',
+                'Format Problems' => 'Report Format Problems',
+                'Missing Data' => 'Missing Report Data',
+                'Scheduling Issues' => 'Report Scheduling Issues'
+            ],
+            'ADMIN' => [
+                'User Management' => 'User Management Issues',
+                'Permission Error' => 'Permission Configuration Problems',
+                'Settings Issues' => 'System Settings Issues',
+                'Audit Log' => 'Audit Log Problems',
+                'Configuration' => 'General Configuration Issues'
+            ],
+            'FIN' => [
+                'Transaction Error' => 'Transaction Processing Error',
+                'Report Issues' => 'Financial Report Issues',
+                'Calculation Error' => 'Financial Calculation Problems',
+                'Integration Issue' => 'Financial Integration Issues',
+                'Balance Mismatch' => 'Balance Reconciliation Issues'
+            ],
+            'HR' => [
+                'Employee Records' => 'Employee Record Issues',
+                'Leave Management' => 'Leave Management Problems',
+                'Payroll Issues' => 'Payroll Processing Issues',
+                'Document Upload' => 'Document Upload Problems',
+                'Attendance System' => 'Attendance System Issues'
+            ],
+            'CREDIT' => [
+                'Loan Processing' => 'Loan Processing Issues',
+                'Credit Score' => 'Credit Score Calculation Problems',
+                'Application Error' => 'Loan Application Errors',
+                'Payment Issues' => 'Loan Payment Issues',
+                'Document Verify' => 'Document Verification Problems'
+            ],
+            'MEMBERS' => [
+                'Login Issues' => 'Member Login Problems',
+                'Profile Update' => 'Profile Update Issues',
+                'Statement Error' => 'Statement Generation Error',
+                'Service Access' => 'Service Access Problems',
+                'Password Reset' => 'Password Reset Issues'
+            ],
+            'MOBILE' => [
+                'App Crash' => 'Mobile App Crash',
+                'Login Failed' => 'Mobile Login Failure',
+                'Transaction Error' => 'Mobile Transaction Error',
+                'Update Issues' => 'App Update Problems',
+                'Feature Access' => 'Feature Access Issues'
+            ],
+            'USSD' => [
+                'Session Error' => 'USSD Session Errors',
+                'Menu Issues' => 'USSD Menu Problems',
+                'Transaction Failed' => 'USSD Transaction Failures',
+                'Response Delay' => 'Slow USSD Response',
+                'Service Access' => 'USSD Service Access Issues'
+            ]
+        ];
+    }
+
+ 
 
 }
 

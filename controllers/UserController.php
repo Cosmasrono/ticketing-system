@@ -4,6 +4,7 @@ namespace app\controllers;
 
 use yii\web\Controller;
 use yii\helpers\ArrayHelper;
+use app\models\User;
 
 class UserController extends Controller
 {

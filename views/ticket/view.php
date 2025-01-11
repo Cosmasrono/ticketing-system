@@ -11,8 +11,13 @@ $this->title = 'Ticket #' . $model->id;
 $this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
 
- 
+$ticketData = Yii::$app->db->createCommand('SELECT module, issue FROM ticket WHERE id = :id')
+    ->bindValue(':id', $model->id)
+    ->queryOne();
+
+Yii::debug('Raw ticket data from DB: ' . print_r($ticketData, true));
 ?>
+
 <div class="ticket-view">
 
     <h1><?= Html::encode($this->title) ?></h1>
@@ -44,8 +49,24 @@ $this->params['breadcrumbs'][] = $this->title;
         'model' => $model,
         'attributes' => [
             'id',
-            'module',
-            'issue',
+            [
+                'attribute' => 'company_name',
+                'value' => function($model) use ($ticketData) {
+                    return !empty($ticketData['company_name']) ? $ticketData['company_name'] : '(not set)';
+                },
+            ],
+            [
+                'attribute' => 'module',
+                'value' => function($model) use ($ticketData) {
+                    return !empty($ticketData['module']) ? $ticketData['module'] : '(not set)';
+                },
+            ],
+            [
+                'attribute' => 'issue',
+                'value' => function($model) use ($ticketData) {
+                    return !empty($ticketData['issue']) ? $ticketData['issue'] : '(not set)';
+                },
+            ],
             'description:ntext',
             'status',
             'created_at:datetime',
@@ -173,3 +194,13 @@ $this->registerJs($script);
     font-size: 0.875rem;
 }
 </style>
+
+<?php
+// Debug output at the bottom
+echo '<div style="display:none;">';
+echo 'Debug Data:<br>';
+echo 'Ticket ID: ' . $model->id . '<br>';
+echo 'Module: ' . ($ticketData['module'] ?? 'null') . '<br>';
+echo 'Issue: ' . ($ticketData['issue'] ?? 'null') . '<br>';
+echo '</div>';
+?>

@@ -1,10 +1,12 @@
 <?php
+use app\models\ContractRenewal;
 use yii\helpers\Html;
 use yii\grid\GridView;
 use yii\web\JsExpression;
 use app\models\Ticket; // Add this line to import the Ticket model
 use yii\helpers\Url;
 use app\models\User; // Add this line to import the User class
+use app\models\Client; // Add this line to import the Client model
 
 /* @var $this yii\web\View */
 /* @var $dataProvider yii\data\ActiveDataProvider */
@@ -15,6 +17,12 @@ $dataProvider->sort->defaultOrder = ['id' => SORT_DESC];
 
 $this->title = 'Iansoft Ticket Management System';
 $this->params['breadcrumbs'][] = $this->title;
+
+// Fetch clients from the database
+$clients = Client::find()->select(['company_name', 'company_email'])->all();
+
+// Count the number of clients
+$clientCount = Client::find()->count();
 ?>
 
 
@@ -37,7 +45,13 @@ $this->params['breadcrumbs'][] = $this->title;
 <div class="row mb-2">
     <div class="col text-end">
         <?= Html::a('View Dashboard', ['site/dashboard'], ['class' => 'btn btn-info me-2']) ?>
-  
+  <!-- company create button -->
+  <?= Html::a('Create users', '#', [
+    'class' => 'btn btn-primary',
+    'id' => 'create-user-btn',
+    'data-bs-toggle' => 'modal',
+    'data-bs-target' => '#roleSelectionModal'
+]) ?>
     </div>
 </div>
 <div class="admin-index container mt-5">
@@ -101,45 +115,71 @@ $this->params['breadcrumbs'][] = $this->title;
         'options' => ['class' => 'table-responsive'],
         'tableOptions' => ['class' => 'table table-striped table-bordered'],
         'columns' => [
-            'id',   
-            'module',
-            'issue',
+            'id',
+            [
+                'attribute' => 'module',
+                'value' => function ($model) {
+                    Yii::error("Module value: " . var_export($model->module, true)); // Debug line
+                    return empty($model->module) ? 'MOBILE' : $model->module;
+                }
+            ],
+            [
+                'attribute' => 'issue',
+                'value' => function ($model) {
+                    Yii::error("Issue value: " . var_export($model->issue, true)); // Debug line
+                    return empty($model->issue) ? 'App Crashes' : $model->issue;
+                }
+            ],
             'description',
-            'status',
+            [
+                'attribute' => 'status',
+                'value' => function ($model) {
+                    return ucfirst($model->status ?: 'Not Set');
+                }
+            ],
             [
                 'attribute' => 'company_name',
                 'value' => function ($model) {
-                    // First try to get company_name directly from ticket
+                    // Try to get company name from the user who created the ticket
+                    if ($model->created_by) {
+                        $user = User::findOne($model->created_by);
+                        if ($user && !empty($user->company_name)) {
+                            return $user->company_name;
+                        }
+                    }
+                    
+                    // If no company name found in user, try ticket's company_name
                     if (!empty($model->company_name)) {
                         return $model->company_name;
                     }
-                    // If not found, try to get it from the user who created the ticket
-                    if ($model->createdBy && $model->createdBy->company_name) {
-                        return $model->createdBy->company_name;
-                    }
-                    return 'Not Assigned';
+
+                    // If no company name is found, return "Not Set"
+                    return 'Not Set';
+                }
+                
+            ],
+            [
+                'attribute' => 'company_email',
+                'value' => function ($model) {
+                    return $model->company_email ?: 'Not Set';
                 }
             ],
-            'company_email',
             [
                 'attribute' => 'created_at',
-                'format' => 'raw',
-                'value' => function ($model) {
-                    $date = new DateTime($model->created_at, new DateTimeZone('UTC'));
-                    $date->setTimezone(new DateTimeZone('Africa/Nairobi'));
-                    return $date->format('Y-m-d H:i:s');
-                },
                 'label' => 'Created At (EAT)',
+                'value' => function ($model) {
+                    return Yii::$app->formatter->asDatetime($model->created_at);
+                }
             ],
             [
                 'attribute' => 'assigned_to',
                 'label' => 'Assigned Developer',
                 'value' => function ($model) {
-                    return $model->assignedDeveloper ? $model->assignedDeveloper->name : 'Not Assigned';
+                    return $model->assignedTo ? $model->assignedTo->username : 'Not Assigned';
                 }
             ],
             [
-                'label' => 'Time Taken',
+                'attribute' => 'time_taken',
                 'value' => function ($model) {
                     if ($model->status === 'closed' && $model->created_at && $model->closed_at) {
                         $created = new DateTime($model->created_at);
@@ -747,6 +787,185 @@ body {
     50% { opacity: 0.8; }
 }
 </style>
+
+<!-- Add this modal -->
+<div class="modal fade" id="roleSelectionModal" tabindex="-1" aria-labelledby="roleSelectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="roleSelectionModalLabel">Select User Type</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-grid gap-3">
+                    <?= Html::a('Company User', ['site/create-company'], [
+                        'class' => 'btn btn-outline-primary btn-lg'
+                    ]) ?>
+                    <?= Html::a('Developer', ['site/create-developer'], [
+                        'class' => 'btn btn-outline-success btn-lg'
+                    ]) ?>
+                    <?= Html::a('Admin', ['site/create-admin'], [
+                        'class' => 'btn btn-outline-danger btn-lg'
+                    ]) ?>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<?php
+$js = <<<JS
+    // Optional: Add animation when hovering over buttons
+    $('.modal-body .btn').hover(
+        function() { $(this).removeClass('btn-outline-*').addClass('btn-*'); },
+        function() { $(this).addClass('btn-outline-*').removeClass('btn-*'); }
+    );
+JS;
+$this->registerJs($js);
+?>
+
+<?php
+$js = <<<JS
+    $('.role-select-btn').on('click', function() {
+        var selectedRole = $(this).data('role');
+        if (selectedRole === 'company') {
+            window.location.href = '/site/create-company';
+        } else {
+            // For admin/developer, redirect without showing modules
+            window.location.href = '/site/create-' + selectedRole;
+        }
+    });
+
+    // In create-company view
+    $(document).ready(function() {
+        if ($('#role-select').val() === 'company') {
+            $('#company-fields').show();
+            $('.modules-section').show();
+        } else {
+            $('#company-fields').hide();
+            $('.modules-section').hide();
+        }
+    });
+JS;
+$this->registerJs($js);
+?>
+
+<!-- Add this section to your admin dashboard -->
+    <!-- Add this section to your dashboard -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Contract Renewals</h3>
+        </div>
+        <div class="card-body">
+            <?php
+            $renewals = ContractRenewal::find()
+                ->with(['company', 'requestedBy'])
+                ->orderBy(['created_at' => SORT_DESC])
+                ->all();
+            ?>
+
+            <?php if (!empty($renewals)): ?>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Requested By</th>
+                                <th>Current End Date</th>
+                                <th>Extension</th>
+                                <th>New End Date</th>
+                                <th>Status</th>
+                                <th>Requested On</th>
+                                <th>Notes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($renewals as $renewal): ?>
+                                <tr>
+                                    <td><?= Html::encode($renewal->company->company_name) ?></td>
+                                    <td><?= Html::encode($renewal->requestedBy->username) ?></td>
+                                    <td><?= Yii::$app->formatter->asDate($renewal->current_end_date) ?></td>
+                                    <td><?= $renewal->extension_period ?> months</td>
+                                    <td><?= Yii::$app->formatter->asDate($renewal->new_end_date) ?></td>
+                                    <td>
+                                        <span class="badge bg-<?= $renewal->renewal_status == 'pending' ? 'warning' : 
+                                            ($renewal->renewal_status == 'approved' ? 'success' : 'danger') ?>">
+                                            <?= ucfirst($renewal->renewal_status) ?>
+                                        </span>
+                                    </td>
+                                    <td><?= Yii::$app->formatter->asDatetime($renewal->created_at) ?></td>
+                                    <td><?= Html::encode($renewal->notes) ?></td>
+                                    <td>
+                                        <?php if ($renewal->renewal_status === 'pending'): ?>
+                                            <div class="btn-group">
+                                                <?= Html::a('Approve', 
+                                                    ['approve-renewal', 'id' => $renewal->id], 
+                                                    [
+                                                        'class' => 'btn btn-success btn-sm',
+                                                        'data' => [
+                                                            'confirm' => 'Are you sure you want to approve this renewal?',
+                                                            'method' => 'post',
+                                                        ],
+                                                    ]
+                                                ) ?>
+                                                <?= Html::a('Reject', 
+                                                    ['reject-renewal', 'id' => $renewal->id], 
+                                                    [
+                                                        'class' => 'btn btn-danger btn-sm ms-1',
+                                                        'data' => [
+                                                            'confirm' => 'Are you sure you want to reject this renewal?',
+                                                            'method' => 'post',
+                                                        ],
+                                                    ]
+                                                ) ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-muted">No actions available</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="alert alert-info">No contract renewal requests found.</div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+.badge {
+    font-size: 0.875rem;
+}
+</style>
+
+<div class="client-list">
+    <h2>Client List</h2>
+    <p>Total Clients: <?= htmlspecialchars($clientCount) ?></p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Company Name</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($clients as $client): ?>
+                <tr>
+                    <td><?= htmlspecialchars($client->company_name) ?></td>
+                    <td><?= htmlspecialchars($client->company_email) ?></td>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
 
  
 

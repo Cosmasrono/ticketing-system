@@ -25,8 +25,30 @@ $this->params['breadcrumbs'][] = $this->title;
         'columns' => [
             ['class' => 'yii\grid\SerialColumn'],
             'id',
-            'module',
-            'issue',
+            [
+                'attribute' => 'company_name',
+                'value' => function($model) {
+                    return !empty($model->company_name) ? $model->company_name : Yii::$app->user->identity->company_name;
+                }
+            ],
+            [
+                'attribute' => 'module',
+                'value' => function($model) {
+                    $ticketData = Yii::$app->db->createCommand('SELECT module FROM ticket WHERE id = :id')
+                        ->bindValue(':id', $model->id)
+                        ->queryOne();
+                    return !empty($ticketData['module']) ? $ticketData['module'] : '(not set)';
+                }
+            ],
+            [
+                'attribute' => 'issue',
+                'value' => function($model) {
+                    $ticketData = Yii::$app->db->createCommand('SELECT issue FROM ticket WHERE id = :id')
+                        ->bindValue(':id', $model->id)
+                        ->queryOne();
+                    return !empty($ticketData['issue']) ? $ticketData['issue'] : '(not set)';
+                }
+            ],
             [
                 'attribute' => 'description',
                 'format' => 'ntext',
@@ -46,6 +68,10 @@ $this->params['breadcrumbs'][] = $this->title;
                 }
             ],
             [
+                'attribute' => 'created_at',
+                'format' => 'datetime',
+            ],
+            [
                 'attribute' => 'screenshotUrl',
                 'format' => 'raw',
                 'value' => function ($model) {
@@ -61,10 +87,6 @@ $this->params['breadcrumbs'][] = $this->title;
                 },
                 'label' => 'Screenshot',
                 'contentOptions' => ['class' => 'text-center'],
-            ],
-            [
-                'attribute' => 'created_at',
-                'format' => 'datetime',
             ],
             [
                 'class' => 'yii\grid\ActionColumn',

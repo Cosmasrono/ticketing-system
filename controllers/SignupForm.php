@@ -4,6 +4,9 @@ namespace app\models;
 use Yii;
 use yii\base\Model;
 use app\models\User;
+use SendinBlue\Client\Configuration;
+use SendinBlue\Client\Api\TransactionalEmailsApi;
+use SendinBlue\Client\Model\SendSmtpEmail;
 
 class SignupForm extends Model
 {

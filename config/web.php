@@ -19,6 +19,8 @@ $config = [
         '@rules' => '@app/rules',
     ],
     'components' => [
+
+        'timezone'=>'UTC',
         'request' => [
             // !!! insert a secret key in the following (if it is empty) - this is required by cookie validation
             'cookieValidationKey' => 'your-secret-key',
@@ -83,6 +85,10 @@ $config = [
                 'change-password' => 'site/change-password',
                 'create-user' => 'site/create-user',
                 'ticket/upload-to-cloudinary' => 'ticket/upload-to-cloudinary',
+                'set-initial-password/<token>/<email:.*>' => 'site/set-initial-password',
+                'set-initial-password' => 'site/set-initial-password',
+                'site/change-initial-password' => 'site/change-initial-password',
+                'site/reset-password' => 'site/reset-password',
             ],
         ],
         'session' => [
@@ -99,11 +105,10 @@ $config = [
             'channel' => 'default', // Queue channel key
             'mutex' => \yii\mutex\MysqlMutex::class, // Mutex used to sync queries
         ],
-        'timeZone' => 'Africa/Nairobi', // Set your timezone
         'formatter' => [
             'class' => 'yii\i18n\Formatter',
             'defaultTimeZone' => 'Africa/Nairobi',
-            'timeZone' => 'Africa/Nairobi',
+            'timeZone' => 'UTC',
             'dateFormat' => 'php:Y-m-d',
             'datetimeFormat' => 'php:Y-m-d H:i:s',
             'timeFormat' => 'php:H:i:s',
@@ -123,6 +128,9 @@ $config = [
             ],
         ],
         'assetManager' => [
+            'class' => 'yii\web\AssetManager',
+            'basePath' => '@webroot/assets',
+            'baseUrl' => '@web/assets',
             'bundles' => [
                 'yii\web\JqueryAsset' => [
                     'sourcePath' => null,
@@ -132,6 +140,22 @@ $config = [
                 ],
             ],
         ],
+        'response' => [
+            'class' => 'yii\web\Response',
+            'on beforeSend' => function ($event) {
+                $response = $event->sender;
+                if (isset($_SERVER['HTTP_ORIGIN'])) {
+                    // Allow only specific origins
+                    $allowedOrigins = ['http://localhost:8080', 'http://localhost:3000'];
+                    if (in_array($_SERVER['HTTP_ORIGIN'], $allowedOrigins)) {
+                        $response->headers->set('Access-Control-Allow-Origin', $_SERVER['HTTP_ORIGIN']);
+                    }
+                }
+                $response->headers->set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+                $response->headers->set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
+                $response->headers->set('Access-Control-Allow-Credentials', 'false');
+            },
+        ],
     ],
     'params' => $params,
     'modules' => [
@@ -140,6 +164,7 @@ $config = [
         // ],
     ],
     'defaultRoute' => 'site/index',
+    'timeZone' => 'UTC',
 ];
 
 // Temporarily enable debug module

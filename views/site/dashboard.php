@@ -463,7 +463,8 @@ $this->registerJs("
             </div>
         </div>
     </div>
-</div>
+
+
 
 <?php
 // Register required assets

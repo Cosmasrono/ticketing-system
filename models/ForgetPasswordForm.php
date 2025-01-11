@@ -6,7 +6,7 @@ use Yii;
 use yii\base\Model;
 use app\models\User;
 
-class ForgotPasswordForm extends Model
+class ForgetPasswordForm extends Model
 {
     public $company_email;
 

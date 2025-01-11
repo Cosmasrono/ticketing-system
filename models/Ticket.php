@@ -2,8 +2,7 @@
 
 namespace app\models;
 
-use Yii; // Make sure this line is included
- 
+use Yii;
 use yii\db\ActiveRecord;
 use yii\db\Expression;
 use yii\behaviors\TimestampBehavior;
@@ -11,6 +10,7 @@ use \DateTime;  // Add this import
 use \DateTimeZone;  // Add this import too
 use yii\web\UploadedFile;
 use yii\helpers\FileHelper;
+use app\models\TicketEscalation; // Ensure this import is present
 
 class Ticket extends ActiveRecord
 {
@@ -25,6 +25,15 @@ class Ticket extends ActiveRecord
     const STATUS_DELETED = 'deleted';
     const STATUS_REASSIGNED = 'reassigned';
 
+    const SLA_STATUS_WITHIN = 'within';
+    const SLA_STATUS_AT_RISK = 'at_risk';
+    const SLA_STATUS_BREACHED = 'breached';
+
+    const SEVERITY_CRITICAL = 1;
+    const SEVERITY_HIGH = 2;
+    const SEVERITY_MEDIUM = 3;
+    const SEVERITY_LOW = 4;
+
     /**
      * @var UploadedFile
      */
@@ -33,11 +42,15 @@ class Ticket extends ActiveRecord
     public $uploadedFile;
     public $imageFile;
     public $screenshot_url;
+    public $issue;
+    public $severity;
+    public $module;
+    public $voice_note_url;
  
  
     public static function tableName()
     {
-        return 'ticket'; // make sure this matches your actual table name
+        return '{{%ticket}}'; // Your ticket table name
     }
 
 
@@ -60,15 +73,16 @@ class Ticket extends ActiveRecord
     {
         return [
             // Remove duplicate rules
-            [['selectedModule', 'issue', 'description'], 'required'],
+            [['module', 'issue', 'description'], 'required'],
             [['description', 'screenshot'], 'string'],
             [['created_at'], 'safe'],
             [['created_by'], 'integer'],
-            [['selectedModule', 'issue', 'status'], 'string', 'max' => 255],
+            [['module', 'issue', 'status'], 'string', 'max' => 255],
             [['status'], 'string'],
             [['approved_at'], 'safe'],
             [['escalation_comment'], 'string'],
             [['assigned_to'], 'integer'],
+            [['module'], 'safe'],
             
             // Escalation rule
             [['escalated_to'], 'required', 'when' => function($model) {
@@ -86,6 +100,27 @@ class Ticket extends ActiveRecord
         ['screenshot', 'file', 'skipOnEmpty' => true, 'extensions' => 'png, jpg, jpeg, gif', 'maxSize' => 5*1024*1024],
         ['screenshotUrl', 'url'],
         ['screenshotUrl', 'validateCloudinaryUrl'],
+        ['severity_level', 'required'],
+        ['severity_level', 'integer'],
+        ['severity_level', 'in', 'range' => [1, 2, 3, 4]],
+        ['sla_status', 'string'],
+        [['first_response_at', 'resolution_deadline', 'last_update_at', 'next_update_due'], 'safe'],
+        [['issue'], 'string'],
+        [['issue'], 'required'],
+        [['severity'], 'integer'],
+        [['severity'], 'required'],
+        [['module', 'issue'], 'required'],
+        [['module', 'issue'], 'string'],
+        [['renewal_status'], 'string', 'max' => 255],
+        [['renewal_date'], 'datetime'],
+        [['approved_by'], 'integer'],
+        [['approved_at'], 'safe'],
+
+        [['renewal_date'], 'date', 'format' => 'php:Y-m-d H:i:s'],
+
+        [['voice_note_url'], 'string'],
+        [['user_id', 'module', 'issue', 'description'], 'required'],
+
     ];
     }
     
@@ -115,7 +150,7 @@ class Ticket extends ActiveRecord
     {
         return [
             'selectedModule' => 'Select Module',
-            'issue' => 'Select Issue',
+            'issue' => 'Issue',
             'description' => 'Description',
             
             
@@ -128,6 +163,17 @@ class Ticket extends ActiveRecord
             'escalation_comment' => 'Escalation Comment',
             'assigned_to' => 'Assigned To',
             'screenshot' => 'Screenshot',
+            'severity_level' => 'Severity',
+            'first_response_at' => 'First Response',
+            'resolution_deadline' => 'Due By',
+            'last_update_at' => 'Last Updated',
+            'sla_status' => 'SLA Status',
+            'next_update_due' => 'Next Update Due',
+            'severity' => 'Severity',
+            'module' => 'Module',
+            'renewal_status'=>'renewal_status',
+            'approved_by' => 'Approved By',
+            'approved_at' => 'Approved At',
         ];
     }
 
@@ -172,6 +218,13 @@ class Ticket extends ActiveRecord
             Yii::debug('Screenshot preview: ' . substr($this->screenshot, 0, 100));
         }
 
+        if ($insert) {
+            $this->calculateSlaDeadlines();
+        }
+
+        $this->updateSlaStatus();
+        $this->last_update_at = new Expression('NOW()');
+
         return true;
     }
 
@@ -191,7 +244,7 @@ class Ticket extends ActiveRecord
 
     public function getUser()
     {
-        return $this->hasOne(User::class, ['id' => 'created_by']);
+        return $this->hasOne(User::class, ['id' => 'user_id']);
     }
 
 
@@ -665,6 +718,79 @@ class Ticket extends ActiveRecord
         return $this->screenshot_url; // Assuming this is stored in the database
     }
 
-  
+    protected function calculateSlaDeadlines()
+    {
+        // Define SLA times in minutes for each severity level
+        $slaConfig = [
+            self::SEVERITY_CRITICAL => ['resolution' => 1440, 'update' => 240],  // 24 hours, 4 hours
+            self::SEVERITY_HIGH => ['resolution' => 2880, 'update' => 480],      // 48 hours, 8 hours
+            self::SEVERITY_MEDIUM => ['resolution' => 10080, 'update' => 1440],  // 7 days, 24 hours
+            self::SEVERITY_LOW => ['resolution' => 20160, 'update' => 2880],     // 14 days, 48 hours
+        ];
+
+        $config = $slaConfig[$this->severity_level] ?? $slaConfig[self::SEVERITY_LOW];
+        
+        $this->resolution_deadline = new Expression("DATE_ADD(NOW(), INTERVAL {$config['resolution']} MINUTE)");
+        $this->next_update_due = new Expression("DATE_ADD(NOW(), INTERVAL {$config['update']} MINUTE)");
     }
+
+    protected function updateSlaStatus()
+    {
+        if ($this->status === 'closed') {
+            return;
+        }
+
+        $now = time();
+        $deadline = strtotime($this->resolution_deadline);
+        
+        // If within 25% of resolution time, mark as at risk
+        if ($now >= ($deadline - ($deadline * 0.25))) {
+            $this->sla_status = self::SLA_STATUS_AT_RISK;
+        }
+        
+        // If past deadline, mark as breached
+        if ($now > $deadline) {
+            $this->sla_status = self::SLA_STATUS_BREACHED;
+        }
+    }
+
+    public function getSeverityLabel()
+    {
+        return [
+            self::SEVERITY_CRITICAL => 'Critical',
+            self::SEVERITY_HIGH => 'High',
+            self::SEVERITY_MEDIUM => 'Medium',
+            self::SEVERITY_LOW => 'Low',
+        ][$this->severity_level] ?? 'Unknown';
+    }
+
+    public function getSeverityList()
+    {
+        return [
+            self::SEVERITY_CRITICAL => 'Critical - System Down (24h)',
+            self::SEVERITY_HIGH => 'High - Major Function Affected (48h)',
+            self::SEVERITY_MEDIUM => 'Medium - Minor Function Affected (7d)',
+            self::SEVERITY_LOW => 'Low - Cosmetic Issue (14d)',
+        ];
+    }
+
+    public function getSlaStatusLabel()
+    {
+        return [
+            self::SLA_STATUS_WITHIN => 'Within SLA',
+            self::SLA_STATUS_AT_RISK => 'At Risk',
+            self::SLA_STATUS_BREACHED => 'SLA Breached',
+        ][$this->sla_status] ?? 'Unknown';
+    }
+
+    public function getCompany()
+    {
+        return $this->hasOne(Company::class, ['id' => 'company_id']);
+    }
+
+    public function getApprovedBy()
+    {
+        return $this->hasOne(User::class, ['id' => 'approved_by']);
+    }
+}
 

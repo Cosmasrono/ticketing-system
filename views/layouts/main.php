@@ -176,14 +176,18 @@ if (!Yii::$app->user->isGuest) {
     // User is logged in; display appropriate menu items based on role
     if (Yii::$app->user->identity->role === 'developer') {
         $menuItems = [
-            ['label' => 'Home', 'url' => ['/site/index']], // Routes to site/index
+            ['label' => 'Home', 'url' => ['/site/index']],
+            ['label' => '<i class="fas fa-user"></i> Profile',
+             'url' => ['/site/profile', 'id' => Yii::$app->user->id],
+             'encode' => false],
             ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
              'url' => ['/developer/view'],
              'encode' => false],
         ];
     } else {
         $menuItems = [
-            ['label' => 'Home', 'url' => ['/site/index']], // Routes to site/index
+            ['label' => 'Home', 'url' => ['/site/index']],
+        
             ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 
              'url' => ['/ticket/create'],
              'encode' => false],
@@ -196,22 +200,26 @@ if (!Yii::$app->user->isGuest) {
             ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
              'url' => ['/developer/view'],
              'encode' => false],
-        ];
 
-        // Add logout button
-        $menuItems[] = '<li>'
-            . Html::beginForm(['/site/logout'], 'post', ['class' => 'd-flex'])
-            . Html::submitButton(
-                'Logout (' . Yii::$app->user->identity->company_name . ')',
-                ['class' => 'btn btn-link logout text-decoration-none']
-            )
-            . Html::endForm()
-            . '</li>';
+             ['label' => '<i class="fas fa-user"></i> Profile',
+             'url' => ['/site/profile', 'id' => Yii::$app->user->id],
+             'encode' => false],
+        ];
     }
+
+    // Add logout button for both developer and regular users
+    $menuItems[] = '<li>'
+        . Html::beginForm(['/site/logout'], 'post', ['class' => 'd-flex'])
+        . Html::submitButton(
+            'Logout (' . Yii::$app->user->identity->company_name . ')',
+            ['class' => 'btn btn-link logout text-decoration-none']
+        )
+        . Html::endForm()
+        . '</li>';
 } else {
     // User is not logged in; show only Home and Login
     $menuItems = [
-        ['label' => 'Home', 'url' => ['/site/index']], // Routes to site/index
+        ['label' => 'Home', 'url' => ['/site/index']],
         ['label' => 'Login', 'url' => ['/site/login']],
     ];
 }

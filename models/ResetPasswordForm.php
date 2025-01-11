@@ -28,11 +28,13 @@ class ResetPasswordForm extends Model
         }
         
         $this->_token = $token;
-        $this->_user = User::findByPasswordResetToken($token);
+        $user = User::findByPasswordResetToken($token);
         
-        if (!$this->_user) {
+        if (!$user) {
             throw new InvalidArgumentException('Wrong password reset token.');
         }
+        
+        $this->_user = $user;
         
         parent::__construct($config);
     }
@@ -57,9 +59,13 @@ class ResetPasswordForm extends Model
     public function resetPassword()
     {
         $user = $this->_user;
-        $user->setPassword($this->new_password);
-        $user->removePasswordResetToken();
+        if (is_object($user)) {
+            $user->setPassword($this->new_password);
+            $user->removePasswordResetToken();
 
-        return $user->save(false);
+            return $user->save(false);
+        }
+
+        return false;
     }
 }

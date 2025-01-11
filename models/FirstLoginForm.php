@@ -39,7 +39,7 @@ class FirstLoginForm extends Model
     {
         if (!$this->hasErrors()) {
             $user = $this->getUser();
-            if (!$user || !Yii::$app->security->validatePassword($this->current_password, $user->password_hash)) {
+            if (!is_object($user) || !Yii::$app->security->validatePassword($this->current_password, $user->password_hash)) {
                 $this->addError($attribute, 'Incorrect temporary password.');
             }
         }
@@ -60,10 +60,15 @@ class FirstLoginForm extends Model
 
         try {
             // Set new password
-            $user->setPassword($this->new_password);
-            $user->first_login = 0;
-            $user->status = 10;
-            $user->password_reset_token = null;
+            if (is_object($user)) {
+                $user->setPassword($this->new_password);
+                $user->first_login = 0;
+                $user->status = 10;
+                $user->password_reset_token = null;
+            } else {
+                Yii::error("User object is not valid.");
+                return false;
+            }
 
             if (!$user->save(false)) {
                 Yii::error("Failed to save user: " . print_r($user->errors, true));

@@ -5,7 +5,6 @@ namespace app\models;
 use Yii;
 use yii\base\Model;
 use app\models\User;
-use app\models\Client;
 
 class LoginForm extends Model
 {
@@ -40,19 +39,18 @@ class LoginForm extends Model
     public function validateClientEmail($attribute, $params)
     {
         if (!$this->hasErrors()) {
-            $client = Client::findOne(['company_email' => $this->company_email]);
-            if (!$client) {
-                $this->addError($attribute, 'This email is not registered as a client.');
+            $user = User::findOne(['company_email' => $this->company_email]);
+            if (!$user) {
+                $this->addError($attribute, 'This email is not registered.');
             }
         }
     }
-
     public function validatePassword($attribute, $params)
     {
         if (!$this->hasErrors()) {
             $user = $this->getUser();
             
-            if (!$user) {
+            if (!$user || !is_object($user)) {
                 $this->addError($attribute, 'Incorrect email or password.');
                 return;
             }
@@ -72,7 +70,7 @@ class LoginForm extends Model
     {
         if ($this->validate()) {
             $user = $this->getUser();
-            if ($user && $user->status == 10) {
+            if ($user && is_object($user) && $user->status == 10) {
                 return Yii::$app->user->login($user, $this->rememberMe ? 3600*24*30 : 0);
             } else {
                 $this->addError('company_email', 'Account is inactive or not found.');

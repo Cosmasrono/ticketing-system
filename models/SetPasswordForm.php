@@ -4,45 +4,68 @@ namespace app\models;
 
 use Yii;
 use yii\base\Model;
+use yii\base\InvalidArgumentException;
 
 class SetPasswordForm extends Model
 {
-    public $company_email;
-    public $password;
-    public $confirmPassword;
+    public $new_password;
+    public $confirm_password;
 
-    /**
-     * @inheritdoc
-     */
+    private $_user;
+
+    public function __construct($token, $config = [])
+    {
+        if (empty($token) || !is_string($token)) {
+            throw new InvalidArgumentException('Password reset token cannot be blank.');
+        }
+
+        // Find user by token
+        $this->_user = User::findOne([
+            'password_reset_token' => $token,
+            'status' => 10
+        ]);
+
+        if (!$this->_user) {
+            Yii::error('No user found with token: ' . $token);
+            throw new InvalidArgumentException('Wrong or expired password reset token.');
+        }
+
+        parent::__construct($config);
+    }
+
     public function rules()
     {
         return [
-            [['company_email', 'password', 'confirmPassword'], 'required'],
-            ['company_email', 'email'],
-            ['password', 'string', 'min' => 8],
-            ['confirmPassword', 'compare', 'compareAttribute' => 'password', 'message' => 'Passwords do not match.'],
-            // Password strength validation
-            ['password', 'match', 'pattern' => '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/',
-                'message' => 'Password must contain at least one uppercase letter, one lowercase letter, and one number.'],
+            [['new_password', 'confirm_password'], 'required'],
+            [['new_password', 'confirm_password'], 'string', 'min' => 6],
+            ['confirm_password', 'compare', 'compareAttribute' => 'new_password', 'message' => 'Passwords do not match.'],
         ];
     }
 
-    /**
-     * Changes password.
-     *
-     * @return bool if password was changed.
-     */
-    public function changePassword()
+    public function resetPassword()
     {
-        if ($this->validate()) {
-            $user = User::findOne(['company_email' => $this->company_email]);
-            if ($user) {
-                $user->setPassword($this->password);
-                $user->password_reset_token = null; // Clear the reset token
-                $user->first_login = 0; // Mark as password changed
-                return $user->save(false);
-            }
+        if (!$this->validate()) {
+            return false;
         }
-        return false;
+
+        $user = $this->_user;
+        if (!$user) {
+            Yii::error('User not found when trying to reset password');
+            return false;
+        }
+
+        $user->setPassword($this->new_password);
+        $user->removePasswordResetToken();
+        $user->first_login = 0;
+
+        return $user->save(false);
+    }
+
+    public function attributeLabels()
+    {
+        return [
+            'new_password' => 'New Password',
+            'confirm_password' => 'Confirm Password',
+        ];
     }
 }

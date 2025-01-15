@@ -34,21 +34,16 @@ $this->params['breadcrumbs'][] = $this->title;
             [
                 'attribute' => 'module',
                 'value' => function($model) {
-                    $ticketData = Yii::$app->db->createCommand('SELECT module FROM ticket WHERE id = :id')
-                        ->bindValue(':id', $model->id)
-                        ->queryOne();
-                    return !empty($ticketData['module']) ? $ticketData['module'] : '(not set)';
+                    return !empty($model['module']) ? $model['module'] : '(not set)';
                 }
             ],
             [
                 'attribute' => 'issue',
                 'value' => function($model) {
-                    $ticketData = Yii::$app->db->createCommand('SELECT issue FROM ticket WHERE id = :id')
-                        ->bindValue(':id', $model->id)
-                        ->queryOne();
-                    return !empty($ticketData['issue']) ? $ticketData['issue'] : '(not set)';
+                    return !empty($model['issue']) ? $model['issue'] : '(not set)';
                 }
             ],
+            
             [
                 'attribute' => 'description',
                 'format' => 'ntext',

@@ -40,7 +40,7 @@ $this->params['breadcrumbs'][] = $this->title;
                         'class' => 'form-control'
                     ]) ?>
 
-                    <?php if ($model->isFirstLogin): ?>
+                    <?php if (isset($model->isFirstLogin) && $model->isFirstLogin): ?>
                         <div class="alert alert-info">
                             Please set your new password below.
                         </div>
@@ -48,14 +48,7 @@ $this->params['breadcrumbs'][] = $this->title;
                         <?= $form->field($model, 'new_password', [
                             'options' => ['class' => 'form-group mb-3']
                         ])->passwordInput([
-                            'placeholder' => 'Enter new password',
-                            'class' => 'form-control'
-                        ]) ?>
-
-                        <?= $form->field($model, 'confirm_password', [
-                            'options' => ['class' => 'form-group mb-3']
-                        ])->passwordInput([
-                            'placeholder' => 'Confirm new password',
+                            'placeholder' => 'Enter your new password',
                             'class' => 'form-control'
                         ]) ?>
                     <?php endif; ?>

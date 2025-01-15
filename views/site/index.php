@@ -1858,3 +1858,39 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<?php if (!empty($inactiveUsers)): ?>
+    <div class="inactive-users-section">
+        <h3>Users Pending Activation</h3>
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Company</th>
+                        <th>Email</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($inactiveUsers as $user): ?>
+                        <tr>
+                            <td><?= Html::encode($user->name) ?></td>
+                            <td><?= Html::encode($user->company_name) ?></td>
+                            <td><?= Html::encode($user->company_email) ?></td>
+                            <td>
+                                <?= Html::a('Activate', ['activate-user', 'id' => $user->id], [
+                                    'class' => 'btn btn-success btn-sm',
+                                    'data' => [
+                                        'confirm' => 'Are you sure you want to activate this user?',
+                                        'method' => 'post',
+                                    ],
+                                ]) ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+<?php endif; ?>
+

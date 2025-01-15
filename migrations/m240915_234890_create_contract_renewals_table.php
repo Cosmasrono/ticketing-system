@@ -6,6 +6,9 @@ class m240915_234890_create_contract_renewals_table extends Migration
 {
     public function up()
     {
+        if ($this->db->schema->getTableSchema('contract_renewals') !== null) {
+            return true; // Skip if table exists
+        }
         $this->createTable('contract_renewals', [
             'id' => $this->primaryKey(),
             'company_id' => $this->integer()->notNull(),
@@ -18,12 +21,19 @@ class m240915_234890_create_contract_renewals_table extends Migration
             'approved_by' => $this->integer()->null(),
         ]);
 
+        $this->createIndex(
+            'idx-contract_renewals-company_id',
+            'contract_renewals',
+            'company_id'
+        );
+
         $this->addForeignKey(
             'fk-contract_renewals-company_id',
             'contract_renewals',
             'company_id',
             'company',
-            'id'
+            'id',
+            'CASCADE'
         );
 
         $this->addForeignKey(

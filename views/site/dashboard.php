@@ -386,46 +386,7 @@ $this->registerJs("
         </div>
         <div class="card-body">
             <div class="timeline">
-                <?php foreach ($recentActivity as $activity): ?>
-                    <div class="timeline-item">
-                        <div class="timeline-marker <?= getStatusColor($activity['status']) ?>"></div>
-                        <div class="timeline-content">
-                            <div class="d-flex justify-content-between">
-                                <h6 class="mb-1">
-                                    <a href="<?= Url::to(['ticket/view', 'id' => $activity['ticket_id']]) ?>">
-                                        Ticket #<?= Html::encode($activity['ticket_id']) ?>
-                                    </a>
-                                </h6>
-                                <small class="text-muted">
-                                    <?= Yii::$app->formatter->asDatetime($activity['timestamp']) ?>
-                                </small>
-                            </div>
-                            <div class="activity-details">
-                                <p class="mb-2">
-                                    Status: <span class="badge <?= getStatusColor($activity['status']) ?>">
-                                        <?= Html::encode(ucfirst($activity['status'])) ?>
-                                    </span>
-                                </p>
-                                <?php if ($activity['developer']): ?>
-                                    <p class="mb-2">
-                                        Assigned to: <strong><?= Html::encode($activity['developer']) ?></strong>
-                                    </p>
-                                <?php endif; ?>
-                                <?php if ($activity['escalated_to']): ?>
-                                    <p class="mb-2">
-                                        Escalated to: <strong><?= Html::encode($activity['escalated_to']) ?></strong>
-                                    </p>
-                                <?php endif; ?>
-                                <?php if (!empty($activity['escalation_comment'])): ?>
-                                    <p class="mb-0 text-muted">
-                                        <i class="fas fa-comment-alt"></i> 
-                                        <?= Html::encode($activity['escalation_comment']) ?>
-                                    </p>
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
+                -->
             </div>
         </div>
     </div>

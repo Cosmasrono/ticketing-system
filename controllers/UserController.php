@@ -10,15 +10,15 @@ class UserController extends Controller
 {
     public function actionGetDevelopers()
     {
-        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-        
-        $developers = User::find()
-            ->select(['id', 'username'])
-            ->where(['role' => 'developer'])
-            ->asArray()
-            ->all();
-        
-        return ArrayHelper::map($developers, 'id', 'username');
+        $developers = User::find()->where(['role' => 3])->all(); // Assuming role 3 is for developers
+        $result = [];
+        foreach ($developers as $developer) {
+            $result[] = [
+                'id' => $developer->id,
+                'name' => $developer->name,
+            ];
+        }
+        return $this->asJson($result);
     }
 
     public function actionToggleStatus()

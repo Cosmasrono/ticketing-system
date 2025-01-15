@@ -24,6 +24,7 @@ class Ticket extends ActiveRecord
     const STATUS_REOPEN = 'reopen';
     const STATUS_DELETED = 'deleted';
     const STATUS_REASSIGNED = 'reassigned';
+    const STATUS_OPEN = 'open';
 
     const SLA_STATUS_WITHIN = 'within';
     const SLA_STATUS_AT_RISK = 'at_risk';
@@ -45,12 +46,12 @@ class Ticket extends ActiveRecord
     public $issue;
     public $severity;
     public $module;
-    public $voice_note_url;
+    // public $voice_note_url;
  
  
     public static function tableName()
     {
-        return '{{%ticket}}'; // Your ticket table name
+        return 'ticket'; // Confirm this matches your actual table name
     }
 
 
@@ -72,9 +73,10 @@ class Ticket extends ActiveRecord
     public function rules()
     {
         return [
-            // Remove duplicate rules
-            [['module', 'issue', 'description'], 'required'],
-            [['description', 'screenshot'], 'string'],
+            [['module', 'issue', 'severity_level', 'description'], 'required'],
+            [['module', 'issue', 'company_name', 'company_email'], 'string', 'max' => 255],
+            [['severity_level'], 'integer'],
+            [['description'], 'string'],
             [['created_at'], 'safe'],
             [['created_by'], 'integer'],
             [['module', 'issue', 'status'], 'string', 'max' => 255],
@@ -115,11 +117,13 @@ class Ticket extends ActiveRecord
         [['renewal_date'], 'datetime'],
         [['approved_by'], 'integer'],
         [['approved_at'], 'safe'],
+        [['severity_level'], 'integer'],
 
         [['renewal_date'], 'date', 'format' => 'php:Y-m-d H:i:s'],
 
-        [['voice_note_url'], 'string'],
+        // [['voice_note_url'], 'string'],
         [['user_id', 'module', 'issue', 'description'], 'required'],
+        // [['voice_note_url'], 'safe'],
 
     ];
     }
@@ -149,12 +153,14 @@ class Ticket extends ActiveRecord
     public function attributeLabels()
     {
         return [
-            'selectedModule' => 'Select Module',
+            'id' => 'ID',
+            'user_id' => 'User ID',
+            'company_name' => 'Company Name',
+            'company_email' => 'Company Email',
+            'module' => 'Module',
             'issue' => 'Issue',
             'description' => 'Description',
-            
-            
-            
+            'severity_level' => 'Severity Level',
             'status' => 'Status',
             'created_at' => 'Created At',
             'updated_at' => 'Updated At',
@@ -174,6 +180,8 @@ class Ticket extends ActiveRecord
             'renewal_status'=>'renewal_status',
             'approved_by' => 'Approved By',
             'approved_at' => 'Approved At',
+            'renewal_date' => 'Renewal Date',
+            'screenshot_url' => 'Screenshot',
         ];
     }
 
@@ -791,6 +799,32 @@ class Ticket extends ActiveRecord
     public function getApprovedBy()
     {
         return $this->hasOne(User::class, ['id' => 'approved_by']);
+    }
+
+    // Optional: Add a method to validate company existence
+    public function validateCompany($attribute, $params)
+    {
+        if (!$this->hasErrors()) {
+            $company = Company::findOne(['company_email' => $this->company_email]);
+            if (!$company) {
+                $this->addError($attribute, 'Company not found with this email.');
+            }
+        }
+    }
+
+    /**
+     * Get the user who approved the ticket
+     */
+    public function getApprover()
+    {
+        return $this->hasOne(User::className(), ['id' => 'approved_by']);
+    }
+
+    // Add this method to help with debugging
+    public function afterFind()
+    {
+        parent::afterFind();
+        Yii::debug('Ticket Model afterFind: ' . print_r($this->attributes, true));
     }
 }
 

@@ -2,68 +2,111 @@
 
 namespace app\controllers;
 
-use yii\web\Controller;
-use yii\filters\AccessControl;
-use yii\web\ForbiddenHttpException;
-use yii\web\NotFoundHttpException;
-use app\models\Ticket;
-use app\models\Developer;
 use Yii;
+use app\models\User; // Import the User model
+use app\models\Ticket;
 use yii\data\ActiveDataProvider;
-use app\models\User;
-
+use yii\web\Controller;
+use yii\web\NotFoundHttpException;
 class DeveloperController extends Controller
 {
     public function behaviors()
     {
         return [
-            'access' => [
-                'class' => AccessControl::class,
-                'only' => ['index', 'view', 'escalate'],
-                'rules' => [
-                    [
-                        'allow' => true,
-                        'actions' => ['index', 'view', 'escalate'],
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            // Only allow developers and superadmins, exclude admins
-                            $allowedRoles = ['developer', 'superadmin'];
-                            return in_array(Yii::$app->user->identity->role, $allowedRoles);
-                        }
-                    ],
-                    [
-                        'actions' => ['escalate', 'view', 'index'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            // Allow developers to access these actions
-                            if (Yii::$app->user->identity->role === 'developer') {
-                                return true;
-                            }
-                            return false;
-                        }
-                    ],
-                ],
-                'denyCallback' => function ($rule, $action) {
-                    Yii::$app->session->setFlash('error', 'You do not have permission to access this page.');
-                    return $this->redirect(['/site/index']);
-                }
-            ],
+            
         ];
     }
 
+
+    // public function actionView() {
+    //     // Get the currently logged-in user's ID from the session
+    //     $id = Yii::$app->session->get('__id');
+        
+    //     // Fetch the user
+    //     $user = User::findOne($id);
+    //     if (!$user) {
+    //         throw new NotFoundHttpException("User not found.");
+    //     }
+    
+    //     // Fetch the data provider for tickets
+    //     $dataProvider = new ActiveDataProvider([
+    //         'query' => Ticket::find()->where(['assigned_to' => $user->id]),
+    //         'pagination' => [
+    //             'pageSize' => 10,
+    //         ],
+    //         'sort' => [
+    //             'defaultOrder' => [
+    //                 'created_at' => SORT_DESC,
+    //             ]
+    //         ],
+    //     ]);
+    
+    //     // Fetch all users for the escalation dropdown
+    //     $query = User::find()->where(['!=', 'id', $id]);
+        
+    //     // Only add status condition if the status column exists
+    //     try {
+    //         if (User::getTableSchema()->getColumn('status')) {
+    //             $query->andWhere(['status' => User::STATUS_ACTIVE]);
+    //         }
+    //     } catch (\Exception $e) {
+    //         // Handle the case where status column doesn't exist
+    //         Yii::warning('Status column not found in users table');
+    //     }
+        
+    //     $users = $query->all();
+    
+    //     return $this->render('view', [
+    //         'model' => $user,
+    //         'dataProvider' => $dataProvider,
+    //         'users' => $users,
+    //     ]);
+    // }
+    
     public function actionView()
     {
-        if (Yii::$app->user->isGuest || !in_array(Yii::$app->user->identity->role, ['developer', 'admin', 'superadmin'])) {
-            throw new \yii\web\ForbiddenHttpException('Access denied.');
-        }
-
         $user = Yii::$app->user->identity;
-        
-        // Add this dataProvider for the GridView
-        $dataProvider = new \yii\data\ActiveDataProvider([
-            'query' => \app\models\Ticket::find()
-                ->where(['assigned_to' => $user->id]),
+    
+        // Check if the user is authenticated
+        if ($user === null) {
+            // Redirect to the login page or throw an exception
+            return $this->redirect(['site/login']); // Redirect to login
+            // OR
+            // throw new \yii\web\ForbiddenHttpException('You are not allowed to access this page.'); // Throw exception
+        }
+    
+        // Data provider for the GridView
+        $dataProvider = new ActiveDataProvider([
+            'query' => Ticket::find()->where(['assigned_to' => $user->id]),
+            'pagination' => [
+                'pageSize' => 10,
+            ],
+            'sort' => [
+                'defaultOrder' => [
+                    'created_at' => SORT_DESC,
+                ]
+            ],
+        ]);
+    
+        return $this->render('view', [
+            'user' => $user,
+            'dataProvider' => $dataProvider,  // Pass dataProvider to the view
+        ]);
+    }
+    
+    public function actionIndex()
+    {
+        $query = (new \yii\db\Query())
+            ->select([
+                'ticket.*',  // Select all columns from ticket table
+                'users.name as developer_name'
+            ])
+            ->from('ticket')
+            ->leftJoin('users', 'users.id = ticket.assigned_to')
+            ->where(['ticket.assigned_to' => Yii::$app->user->id]);
+
+        $dataProvider = new ActiveDataProvider([
+            'query' => $query,
             'pagination' => [
                 'pageSize' => 10,
             ],
@@ -74,11 +117,14 @@ class DeveloperController extends Controller
             ],
         ]);
 
-        return $this->render('view', [
-            'user' => $user,
-            'dataProvider' => $dataProvider,  // Pass dataProvider to the view
+        // Debug the SQL query
+        Yii::debug('SQL Query: ' . $query->createCommand()->getRawSql());
+
+        return $this->render('index', [
+            'dataProvider' => $dataProvider,
+            'user' => User::findOne(Yii::$app->user->id),
         ]);
     }
-
-    // Remove or comment out all other actions (approve-ticket, close-ticket, etc.)
+    
+    // Other actions can be added here as needed
 }

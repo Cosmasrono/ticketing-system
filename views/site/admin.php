@@ -201,7 +201,7 @@ $clientCount = Client::find()->count();
             ],
             [
                 'class' => 'yii\grid\ActionColumn',
-    'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel} {close}</div>',
+    'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel}</div>',
     'buttons' => [
         'approve' => function ($url, $model, $key) {
             $isDisabled = $model->status === Ticket::STATUS_APPROVED ||

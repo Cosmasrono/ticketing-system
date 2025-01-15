@@ -85,10 +85,12 @@ $config = [
                 'change-password' => 'site/change-password',
                 'create-user' => 'site/create-user',
                 'ticket/upload-to-cloudinary' => 'ticket/upload-to-cloudinary',
-                'set-initial-password/<token>/<email:.*>' => 'site/set-initial-password',
+                'set-initial-password/<token:[\w\-]+>/<email:.*>' => 'site/set-initial-password',
                 'set-initial-password' => 'site/set-initial-password',
                 'site/change-initial-password' => 'site/change-initial-password',
                 'site/reset-password' => 'site/reset-password',
+                'site/create-user-for-company' => 'site/create-user-for-company',
+                'developer/view/<id:\d+>' => 'developer/view',
             ],
         ],
         'session' => [

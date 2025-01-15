@@ -67,7 +67,7 @@ public function isUser()
      */
     public static function tableName()
     {
-        return '{{%user}}';
+        return '{{%users}}';
     }
 
     /**
@@ -83,6 +83,7 @@ public function isUser()
             ['modules', 'safe'],
             [['email_verified_at'], 'safe'],
             ['password_reset_token', 'string', 'max' => 255],
+            [['token_created_at'], 'safe'],
         ];
     }
 
@@ -371,38 +372,37 @@ public function isUser()
 
     public static function findByPasswordResetToken($token)
     {
-        if (!static::isPasswordResetTokenValid($token)) {
-            return false;
+        if (empty($token)) {
+            Yii::error('Empty token provided');
+            return null;
         }
+
+        // Debug log
+        Yii::debug("Looking for user with token: " . $token);
 
         $user = static::findOne([
             'password_reset_token' => $token,
-            'first_login' => 1,
+            'status' => [self::STATUS_INACTIVE, self::STATUS_UNVERIFIED]
         ]);
-        return $user !== null;
-    }
-    public static function isPasswordResetTokenValid($token)
-    {
-        if (empty($token)) {
-            return false;
+
+        if (!$user) {
+            Yii::error("No user found with token: " . $token);
+            return null;
         }
-        return true;
-    }
-    public function generatePasswordResetToken()
-    {
-        $this->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
-        if (!$this->save(false)) {
-            Yii::error("Failed to save user with new password reset token: " . json_encode($this->errors));
-            return false;
+
+        // Check if token is expired (24 hours)
+        if ($user->token_created_at + 86400 < time()) {
+            Yii::error("Token expired for user ID: " . $user->id);
+            return null;
         }
-        Yii::info("Generated password reset token for user {$this->id}: {$this->password_reset_token}");
-        return true;
+
+        return $user;
     }
-    
+
     public function removePasswordResetToken()
     {
         $this->password_reset_token = null;
-        return $this->save(false);
+        $this->token_created_at = null;
     }
 
     public function sendEmail()

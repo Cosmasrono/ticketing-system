@@ -84,8 +84,33 @@ Yii::debug('Raw ticket data from DB: ' . print_r($ticketData, true));
                     return '<span class="text-muted">No screenshot available</span>';
                 },
             ],
+            [
+                'attribute' => 'voice_note_url',
+                'format' => 'raw',
+                'value' => function ($model) {
+                    if (!empty($model->voice_note_url)) {
+                        return '
+                            <div class="voice-note-player">
+                                <audio controls>
+                                    <source src="' . $model->voice_note_url . '" type="audio/wav">
+                                    Your browser does not support the audio element.
+                                </audio>
+                            </div>';
+                    }
+                    return '<span class="text-muted">No voice note available</span>';
+                },
+            ],
         ],
     ]) ?>
+
+    <h2>Ticket Details</h2>
+    <p><strong>Voice Note URL:</strong> 
+        <?php if (!empty($model->voice_note_url)): ?>
+            <a href="<?= Html::encode($model->voice_note_url) ?>" target="_blank">Listen to Voice Note</a>
+        <?php else: ?>
+            No voice note available
+        <?php endif; ?>
+    </p>
 
 </div>
 

@@ -9,6 +9,8 @@ use yii\helpers\Json;
 /* @var $companyModules array */
 
 $this->title = 'Create Ticket';
+
+Yii::debug('ModuleIssues passed to view: ' . print_r($moduleIssues, true));
 ?>
 
 <div class="ticket-create">
@@ -22,7 +24,7 @@ $this->title = 'Create Ticket';
     ]) ?>
 
     <?= $form->field($model, 'module')->dropDownList(
-        array_combine($companyModules, $companyModules),
+        $companyModules,
         [
             'prompt' => 'Select Module',
             'id' => 'ticket-module',
@@ -37,17 +39,18 @@ $this->title = 'Create Ticket';
             'id' => 'ticket-issue',
             'class' => 'form-control'
         ]
-    ) ?>
+    )->hint('Please select a module first') ?>
 
-    <?= $form->field($model, 'severity_level')->dropDownList(
-        [
-            1 => 'Low',
-            2 => 'Medium',
-            3 => 'High',
-            4 => 'Critical'
-        ],
-        ['prompt' => 'Select Severity']
-    ) ?>
+
+<?= $form->field($model, 'severity')->dropDownList(    // Changed from severity_level to severity
+    [
+        1 => 'Low',
+        2 => 'Medium',
+        3 => 'High',
+        4 => 'Critical'
+    ],
+    ['prompt' => 'Select Severity']
+) ?>
 
     <?= $form->field($model, 'description')->textarea(['rows' => 6]) ?>
 
@@ -55,15 +58,6 @@ $this->title = 'Create Ticket';
         'class' => 'form-control',
         'accept' => 'image/*'
     ])->hint('Allowed file types: PNG, JPG, JPEG. Max size: 2MB') ?>
-
-    <!-- Voice Note Section -->
-    <div class="form-group">
-        <label for="voice-note">Voice Note</label>
-        <button type="button" id="start-recording" class="btn btn-primary">Start Recording</button>
-        <button type="button" id="stop-recording" class="btn btn-danger" disabled>Stop Recording</button>
-        <audio id="audio-playback" controls style="display:none;"></audio>
-        <input type="hidden" id="voice-note" name="Ticket[voice_note_url]" value="">
-    </div>
 
     <div class="form-group">
         <?= Html::submitButton('Create Ticket', ['class' => 'btn btn-success']) ?>
@@ -75,54 +69,103 @@ $this->title = 'Create Ticket';
 <?php
 $moduleIssuesJson = Json::encode($moduleIssues);
 $script = <<<JS
+    // Define moduleIssues globally
     var moduleIssues = {$moduleIssuesJson};
     
-    $('#ticket-module').change(function() {
-        var selectedModule = $(this).val();
-        var issueDropdown = $('#ticket-issue');
-        
-        issueDropdown.empty().append($('<option>').text('Select Issue').val(''));
-        
-        if (selectedModule && moduleIssues[selectedModule]) {
-            issueDropdown.prop('disabled', false);
-            moduleIssues[selectedModule].forEach(function(issue) {
-                issueDropdown.append($('<option>').text(issue).val(issue));
+    $(document).ready(function() {
+        // Module change handler
+        $('#ticket-module').on('change', function() {
+            var selectedModule = $(this).val();
+            var issueDropdown = $('#ticket-issue');
+            
+            // Clear and disable issue dropdown
+            issueDropdown.empty().append($('<option>').text('Select Issue').val(''));
+            
+            if (selectedModule && moduleIssues[selectedModule]) {
+                // Enable and populate issues dropdown
+                issueDropdown.prop('disabled', false);
+                
+                moduleIssues[selectedModule].forEach(function(issue) {
+                    issueDropdown.append(
+                        $('<option>')
+                            .text(issue)
+                            .val(issue)
+                    );
+                });
+                
+                // Trigger form validation if needed
+                issueDropdown.trigger('change');
+            } else {
+                issueDropdown.prop('disabled', true);
+            }
+        });
+
+        // Issue change handler
+        $('#ticket-issue').on('change', function() {
+            var selectedIssue = $(this).val();
+            console.log('Issue Selection:', {
+                selectedIssue: selectedIssue,
+                dropdownEnabled: !$(this).prop('disabled'),
+                availableOptions: $(this).find('option').map(function() {
+                    return $(this).val();
+                }).get()
             });
-        } else {
-            issueDropdown.prop('disabled', true);
+        });
+
+        // Form submission handler
+        $('form').on('beforeSubmit', function(e) {
+            e.preventDefault();
+            
+            var form = $(this);
+            var formData = new FormData(this);
+            
+            $.ajax({
+                url: form.attr('action'),
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        // Redirect silently without showing the JSON
+                        window.location.href = response.redirectUrl;
+                    } else {
+                        // Show error message if needed
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.message || 'An error occurred'
+                        });
+                    }
+                },
+                error: function(xhr, status, error) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'An error occurred while processing your request'
+                    });
+                }
+            });
+            
+            return false;
+        });
+
+        // Initialize dropdowns on page load
+        console.log('Initial State:', {
+            moduleSelected: $('#ticket-module').val(),
+            issueDropdownState: {
+                disabled: $('#ticket-issue').prop('disabled'),
+                value: $('#ticket-issue').val(),
+                options: $('#ticket-issue option').length
+            }
+        });
+
+        // Trigger module change if there's a pre-selected value
+        if ($('#ticket-module').val()) {
+            $('#ticket-module').trigger('change');
         }
     });
-
-    let mediaRecorder;
-    let audioChunks = [];
-
-    document.getElementById('start-recording').onclick = async function() {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaRecorder = new MediaRecorder(stream);
-        
-        mediaRecorder.start();
-        document.getElementById('start-recording').disabled = true;
-        document.getElementById('stop-recording').disabled = false;
-
-        mediaRecorder.ondataavailable = function(event) {
-            audioChunks.push(event.data);
-        };
-
-        mediaRecorder.onstop = function() {
-            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            document.getElementById('audio-playback').src = audioUrl;
-            document.getElementById('audio-playback').style.display = 'block';
-            document.getElementById('voice-note').value = audioUrl; // Store the audio URL in the hidden input
-            audioChunks = [];
-        };
-    };
-
-    document.getElementById('stop-recording').onclick = function() {
-        mediaRecorder.stop();
-        document.getElementById('start-recording').disabled = false;
-        document.getElementById('stop-recording').disabled = true;
-    };
 JS;
+
 $this->registerJs($script);
 ?>

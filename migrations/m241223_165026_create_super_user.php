@@ -11,22 +11,18 @@ class m241223_165026_create_super_user extends Migration
   
         public function safeUp()
         {
-            // Set user details
-            $email = 'ccosmas001@gmail.com'; // Use company email here
-            $rawPassword = '22360010s'; // Raw password provided
-            
-            // Generate the hashed password using Yii2's security component
-            $hashedPassword = Yii::$app->security->generatePasswordHash($rawPassword);
-            
-            // Insert the user into the 'user' table with hashed password
-            $this->insert('user', [
-                'company_email' => $email,
-                'password_hash' => $hashedPassword,  // Use 'password_hash' or whatever the actual column is
-                // Add any other necessary fields, for example:
-                // 'username' => 'superadmin', 
-                // 'created_at' => time(),
-                // 'updated_at' => time()
-            ]);
+            // First check if the user already exists
+            $existingUser = $this->db->createCommand('SELECT id FROM user WHERE company_email = :email', [
+                ':email' => 'ccosmas001@gmail.com'
+            ])->queryOne();
+
+            if (!$existingUser) {
+                // Only insert if user doesn't exist
+                $this->insert('user', [
+                    'company_email' => 'ccosmas001@gmail.com',
+                    'password_hash' => '$2y$13$lTrR0lEK6wJ.AQn30RsXKOEyeMHjItlp22IRwk68ZBAA5C3f27xX6'
+                ]);
+            }
             
             // Get the role 'superUser' and assign it to the new user
             $auth = Yii::$app->authManager;

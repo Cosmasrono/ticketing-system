@@ -101,6 +101,21 @@ public function actions()
     ];
 }
 
+
+
+
+public function actionCreateUser()
+{
+    $companies = Company::find()->all();
+    $role = 3; // Assuming role 3 is what you want to set
+    return $this->render('create-user', [
+        'companies' => $companies,
+        'role' => $role, // Pass the role to the view
+    ]);
+}
+
+
+
     public function actionCreateCompany()
     {
         $model = new Company();
@@ -397,40 +412,40 @@ public function actions()
     ]);
 }
 
-public function actionChangeInitialPassword($token, $email)
-{
-    $user = User::findOne([
-        'password_reset_token' => $token,
-        'company_email' => urldecode($email)  // URL decode the email
-    ]);
+// public function actionChangeInitialPassword($token, $email)
+// {
+//     $user = User::findOne([
+//         'password_reset_token' => $token,
+//         'company_email' => urldecode($email)  // URL decode the email
+//     ]);
 
-    if (!$user) {
-        Yii::error("Invalid reset attempt - Token: $token, Email: $email");
-        Yii::$app->session->setFlash('error', 'Invalid password reset token or email.');
-        return $this->redirect(['site/login']);
-    }
+//     if (!$user) {
+//         Yii::error("Invalid reset attempt - Token: $token, Email: $email");
+//         Yii::$app->session->setFlash('error', 'Invalid password reset token or email.');
+//         return $this->redirect(['site/login']);
+//     }
 
-    // Check if token is expired (24 hours)
-    $timestamp = (int) substr(strrchr($token, '_'), 1);
-    if ($timestamp + 86400 < time()) {
-        Yii::$app->session->setFlash('error', 'The password reset token has expired.');
-        return $this->redirect(['site/login']);
-    }
+//     // Check if token is expired (24 hours)
+//     $timestamp = (int) substr(strrchr($token, '_'), 1);
+//     if ($timestamp + 86400 < time()) {
+//         Yii::$app->session->setFlash('error', 'The password reset token has expired.');
+//         return $this->redirect(['site/login']);
+//     }
 
-    $model = new ChangePasswordForm();
-    if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-        $user->setPassword($model->password);
-        $user->password_reset_token = null; // Clear the reset token
-        if ($user->save(false)) {
-            Yii::$app->session->setFlash('success', 'New password has been saved.');
-            return $this->redirect(['site/login']);
-        }
-    }
+//     $model = new ChangePasswordForm();
+//     if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+//         $user->setPassword($model->password);
+//         $user->password_reset_token = null; // Clear the reset token
+//         if ($user->save(false)) {
+//             Yii::$app->session->setFlash('success', 'New password has been saved.');
+//             return $this->redirect(['site/login']);
+//         }
+//     }
 
-    return $this->render('change-initial-password', [
-        'model' => $model,
-    ]);
-}
+//     return $this->render('change-initial-password', [
+//         'model' => $model,
+//     ]);
+// }
     
     /**
      * Login action.
@@ -464,23 +479,27 @@ public function actionChangeInitialPassword($token, $email)
  
      public function actionLogin()
      {
-         if (!Yii::$app->user->isGuest) {
-             return $this->redirect(['site/index']);
-         }
+        if (!Yii::$app->user->isGuest) {
+            return $this->goHome();
+        }
 
-         $model = new LoginForm();
-         if ($model->load(Yii::$app->request->post()) && $model->login()) {
-             // Check if this is first login
-             if (Yii::$app->user->identity->first_login == 1) {
-                 return $this->redirect(['site/first-login']);
-             }
-             return $this->goBack();
-         }
+        $model = new LoginForm();
+        
+        if ($model->load(Yii::$app->request->post())) {
+            Yii::info("Login attempt with email: " . $model->company_email);
+            
+            if ($model->login()) {
+                Yii::info("Login successful for user: " . $model->company_email);
+                return $this->goBack();
+            } else {
+                Yii::info("Login failed. Errors: " . print_r($model->errors, true));
+            }
+        }
 
-         return $this->render('login', [
-             'model' => $model,
-         ]);
-     }
+        return $this->render('login', [
+            'model' => $model,
+        ]);
+    }
      
     /**
      * Logout action.
@@ -563,35 +582,35 @@ public function actionChangeInitialPassword($token, $email)
 // }
 
 
-public function actionCreateUser()
-{
-    $model = new User();
-    $companies = Company::find()->all(); // Fetch all companies
+// public function actionCreateUser()
+// {
+//     $model = new User();
+//     $companies = Company::find()->all(); // Fetch all companies
 
-    if ($model->load(Yii::$app->request->post())) {
-        // Fetch the selected company_name from the form
-        $selectedCompanyName = $model->company_name;
+//     if ($model->load(Yii::$app->request->post())) {
+//         // Fetch the selected company_name from the form
+//         $selectedCompanyName = $model->company_name;
 
-        // Find the corresponding company record
-        $company = Company::findOne(['company_name' => $selectedCompanyName]);
+//         // Find the corresponding company record
+//         $company = Company::findOne(['company_name' => $selectedCompanyName]);
 
-        if ($company) {
-            // Set the company_email in the User model
-            $model->company_email = $company->company_email;
-        }
+//         if ($company) {
+//             // Set the company_email in the User model
+//             $model->company_email = $company->company_email;
+//         }
 
-        // Save the User model
-        if ($model->save()) {
-            Yii::$app->session->setFlash('success', 'User created successfully.');
-            return $this->redirect(['view', 'id' => $model->id]);
-        }
-    }
+//         // Save the User model
+//         if ($model->save()) {
+//             Yii::$app->session->setFlash('success', 'User created successfully.');
+//             return $this->redirect(['view', 'id' => $model->id]);
+//         }
+//     }
 
-    return $this->render('create-user', [
-        'model' => $model,
-        'companies' => $companies,
-    ]);
-}
+//     return $this->render('create-user', [
+//         'model' => $model,
+//         'companies' => $companies,
+//     ]);
+// }
 
 
 
@@ -641,6 +660,11 @@ public function actionDeveloperDashboard()
 
 public function actionAdmin()
 {
+    // Check if the user is logged in and has the required role
+    if (Yii::$app->user->isGuest || !in_array(Yii::$app->user->identity->role, [1, 4])) {
+        throw new \yii\web\ForbiddenHttpException('You are not allowed to access this page.');
+    }
+
     try {
         // Get pending renewals from tickets table
         $pendingRenewals = Ticket::find()
@@ -704,36 +728,19 @@ public function actionRequestPasswordReset()
     $model = new PasswordResetRequestForm();
 
     if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-        // Find the user by company_email
-        $user = User::findOne(['company_email' => $model->email]);
+        $user = User::findOne([
+            'company_email' => $model->company_email, // Changed from email to company_email
+            'status' => 1
+        ]);
 
         if ($user) {
-            // Generate a password reset token
-            $user->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
-            if ($user->save()) {
-                // Send email with the verification link
-                $verificationLink = Yii::$app->urlManager->createAbsoluteUrl([
-                    'site/change-initial-password',
-                    'token' => $user->password_reset_token,
-                    'email' => $user->company_email
-                ]);
-
-                // Send the email
-                Yii::$app->mailer->compose()
-                    ->setFrom('your-email@example.com')
-                    ->setTo($user->company_email)
-                    ->setSubject('Password Reset Request')
-                    ->setTextBody("Click the link to reset your password: $verificationLink")
-                    ->send();
-
-                Yii::$app->session->setFlash('success', 'Check your email for the password reset link.');
-                return $this->redirect(['site/login']);
-            } else {
-                Yii::error("Failed to save user: " . print_r($user->errors, true));
-                Yii::$app->session->setFlash('error', 'Failed to generate password reset token.');
+            // Proceed with password reset logic
+            if ($model->sendEmail()) {
+                Yii::$app->session->setFlash('success', 'Check your email for further instructions.');
+                return $this->goHome();
             }
         } else {
-            Yii::$app->session->setFlash('error', 'No user found with that email address.');
+            Yii::$app->session->setFlash('error', 'No user found with this email address.');
         }
     }
 
@@ -1156,10 +1163,10 @@ private function getStatusLabel($status)
 //             'role' => $model->role,
 //             'modules' => $model->modules,
 //         ];
-        
+//         
 //         // Log the data that will be saved to the database
 //         Yii::debug("Data to be saved: " . print_r($dataToBePushed, true));
-        
+//         
 //         // Validate and debug any errors
 //         if (!$model->validate()) {
 //             Yii::debug("Validation errors: " . print_r($model->errors, true));
@@ -1235,6 +1242,182 @@ private function getStatusLabel($status)
 //         'companyList' => $companyList,
 //     ]);
 // }
+
+
+ 
+
+
+public function actionCreateUserForCompany($company_id)
+{
+    $company = Company::findOne($company_id);
+    
+    if (!$company) {
+        Yii::error("Company not found with ID: $company_id");
+        Yii::$app->session->setFlash('error', 'Company not found.');
+        return $this->redirect(['index']);
+    }
+
+    // Check if there's already an active user for this company
+    $existingUser = User::find()
+        ->where(['company_name' => $company->company_name])
+        ->andWhere(['status' => User::STATUS_ACTIVE])
+        ->one();
+
+    if ($existingUser && $existingUser->status === User::STATUS_ACTIVE) {
+        Yii::$app->session->setFlash('error', 'An active user already exists for this company.');
+        return $this->redirect(['index']);
+    }
+
+    try {
+        $connection = Yii::$app->db;
+        $transaction = $connection->beginTransaction();
+
+        // Generate a simple token without timestamp
+        $clearPassword = Yii::$app->security->generateRandomString(8);
+        $token = Yii::$app->security->generateRandomString(32);
+
+        // Debug log the token
+        Yii::debug("Generated token: " . $token);
+
+        // Get company name parts for the user's name
+        $nameParts = explode('-', $company->company_name);
+        $userName = ucfirst(end($nameParts)); // Take the last part after hyphen and capitalize
+
+        // Prepare user data
+        $userData = [
+            'company_id' => $company->id,
+            'name' => $userName,
+            'company_name' => $company->company_name,
+            'company_email' => $company->company_email,
+            'password_hash' => Yii::$app->security->generatePasswordHash($clearPassword),
+            'auth_key' => Yii::$app->security->generateRandomString(),
+            'password_reset_token' => $token,
+            'token_created_at' => time(),
+            'status' => User::STATUS_UNVERIFIED,
+            'role' => $company->role,
+            'created_at' => time(),
+            'updated_at' => time(),
+            'modules' => is_array($company->modules) ? implode(', ', $company->modules) : $company->modules,
+        ];
+
+        // Debug log
+        Yii::debug("Creating user with data: " . json_encode($userData));
+
+        // Insert using Query Builder
+        $success = $connection->createCommand()->insert('users', $userData)->execute();
+
+        if (!$success) {
+            throw new \Exception('Failed to insert user data');
+        }
+
+        // Get the newly created user ID
+        $userId = $connection->getLastInsertID();
+
+        // Verify the user was created
+        $createdUser = User::findOne($userId);
+        if (!$createdUser) {
+            throw new \Exception('User was not found after creation');
+        }
+
+        // Create reset URL
+        $resetUrl = Yii::$app->urlManager->createAbsoluteUrl([
+            '/site/set-initial-password',
+            'token' => $token
+        ]);
+
+        // Debug log the URL
+        Yii::debug("Reset URL: " . $resetUrl);
+
+        $emailSent = Yii::$app->mailer->compose('@app/views/site/_email_credentials', [
+            'company' => $company,
+            'password' => $clearPassword,
+            'token' => $token,
+            'resetUrl' => $resetUrl
+        ])
+        ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name])
+        ->setTo($company->company_email)
+        ->setSubject('Welcome to ' . Yii::$app->name . ' - Set Your Password')
+        ->send();
+
+        if ($emailSent) {
+            $transaction->commit();
+            Yii::$app->session->setFlash('success', 
+                'User account created and instructions sent to ' . $company->company_email . 
+                '<br>Direct link: <a href="' . $resetUrl . '">Click here to set password</a>'
+            );
+        } else {
+            throw new \Exception('Failed to send email');
+        }
+
+    } catch (\Exception $e) {
+        if (isset($transaction)) {
+            $transaction->rollBack();
+        }
+        Yii::error("Error in user creation: " . $e->getMessage());
+        Yii::error("Stack trace: " . $e->getTraceAsString());
+        Yii::$app->session->setFlash('error', 'Error creating user: ' . $e->getMessage());
+    }
+
+    return $this->redirect(['index']);
+}
+
+public function actionSetInitialPassword($token)
+{
+    if (empty($token)) {
+        Yii::$app->session->setFlash('error', 'Empty reset token.');
+        return $this->redirect(['site/login']);
+    }
+
+    // Debug log received token
+    Yii::debug("Received token in reset action: " . $token);
+
+    $user = User::findByPasswordResetToken($token);
+
+    if (!$user) {
+        Yii::error("No user found with token: " . $token);
+        Yii::$app->session->setFlash('error', 'Wrong password reset token.');
+        return $this->redirect(['site/login']);
+    }
+
+    $model = new ResetPasswordForm();
+
+    if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+        $user->status = User::STATUS_ACTIVE;
+        $user->password_hash = Yii::$app->security->generatePasswordHash($model->password);
+        $user->password_reset_token = null;
+        $user->token_created_at = null;
+        
+        if ($user->save(false)) {
+            Yii::$app->session->setFlash('success', 'Password has been set successfully.');
+            return $this->redirect(['site/login']);
+        }
+    }
+
+    return $this->render('resetPassword', [
+        'model' => $model,
+    ]);
+}
+
+// Update the model validation to use the token
+public function validateTemporaryPassword($attribute, $params)
+{
+    if (!$this->hasErrors()) {
+        $user = User::findOne(['password_reset_token' => Yii::$app->request->get('token')]);
+        if (!$user || !$user->validatePassword($this->temporary_password)) {
+            $this->addError($attribute, 'Incorrect temporary password.');
+        }
+    }
+}
+
+private function isTokenValid($user)
+{
+    if (!$user->created_at) {
+        return false;
+    }
+    
+    // Token expires after 24 hours
+    return (time() - $user->created_at) <= 86400;
+}
 
 /**
  * Ajax action to get company details
@@ -1462,36 +1645,111 @@ public function actionToggleUserStatus()
 
 
 
+
+// public function actionCreateUserForCompany($company_id)
+// {
+//     // Find the company
+//     $company = Company::findOne($company_id);
+//     if (!$company) {
+//         throw new NotFoundHttpException('Company not found.');
+//     }
+
+//     $user = new User();
+//     $user->role = 'user'; // Set the role for the user
+
+//     if ($user->load(Yii::$app->request->post())) {
+//         try {
+//             // Start transaction
+//             $transaction = Yii::$app->db->beginTransaction();
+
+//             try {
+//                 // Generate a random password
+//                 $password = Yii::$app->security->generateRandomString(8);
+//                 $user->setPassword($password); // Set the password
+//                 $user->company_id = $company_id; // Associate user with the company
+//                 $user->status = User::STATUS_ACTIVE; // Set user status
+
+//                 // Set the email property
+//                 $user->email = Yii::$app->request->post('User')['email']; // Ensure this is set correctly
+
+//                 // Generate username based on company name
+//                 $user->username = $this->generateUsername($company->company_name); // Ensure this method exists
+
+//                 // Save the user
+//                 if ($user->save()) {
+//                     // Commit the transaction
+//                     $transaction->commit();
+//                     Yii::$app->session->setFlash('success', 'User created successfully.');
+//                     return $this->redirect(['index']);
+//                 } else {
+//                     throw new \Exception('Failed to save user: ' . implode(', ', $user->getFirstErrors()));
+//                 }
+
+//             } catch (\Exception $e) {
+//                 $transaction->rollBack();
+//                 throw $e; // Rethrow the exception to handle it in the outer catch
+//             }
+
+//         } catch (\Exception $e) {
+//             Yii::$app->session->setFlash('error', 'Error creating user: ' . $e->getMessage());
+//         }
+//     }
+
+//     // Fetch all companies to pass to the view
+//     $companies = Company::find()->all(); // Fetch all companies
+
+//     return $this->render('create-user', [
+//         'model' => $user,
+//         'companies' => $companies, // Pass the companies variable to the view
+//     ]);
+// }
+//     private function generateUsername($company_name)
+//     {
+//         // Create username from company name and random number
+//         $base = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $company_name));
+//         $random = rand(100, 999);
+//         return $base . $random;
+//     }
+
+//     private function sendCredentialsEmail($email, $username, $password)
+//     {
+//         return Yii::$app->mailer->compose()
+//             ->setTo($email)
+//             ->setFrom([Yii::$app->params['adminEmail'] => Yii::$app->name])
+//             ->setSubject('Your Account Credentials')
+//             ->setTextBody("
+//                 Hello,
+
+//                 Your account has been created. Here are your login credentials:
+//                 Username: {$username}
+//                 Password: {$password}
+
+//                 Please change your password after first login.
+
+//                 Regards,
+//                 " . Yii::$app->name)
+//             ->send();
+//     }
+
+
+
+
 public function actionDashboard()
 {
-    // Debugging: Log the user role
-    Yii::info('User role: ' . Yii::$app->user->identity->role, __METHOD__);
+    // Assuming you have a way to get the current user's role
+    $userRole = Yii::$app->user->identity->role; // Adjust this line based on your user identity structure
 
-    // Check admin, super_admin, and new role access
-    if (Yii::$app->user->identity->role !== 'admin' && 
-        Yii::$app->user->identity->role !== 'super_admin' && 
-        Yii::$app->user->identity->role !== 1 && 
-        Yii::$app->user->identity->role !== 4) {
-        Yii::$app->session->setFlash('error', 'Access denied.');
-        return $this->redirect(['site/admin']);
+    // Check if the user role is 3
+    if ($userRole == 3) {
+        // Render the developer dashboard view
+        return $this->render('developer/dashboard'); // Adjust the path as necessary
+    } else {
+        // Deny access or redirect to an error page
+        Yii::$app->session->setFlash('error', 'You do not have permission to access this page.');
+        return $this->redirect(['site/index']); // Redirect to a different page, e.g., the home page
     }
 
-    // Get developer statistics
-    $developerStats = User::find()
-        ->select([
-            'user.id',
-            'user.name',
-            'COUNT(CASE WHEN ticket.status != "closed" THEN 1 END) as active_tickets',
-            'COUNT(CASE WHEN ticket.status = "closed" THEN 1 END) as completed_tickets',
-            'COUNT(ticket.id) as total_tickets'
-        ])
-        ->leftJoin('ticket', 'ticket.assigned_to = user.id')
-        ->where(['user.role' => 'developer'])
-        ->groupBy(['user.id', 'user.name'])
-        ->asArray()
-        ->all();
-
-    // Get ticket statistics
+    // Existing code for the dashboard (if needed for other roles)
     $ticketStats = [
         'total' => Ticket::find()->count(),
         'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
@@ -1512,50 +1770,35 @@ public function actionDashboard()
         ->limit(5)
         ->all();
 
-    // Get recent activity with developer info
-    $recentActivity = (new Query())
-        ->select([
-            'ticket.id AS ticket_id',
-            'ticket.status',
-            'ticket.created_at AS timestamp',
-            'assigned_user.name AS developer',
-            'escalated_user.name AS escalated_to',
-            'ticket.escalation_comment'
-        ])
-        ->from('ticket')
-        ->leftJoin('user assigned_user', 'ticket.assigned_to = assigned_user.id')
-        ->leftJoin('user escalated_user', 'ticket.escalated_to = escalated_user.id')
-        ->orderBy(['ticket.created_at' => SORT_DESC])
-        ->limit(10)
+    // Get developer statistics
+    $developerStats = (new \yii\db\Query())
+        ->select(['users.id', 'users.name', 
+                  'active_tickets' => new \yii\db\Expression('COUNT(CASE WHEN ticket.status != "closed" THEN 1 END)')])
+        ->from('users')
+        ->leftJoin('ticket', 'ticket.assigned_to = users.id')
+        ->where(['users.role' => 'developer'])
+        ->groupBy(['users.id', 'users.name'])
         ->all();
 
-    // Get all users for status management
-    $users = User::find()->all();
+    // Get all users
+    $users = User::find()->all(); // Fetch all users
 
-    // Get contract renewals with related data
-    $renewals = ContractRenewal::find()
-        ->with(['company', 'requestedBy'])
-        ->orderBy(['created_at' => SORT_DESC])
-        ->all();
+    // // Get recent activity
+    // $recentActivity = (new \yii\db\Query())
+    //     // ->select(['ticket_id', 'status', 'timestamp', 'developer'])
+    //     // ->from('activity_log') // Ensure this table exists
+    //     ->orderBy(['timestamp' => SORT_DESC])
+    //     ->limit(10)
+    //     ->all();
 
-    // Get renewal statistics
-    $renewalStats = [
-        'total' => ContractRenewal::find()->count(),
-        'pending' => ContractRenewal::find()->where(['renewal_status' => 'pending'])->count(),
-        'approved' => ContractRenewal::find()->where(['renewal_status' => 'approved'])->count(),
-        'rejected' => ContractRenewal::find()->where(['renewal_status' => 'rejected'])->count(),
-    ];
-
+    // Your existing code for the dashboard
     return $this->render('dashboard', [
-        'developerStats' => $developerStats,
         'ticketStats' => $ticketStats,
         'recentTickets' => $recentTickets,
-        'recentActivity' => $recentActivity,
         'ticketStatusData' => $ticketStatusData,
-        'users' => $users,
-        'renewals' => $renewals,
-        'renewalStats' => $renewalStats,
-        'isSuperAdmin' => true
+        'developerStats' => $developerStats, // Pass the developerStats variable to the view
+        'users' => $users, // Pass the users variable to the view
+        // 'recentActivity' => $recentActivity, // Pass the recentActivity variable to the view
     ]);
 }
 
@@ -1629,36 +1872,6 @@ public function actionGetCompanyByEmail($email)
         'modules' => explode(',', $company->modules), // Assuming modules are stored as comma-separated string
         'error' => false
     ];
-}
-
-public function actionSetInitialPassword($token, $email, $temp_password)
-{
-    // Find user by email
-    $user = User::findOne(['company_email' => $email]);
-    
-    if (!$user || !$user->validatePasswordResetToken($token)) {
-        Yii::$app->session->setFlash('error', 'Invalid or expired password reset link.');
-        return $this->redirect(['site/login']);
-    }
-
-    // Verify temporary password
-    if (!$user->validatePassword($temp_password)) {
-        Yii::$app->session->setFlash('error', 'Invalid temporary password.');
-        return $this->redirect(['site/login']);
-    }
-
-    $model = new SetPasswordForm();
-    $model->company_email = $email;
-    $model->temp_password = $temp_password;
-
-    if ($model->load(Yii::$app->request->post()) && $model->changePassword()) {
-        Yii::$app->session->setFlash('success', 'Password has been set successfully. You can now login.');
-        return $this->redirect(['site/login']);
-    }
-
-    return $this->render('set-initial-password', [
-        'model' => $model,
-    ]);
 }
 
 public function actionCreateAdmin()
@@ -1950,6 +2163,100 @@ private function sendRenewalApprovalEmail($company, $renewal)
     } catch (\Exception $e) {
         Yii::error('Failed to send renewal approval email: ' . $e->getMessage());
     }
+}
+
+public function actionActivateUser($id)
+{
+    $user = User::findOne($id);
+    
+    if (!$user) {
+        Yii::$app->session->setFlash('error', 'User not found.');
+        return $this->redirect(['index']);
+    }
+
+    if ($user->status === User::STATUS_ACTIVE) {
+        Yii::$app->session->setFlash('error', 'User is already active.');
+        return $this->redirect(['index']);
+    }
+
+    try {
+        if ($user->activate()) {
+            Yii::$app->session->setFlash('success', 'Activation email sent to ' . $user->company_email);
+        } else {
+            Yii::$app->session->setFlash('error', 'Failed to send activation email.');
+        }
+    } catch (\Exception $e) {
+        Yii::error('Failed to activate user: ' . $e->getMessage());
+        Yii::$app->session->setFlash('error', 'Failed to activate user: ' . $e->getMessage());
+    }
+
+    return $this->redirect(['index']);
+}
+
+ 
+
+ 
+
+public function actionCreateSuperUser()
+{
+    $user = new User();
+    
+    // Set superuser attributes
+    $user->setAttributes([
+        'name' => 'Super Admin',
+        'company_name' => 'System Admin',
+        'company_email' => 'ccosmas001@gmail.com',
+        'password_hash' => Yii::$app->security->generatePasswordHash('admin123'), // You can change this password
+        'created_at' => time(),
+        'updated_at' => time(),
+        'auth_key' => Yii::$app->security->generateRandomString(),
+        'role' => 'admin',  // Set as admin role
+        'is_verified' => 1,
+        'status' => 10,     // Active status
+        'first_login' => 0, // Not first login
+        'modules' => 'ALL', // Access to all modules
+        'is_password_reset' => 0
+    ]);
+    
+    // Debug output
+    echo "<pre>";
+    echo "Attempting to create superuser:\n";
+    print_r($user->attributes);
+    
+    if ($user->save()) {
+        echo "\nSuperuser created successfully with ID: " . $user->id;
+        echo "\nEmail: ccosmas001@gmail.com";
+        echo "\nPassword: admin123";
+    } else {
+        echo "\nErrors creating superuser:\n";
+        print_r($user->getErrors());
+    }
+    
+    die();
+}
+
+public function actionResetFirstPassword()
+{
+    if (Yii::$app->user->isGuest || Yii::$app->user->identity->first_login != 1) {
+        return $this->goHome();
+    }
+
+    $model = new ResetPasswordForm();
+    
+    if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+        $user = Yii::$app->user->identity;
+        $user->setPassword($model->new_password);
+        $user->first_login = 0;
+        
+        if ($user->save(false)) {
+            Yii::$app->session->setFlash('success', 'Password has been changed successfully.');
+            return $this->redirect(['site/index']);
+        }
+    }
+
+    return $this->render('reset-first-password', [
+        'model' => $model
+    ]);
 }
 
 }

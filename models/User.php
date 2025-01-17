@@ -116,7 +116,11 @@ public function isUser()
     /**
      * {@inheritdoc}
      */
- 
+    public function getCompanyName()
+    {
+        return $this->requestedBy->company_name; // Assuming 'requestedBy' is linked to User with 'company_name'
+    }
+    
 
      public function isSuperAdmin()
      {
@@ -637,10 +641,10 @@ public function verify($token, $companyEmail)
         return $this->hasOne(Company::class, ['id' => 'company_id']);
     }
 
-    public function getCompanyName()
-    {
-        return $this->company_name ?: 'Unknown Company';
-    }
+    // public function getCompanyName()
+    // {
+    //     return $this->company_name ?: 'Unknown Company';
+    // }
 
     /**
      * Check if user is super admin

@@ -2,6 +2,7 @@
 use yii\helpers\Html;
 use yii\helpers\Url;
 use yii\web\JqueryAsset;
+use app\models\ContractRenewal;
 
 $this->title = 'Help Desk Analytics Dashboard';
 
@@ -114,71 +115,130 @@ $this->registerJs("
     ...
 </div>
 
-    <!-- Summary Cards Row -->
-    <!-- <div class="row mb-4">
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-left-primary shadow h-100">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">Total Active Tickets</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $totalActiveTickets ?? 0 ?></div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-ticket-alt fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<!-- Add this section to your admin dashboard -->
+    <!-- Add this section to your dashboard -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3>Contract Renewals</h3>
         </div>
+        <div class="card-body">
+            <?php
+            $renewals = ContractRenewal::find()
+                ->with(['company', 'requestedBy'])
+                ->orderBy(['created_at' => SORT_DESC])
+                ->all();
+            ?>
 
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-left-success shadow h-100">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">Resolution Rate</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $resolutionRate ?? '0%' ?></div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-check-circle fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
+            <?php if (!empty($renewals)): ?>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Company</th>
+                                <th>Requested By</th>
+                                <th>Current End Date</th>
+                                <th>Extension</th>
+                                <th>New End Date</th>
+                                <th>Status</th>
+                                <th>Requested On</th>
+                                <th>Notes</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($renewals as $renewal): ?>
+                                <tr>
+                                    <td><?= Html::encode($renewal->company->company_name) ?></td>
+                                    <td><?= Html::encode($renewal->requestedBy->username) ?></td>
+                                    <td><?= Yii::$app->formatter->asDate($renewal->current_end_date) ?></td>
+                                    <td><?= $renewal->extension_period ?> months</td>
+                                    <td><?= Yii::$app->formatter->asDate($renewal->new_end_date) ?></td>
+                                    <td>
+                                        <span class="badge bg-<?= $renewal->renewal_status == 'pending' ? 'warning' : 
+                                            ($renewal->renewal_status == 'approved' ? 'success' : 'danger') ?>">
+                                            <?= ucfirst($renewal->renewal_status) ?>
+                                        </span>
+                                    </td>
+                                    <td><?= Yii::$app->formatter->asDatetime($renewal->created_at) ?></td>
+                                    <td><?= Html::encode($renewal->notes) ?></td>
+                                    <td>
+                                        <?php if ($renewal->renewal_status === 'pending'): ?>
+                                            <div class="btn-group">
+                                                <?= Html::a('Approve', 
+                                                    ['approve-renewal', 'id' => $renewal->id], 
+                                                    [
+                                                        'class' => 'btn btn-success btn-sm',
+                                                        'data' => [
+                                                            'confirm' => 'Are you sure you want to approve this renewal?',
+                                                            'method' => 'post',
+                                                        ],
+                                                    ]
+                                                ) ?>
+                                                <?= Html::a('Reject', 
+                                                    ['reject-renewal', 'id' => $renewal->id], 
+                                                    [
+                                                        'class' => 'btn btn-danger btn-sm ms-1',
+                                                        'data' => [
+                                                            'confirm' => 'Are you sure you want to reject this renewal?',
+                                                            'method' => 'post',
+                                                        ],
+                                                    ]
+                                                ) ?>
+                                            </div>
+                                        <?php else: ?>
+                                            <span class="text-muted">No actions available</span>
+                                        <?php endif; ?>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
                 </div>
-            </div>
+            <?php else: ?>
+                <div class="alert alert-info">No contract renewal requests found.</div>
+            <?php endif; ?>
         </div>
+    </div>
+</div>
 
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-left-info shadow h-100">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">Avg Response Time</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $avgResponseTime ?? '0h' ?></div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-clock fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<style>
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+.badge {
+    font-size: 0.875rem;
+}
+</style>
 
-        <div class="col-xl-3 col-md-6">
-            <div class="card border-left-warning shadow h-100">
-                <div class="card-body">
-                    <div class="row no-gutters align-items-center">
-                        <div class="col mr-2">
-                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">Pending Tickets</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $pendingTickets ?? 0 ?></div>
-                        </div>
-                        <div class="col-auto">
-                            <i class="fas fa-pause-circle fa-2x text-gray-300"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div> -->
+<div class="client-list">
+    <h2>Our Clients</h2>
+    <p>Total Clients: <?= htmlspecialchars($clientCount) ?></p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Company Name</th>
+                <th>Email</th>
+                <th>Created At</th>
+                <th>Updated At</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($clients as $client): ?>
+                <tr>
+                    <td><?= htmlspecialchars($client->id) ?></td>
+                    <td><?= htmlspecialchars($client->company_name) ?></td>
+                    <td><?= htmlspecialchars($client->company_email) ?></td>
+                    <td><?= htmlspecialchars($client->created_at) ?></td>
+                    <td><?= htmlspecialchars($client->updated_at) ?></td>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+
+
     </div>
 
 

@@ -13,7 +13,40 @@ class DeveloperController extends Controller
     public function behaviors()
     {
         return [
-            
+            'access' => [
+                'class' => \yii\filters\AccessControl::className(),
+                'only' => ['view'],
+                'rules' => [
+                    [
+                        'actions' => ['view'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                        'matchCallback' => function ($rule, $action) {
+                            $user = Yii::$app->user->identity;
+                            
+                            // Debug logging
+                            Yii::debug([
+                                'user_id' => $user->id,
+                                'role' => $user->role,
+                                'role_type' => gettype($user->role)
+                            ], 'developer_access');
+                            
+                            // Convert role to integer for comparison if it's a string
+                            $userRole = is_string($user->role) ? intval($user->role) : $user->role;
+                            
+                            // Check if the user has role 3
+                            if ($userRole !== 3) {
+                                Yii::debug('Access denied: User role is not 3', 'developer_access');
+                                Yii::$app->session->setFlash('error', 'You do not have permission to access this page.');
+                                return false;
+                            }
+                            
+                            Yii::debug('Access granted: User role is 3', 'developer_access');
+                            return true;
+                        }
+                    ],
+                ],
+            ],
         ];
     }
 
@@ -66,16 +99,24 @@ class DeveloperController extends Controller
     public function actionView()
     {
         $user = Yii::$app->user->identity;
-    
-        // Check if the user is authenticated
-        if ($user === null) {
-            // Redirect to the login page or throw an exception
-            return $this->redirect(['site/login']); // Redirect to login
-            // OR
-            // throw new \yii\web\ForbiddenHttpException('You are not allowed to access this page.'); // Throw exception
+        
+        // Debug logging
+        Yii::debug([
+            'user_id' => $user->id,
+            'role' => $user->role,
+            'role_type' => gettype($user->role)
+        ], 'developer_view');
+        
+        // Convert role to integer for comparison if it's a string
+        $userRole = is_string($user->role) ? intval($user->role) : $user->role;
+        
+        // Check if the user has role 3
+        if ($userRole !== 3) {
+            Yii::debug('View access denied: User role is not 3', 'developer_view');
+            Yii::$app->session->setFlash('error', 'You do not have permission to access this page.');
+            return $this->redirect(['site/index']);
         }
-    
-        // Data provider for the GridView
+
         $dataProvider = new ActiveDataProvider([
             'query' => Ticket::find()->where(['assigned_to' => $user->id]),
             'pagination' => [
@@ -87,44 +128,13 @@ class DeveloperController extends Controller
                 ]
             ],
         ]);
-    
+
         return $this->render('view', [
             'user' => $user,
-            'dataProvider' => $dataProvider,  // Pass dataProvider to the view
+            'dataProvider' => $dataProvider,
         ]);
     }
     
-    public function actionIndex()
-    {
-        $query = (new \yii\db\Query())
-            ->select([
-                'ticket.*',  // Select all columns from ticket table
-                'users.name as developer_name'
-            ])
-            ->from('ticket')
-            ->leftJoin('users', 'users.id = ticket.assigned_to')
-            ->where(['ticket.assigned_to' => Yii::$app->user->id]);
-
-        $dataProvider = new ActiveDataProvider([
-            'query' => $query,
-            'pagination' => [
-                'pageSize' => 10,
-            ],
-            'sort' => [
-                'defaultOrder' => [
-                    'created_at' => SORT_DESC,
-                ]
-            ],
-        ]);
-
-        // Debug the SQL query
-        Yii::debug('SQL Query: ' . $query->createCommand()->getRawSql());
-
-        return $this->render('index', [
-            'dataProvider' => $dataProvider,
-            'user' => User::findOne(Yii::$app->user->id),
-        ]);
-    }
     
     // Other actions can be added here as needed
 }

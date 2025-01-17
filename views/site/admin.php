@@ -44,7 +44,7 @@ $clientCount = Client::find()->count();
 
 <div class="row mb-2">
     <div class="col text-end">
-        <?= Html::a('View Dashboard', ['site/dashboard'], ['class' => 'btn btn-info me-2']) ?>
+        <?= Html::a('Dashboard', ['site/dashboard'], ['class' => 'btn btn-info me-2']) ?>
   <!-- company create button -->
   <?= Html::a('Create users', '#', [
     'class' => 'btn btn-primary',
@@ -175,7 +175,7 @@ $clientCount = Client::find()->count();
                 'attribute' => 'assigned_to',
                 'label' => 'Assigned Developer',
                 'value' => function ($model) {
-                    return $model->assignedTo ? $model->assignedTo->username : 'Not Assigned';
+                    return $model->assignedTo ? $model->assignedTo->name : 'Not Assigned';
                 }
             ],
             [
@@ -904,122 +904,7 @@ JS;
 $this->registerJs($js);
 ?>
 
-<!-- Add this section to your admin dashboard -->
-    <!-- Add this section to your dashboard -->
-    <div class="card mb-4">
-        <div class="card-header">
-            <h3>Contract Renewals</h3>
-        </div>
-        <div class="card-body">
-            <?php
-            $renewals = ContractRenewal::find()
-                ->with(['company', 'requestedBy'])
-                ->orderBy(['created_at' => SORT_DESC])
-                ->all();
-            ?>
 
-            <?php if (!empty($renewals)): ?>
-                <div class="table-responsive">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Company</th>
-                                <th>Requested By</th>
-                                <th>Current End Date</th>
-                                <th>Extension</th>
-                                <th>New End Date</th>
-                                <th>Status</th>
-                                <th>Requested On</th>
-                                <th>Notes</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($renewals as $renewal): ?>
-                                <tr>
-                                    <td><?= Html::encode($renewal->company->company_name) ?></td>
-                                    <td><?= Html::encode($renewal->requestedBy->username) ?></td>
-                                    <td><?= Yii::$app->formatter->asDate($renewal->current_end_date) ?></td>
-                                    <td><?= $renewal->extension_period ?> months</td>
-                                    <td><?= Yii::$app->formatter->asDate($renewal->new_end_date) ?></td>
-                                    <td>
-                                        <span class="badge bg-<?= $renewal->renewal_status == 'pending' ? 'warning' : 
-                                            ($renewal->renewal_status == 'approved' ? 'success' : 'danger') ?>">
-                                            <?= ucfirst($renewal->renewal_status) ?>
-                                        </span>
-                                    </td>
-                                    <td><?= Yii::$app->formatter->asDatetime($renewal->created_at) ?></td>
-                                    <td><?= Html::encode($renewal->notes) ?></td>
-                                    <td>
-                                        <?php if ($renewal->renewal_status === 'pending'): ?>
-                                            <div class="btn-group">
-                                                <?= Html::a('Approve', 
-                                                    ['approve-renewal', 'id' => $renewal->id], 
-                                                    [
-                                                        'class' => 'btn btn-success btn-sm',
-                                                        'data' => [
-                                                            'confirm' => 'Are you sure you want to approve this renewal?',
-                                                            'method' => 'post',
-                                                        ],
-                                                    ]
-                                                ) ?>
-                                                <?= Html::a('Reject', 
-                                                    ['reject-renewal', 'id' => $renewal->id], 
-                                                    [
-                                                        'class' => 'btn btn-danger btn-sm ms-1',
-                                                        'data' => [
-                                                            'confirm' => 'Are you sure you want to reject this renewal?',
-                                                            'method' => 'post',
-                                                        ],
-                                                    ]
-                                                ) ?>
-                                            </div>
-                                        <?php else: ?>
-                                            <span class="text-muted">No actions available</span>
-                                        <?php endif; ?>
-                                    </td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php else: ?>
-                <div class="alert alert-info">No contract renewal requests found.</div>
-            <?php endif; ?>
-        </div>
-    </div>
-</div>
-
-<style>
-.btn-sm {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
-}
-.badge {
-    font-size: 0.875rem;
-}
-</style>
-
-<div class="client-list">
-    <h2>Client List</h2>
-    <p>Total Clients: <?= htmlspecialchars($clientCount) ?></p>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Company Name</th>
-                <th>Email</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($clients as $client): ?>
-                <tr>
-                    <td><?= htmlspecialchars($client->company_name) ?></td>
-                    <td><?= htmlspecialchars($client->company_email) ?></td>
-                </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
-</div>
 
  
 

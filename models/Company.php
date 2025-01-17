@@ -91,6 +91,12 @@ class Company extends ActiveRecord
         return true;
     }
 
+
+    public function getCompanyName()
+{
+    return $this->requestedBy->company->name; // Assuming 'company' is a relation in User model
+}
+
     public function afterFind()
     {
         parent::afterFind();

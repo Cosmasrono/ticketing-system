@@ -1733,23 +1733,26 @@ public function actionToggleUserStatus()
 
 
 
-
 public function actionDashboard()
 {
-    // Assuming you have a way to get the current user's role
-    $userRole = Yii::$app->user->identity->role; // Adjust this line based on your user identity structure
-
-    // Check if the user role is 3
-    if ($userRole == 3) {
-        // Render the developer dashboard view
-        return $this->render('developer/dashboard'); // Adjust the path as necessary
-    } else {
-        // Deny access or redirect to an error page
-        Yii::$app->session->setFlash('error', 'You do not have permission to access this page.');
-        return $this->redirect(['site/index']); // Redirect to a different page, e.g., the home page
+    // Check if user is logged in
+    if (Yii::$app->user->isGuest) {
+        return $this->redirect(['site/login']);
     }
 
-    // Existing code for the dashboard (if needed for other roles)
+    // Get user role
+    $userRole = Yii::$app->user->identity->role;
+
+    // Check if user has permission (role 1 or 4)
+    if ($userRole != 1 && $userRole != 4) {
+        Yii::$app->session->setFlash('error', 'You do not have permission to access this page.');
+        return $this->redirect(['site/index']);
+    }
+
+    // Get client data
+    $clients = \app\models\Company::find()->all(); // Assuming you have a Company model
+    $clientCount = count($clients);
+
     $ticketStats = [
         'total' => Ticket::find()->count(),
         'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
@@ -1781,27 +1784,18 @@ public function actionDashboard()
         ->all();
 
     // Get all users
-    $users = User::find()->all(); // Fetch all users
+    $users = User::find()->all();
 
-    // // Get recent activity
-    // $recentActivity = (new \yii\db\Query())
-    //     // ->select(['ticket_id', 'status', 'timestamp', 'developer'])
-    //     // ->from('activity_log') // Ensure this table exists
-    //     ->orderBy(['timestamp' => SORT_DESC])
-    //     ->limit(10)
-    //     ->all();
-
-    // Your existing code for the dashboard
     return $this->render('dashboard', [
         'ticketStats' => $ticketStats,
         'recentTickets' => $recentTickets,
         'ticketStatusData' => $ticketStatusData,
-        'developerStats' => $developerStats, // Pass the developerStats variable to the view
-        'users' => $users, // Pass the users variable to the view
-        // 'recentActivity' => $recentActivity, // Pass the recentActivity variable to the view
+        'developerStats' => $developerStats,
+        'users' => $users,
+        'clients' => $clients,          // Add this line
+        'clientCount' => $clientCount,  // Add this line
     ]);
 }
-
 public function actionToggleStatus()
 {
     // Clear any existing output buffers
@@ -2044,6 +2038,10 @@ public function actionProfile($id)
     ]);
 }
 
+
+
+
+
 public function actionRenewContract($id)
 {
     $company = Company::findOne($id);
@@ -2054,7 +2052,18 @@ public function actionRenewContract($id)
     if (Yii::$app->request->isPost) {
         $renewal = new ContractRenewal();
         $renewal->company_id = $company->id;
-        $renewal->requested_by = Yii::$app->user->id;
+
+        // Get the current user ID
+        $userId = Yii::$app->user->id;
+        Yii::info('Current user ID: ' . $userId);
+
+        // Check if the user ID exists in the users table
+        if (!User::find()->where(['id' => $userId])->exists()) {
+            Yii::$app->session->setFlash('error', 'Invalid user.');
+            return $this->redirect(['profile', 'id' => $userId]);
+        }
+
+        $renewal->requested_by = $userId;
         $renewal->extension_period = Yii::$app->request->post('extension_period');
         $renewal->notes = Yii::$app->request->post('notes');
         $renewal->current_end_date = $company->end_date;
@@ -2065,9 +2074,15 @@ public function actionRenewContract($id)
         $newEndDate = strtotime("+{$renewal->extension_period} months", $currentEndDate);
         $renewal->new_end_date = date('Y-m-d', $newEndDate);
 
+        // Log the attributes being saved
+        Yii::info('Saving ContractRenewal with data: ' . json_encode($renewal->attributes));
+
         if ($renewal->save()) {
             Yii::$app->session->setFlash('success', 'Contract renewal request submitted successfully.');
-            return $this->redirect(['profile', 'id' => Yii::$app->user->id]);
+            return $this->redirect(['profile', 'id' => $userId]);
+        } else {
+            Yii::error('Failed to save renewal: ' . json_encode($renewal->errors));
+            Yii::$app->session->setFlash('error', 'Failed to submit contract renewal.');
         }
     }
 
@@ -2075,6 +2090,8 @@ public function actionRenewContract($id)
         'company' => $company,
     ]);
 }
+
+
 
 public function actionApproveRenewal($id)
 {

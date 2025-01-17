@@ -43,12 +43,16 @@ class Ticket extends ActiveRecord
     public $uploadedFile;
     public $imageFile;
     public $screenshot_url;
-    public $issue;
+ 
+    public $developer_name;
+    public $voice_note_url;
+    private $_voice_note;
+ 
+    /**
+     * @var int severity level of the ticket
+     */
     public $severity;
-    public $module;
-    // public $voice_note_url;
- 
- 
+
     public static function tableName()
     {
         return 'ticket'; // Confirm this matches your actual table name
@@ -73,18 +77,43 @@ class Ticket extends ActiveRecord
     public function rules()
     {
         return [
-            [['module', 'issue', 'severity_level', 'description'], 'required'],
-            [['module', 'issue', 'company_name', 'company_email'], 'string', 'max' => 255],
-            [['severity_level'], 'integer'],
-            [['description'], 'string'],
-            [['created_at'], 'safe'],
-            [['created_by'], 'integer'],
-            [['module', 'issue', 'status'], 'string', 'max' => 255],
-            [['status'], 'string'],
-            [['approved_at'], 'safe'],
-            [['escalation_comment'], 'string'],
-            [['assigned_to'], 'integer'],
-            [['module'], 'safe'],
+            // Core required fields
+            [['user_id', 'module', 'issue', 'description', 'severity'], 'required'],
+            
+            // String fields with max length
+            [['module', 'issue', 'company_name', 'company_email', 'status', 'renewal_status'], 'string', 'max' => 255],
+            
+            // Integer fields
+            [['severity', 'severity_level', 'created_by', 'assigned_to', 'approved_by'], 'integer'],
+            
+            // Text fields
+            [['description', 'escalation_comment'], 'string'],
+            
+            // Date/time fields
+            [['created_at', 'approved_at', 'first_response_at', 'resolution_deadline', 
+              'last_update_at', 'next_update_due', 'renewal_date'], 'safe'],
+            
+            // File and URL validations
+            ['screenshot', 'file', 'skipOnEmpty' => true, 'extensions' => 'png, jpg, jpeg, gif', 'maxSize' => 5*1024*1024],
+            ['screenshotUrl', 'string'],
+            ['screenshotUrl', 'url'],
+            ['screenshotUrl', 'validateCloudinaryUrl'],
+            ['voice_note_url', 'string'],
+            
+            // Specific validations
+            ['severity', 'in', 'range' => [
+                self::SEVERITY_LOW,
+                self::SEVERITY_MEDIUM, 
+                self::SEVERITY_HIGH,
+                self::SEVERITY_CRITICAL
+            ]],
+            ['renewal_date', 'date', 'format' => 'php:Y-m-d H:i:s'],
+            ['sla_status', 'string'],
+            ['developer_name', 'safe'],
+            
+            // Custom module validation
+            ['module', 'validateModule'],
+            ['issue', 'validateIssue'],
             
             // Escalation rule
             [['escalated_to'], 'required', 'when' => function($model) {
@@ -92,63 +121,42 @@ class Ticket extends ActiveRecord
             }, 'whenClient' => "function (attribute, value) {
                 return $('#ticket-status').val() === 'reassigned';
             }"],
-            
-            [['status'], 'string', 'max' => 20],
-            [['company_name', 'company_email', 'module', 'issue'], 'string', 'max' => 255],
-            
-
-        
-        ['screenshotUrl', 'string'],
-        ['screenshot', 'file', 'skipOnEmpty' => true, 'extensions' => 'png, jpg, jpeg, gif', 'maxSize' => 5*1024*1024],
-        ['screenshotUrl', 'url'],
-        ['screenshotUrl', 'validateCloudinaryUrl'],
-        ['severity_level', 'required'],
-        ['severity_level', 'integer'],
-        ['severity_level', 'in', 'range' => [1, 2, 3, 4]],
-        ['sla_status', 'string'],
-        [['first_response_at', 'resolution_deadline', 'last_update_at', 'next_update_due'], 'safe'],
-        [['issue'], 'string'],
-        [['issue'], 'required'],
-        [['severity'], 'integer'],
-        [['severity'], 'required'],
-        [['module', 'issue'], 'required'],
-        [['module', 'issue'], 'string'],
-        [['renewal_status'], 'string', 'max' => 255],
-        [['renewal_date'], 'datetime'],
-        [['approved_by'], 'integer'],
-        [['approved_at'], 'safe'],
-        [['severity_level'], 'integer'],
-
-        [['renewal_date'], 'date', 'format' => 'php:Y-m-d H:i:s'],
-
-        // [['voice_note_url'], 'string'],
-        [['user_id', 'module', 'issue', 'description'], 'required'],
-        // [['voice_note_url'], 'safe'],
-
-    ];
+        ];
     }
-    
-    // Add this method to your model
-    public function validateScreenshot($attribute, $params)
+
+    // Add custom validators to debug module and issue validation
+    public function validateModule($attribute, $params)
     {
-        if (!empty($this->$attribute)) {
-            // More permissive regex for base64 validation
-            if (!preg_match('/^data:image\/[a-zA-Z]+;base64,/', $this->$attribute)) {
-                $this->addError($attribute, 'Invalid screenshot format');
-                return;
-            }
-    
-            // Size validation
-            $base64 = preg_replace('/^data:image\/[a-zA-Z]+;base64,/', '', $this->$attribute);
-            $base64 = str_replace(' ', '+', $base64);
-            $imageSize = strlen(base64_decode($base64));
-            
-            if ($imageSize > 5 * 1024 * 1024) { // 5MB limit
-                $this->addError($attribute, 'Screenshot is too large (max 5MB)');
-            }
+        Yii::info("Validating module: " . $this->$attribute, 'ticket-validation');
+        if (empty($this->$attribute)) {
+            $this->addError($attribute, 'Module cannot be blank.');
+            Yii::error("Module validation failed - empty value", 'ticket-validation');
         }
     }
-    
+
+    public function validateIssue($attribute, $params)
+    {
+        Yii::info("Validating issue: " . $this->$attribute, 'ticket-validation');
+        if (empty($this->$attribute)) {
+            $this->addError($attribute, 'Issue cannot be blank.');
+            Yii::error("Issue validation failed - empty value", 'ticket-validation');
+        }
+    }
+
+  
+
+    // Override afterValidate to log results
+    public function afterValidate()
+    {
+        parent::afterValidate();
+        
+        if ($this->hasErrors()) {
+            Yii::error("Validation errors:", 'ticket-validation');
+            Yii::error($this->errors, 'ticket-validation');
+        } else {
+            Yii::info("Validation passed successfully", 'ticket-validation');
+        }
+    }
 
     public function attributeLabels()
     {
@@ -182,6 +190,8 @@ class Ticket extends ActiveRecord
             'approved_at' => 'Approved At',
             'renewal_date' => 'Renewal Date',
             'screenshot_url' => 'Screenshot',
+            'voice_note' => 'Voice Note',
+            'voice_note_url' => 'Voice Note URL',
         ];
     }
 
@@ -212,11 +222,29 @@ class Ticket extends ActiveRecord
         return $this->screenshot ? $this->screenshot : null;
     }
 
+
+    public function getVoice_note()
+    {
+        return $this->_voice_note;
+    }
+
+    /**
+     * Sets the uploaded voice note file
+     */
+    public function setVoice_note($value)
+    {
+        $this->_voice_note = $value;
+    }
     
     public function beforeSave($insert)
     {
         if (!parent::beforeSave($insert)) {
             return false;
+        }
+
+        // Map severity to severity_level if needed
+        if ($this->severity !== null) {
+            $this->severity_level = $this->severity;
         }
 
         // Log the screenshot data
@@ -267,7 +295,7 @@ class Ticket extends ActiveRecord
 
     public function getDeveloper()
     {
-        return $this->hasOne(User::class, ['id' => 'developer_id']);
+        return $this->hasOne(User::class, ['id' => 'assigned_to']);
     }
 
     public function getAssignedTo()
@@ -825,6 +853,14 @@ class Ticket extends ActiveRecord
     {
         parent::afterFind();
         Yii::debug('Ticket Model afterFind: ' . print_r($this->attributes, true));
+        // Map severity_level to severity for form display
+        $this->severity = $this->severity_level;
+    }
+
+    // Helper method to get developer name
+    public function getDeveloperName()
+    {
+        return $this->developer ? $this->developer->name : 'Not Assigned';
     }
 }
 

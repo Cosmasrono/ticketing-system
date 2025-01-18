@@ -1581,6 +1581,13 @@ public function actionClose()
                 // Load POST data first
                 $model->load(Yii::$app->request->post());
 
+                // Handle voice note URL if provided
+                $voiceNoteUrl = Yii::$app->request->post('voice_note_url');
+                if (!empty($voiceNoteUrl)) {
+                    $model->voice_note_url = $voiceNoteUrl;
+                    Yii::info('Voice note URL received: ' . $voiceNoteUrl);
+                }
+
                 // Handle screenshot upload
                 if (isset($_FILES['Ticket']) && isset($_FILES['Ticket']['tmp_name']['screenshot'])) {
                     $tempFile = $_FILES['Ticket']['tmp_name']['screenshot'];
@@ -1610,28 +1617,28 @@ public function actionClose()
                     'company_email' => $userInfo['company_email'] ?? null,
                 ]);
 
-                // Try to save and log any errors
+                // Try to save and verify
                 if (!$model->save()) {
                     Yii::error('Failed to save ticket: ' . json_encode($model->errors));
                     throw new \Exception('Failed to save ticket: ' . json_encode($model->errors));
                 }
 
-                // Verify the save by doing a direct database query
-                $saved = Yii::$app->db->createCommand('SELECT screenshot_url FROM ticket WHERE id = :id')
+                // Verify voice note URL was saved
+                $saved = Yii::$app->db->createCommand('SELECT screenshot_url, voice_note_url FROM ticket WHERE id = :id')
                     ->bindValue(':id', $model->id)
                     ->queryOne();
                 
-                Yii::info('Saved screenshot_url in database: ' . ($saved['screenshot_url'] ?? 'null'));
+                Yii::info('Saved voice_note_url in database: ' . ($saved['voice_note_url'] ?? 'null'));
 
-                // If the URL wasn't saved properly, try a direct database update
-                if (empty($saved['screenshot_url']) && !empty($screenshotUrl)) {
+                // If voice note URL wasn't saved properly, try direct update
+                if (empty($saved['voice_note_url']) && !empty($voiceNoteUrl)) {
                     Yii::$app->db->createCommand()
                         ->update('ticket', 
-                            ['screenshot_url' => $screenshotUrl],
+                            ['voice_note_url' => $voiceNoteUrl],
                             ['id' => $model->id])
                         ->execute();
                     
-                    Yii::info('Performed direct database update for screenshot_url');
+                    Yii::info('Performed direct database update for voice_note_url');
                 }
 
                 return $this->redirect(['view', 'id' => $model->id]);
@@ -1863,12 +1870,14 @@ public function actionClose()
     public function actionUploadVoiceNote()
     {
         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-        
+
         try {
             if (!isset($_FILES['voice_note'])) {
                 throw new \Exception('No voice note file received');
             }
 
+            $tempFile = $_FILES['voice_note']['tmp_name'];
+            
             // Initialize Cloudinary
             $cloudinary = new \Cloudinary\Cloudinary([
                 'cloud' => [
@@ -1878,31 +1887,22 @@ public function actionClose()
                 ]
             ]);
 
-            // Upload to Cloudinary with simplified audio settings
-            $result = $cloudinary->uploadApi()->upload(
-                $_FILES['voice_note']['tmp_name'],
-                [
-                    'resource_type' => 'video', // Cloudinary uses 'video' for audio files
-                    'folder' => 'tickets/voice-notes',
-                    'format' => 'mp3'  // Only specify the format
-                ]
-            );
-
-            if (!isset($result['secure_url'])) {
-                throw new \Exception('Failed to get secure URL from Cloudinary');
-            }
+            // Upload to Cloudinary
+            $result = $cloudinary->uploadApi()->upload($tempFile, [
+                'folder' => 'tickets/voice_notes',
+                'resource_type' => 'video' // Use 'video' for audio files
+            ]);
 
             return [
                 'success' => true,
-                'url' => $result['secure_url'],
-                'message' => 'Voice note uploaded successfully'
+                'url' => $result['secure_url']
             ];
 
         } catch (\Exception $e) {
             Yii::error('Voice note upload error: ' . $e->getMessage());
             return [
                 'success' => false,
-                'message' => 'Failed to upload voice note: ' . $e->getMessage()
+                'message' => YII_DEBUG ? $e->getMessage() : 'Failed to upload voice note'
             ];
         }
     }

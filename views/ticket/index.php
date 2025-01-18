@@ -67,21 +67,44 @@ $this->params['breadcrumbs'][] = $this->title;
                 'format' => 'datetime',
             ],
             [
-                'attribute' => 'screenshotUrl',
+                'label' => 'Attachments',
                 'format' => 'raw',
                 'value' => function ($model) {
-                    if (!empty($model->screenshotUrl)) {
-                        return Html::button('<i class="fas fa-eye"></i> View', [
-                            'class' => 'btn btn-orange btn-xs view-screenshot',
-                            'data-src' => $model->screenshotUrl,
+                    $ticketData = Yii::$app->db->createCommand('
+                        SELECT screenshot_url, voice_note_url 
+                        FROM ticket 
+                        WHERE id = :id
+                    ')
+                    ->bindValue(':id', $model->id)
+                    ->queryOne();
+                    
+                    $buttons = [];
+                    
+                    // Screenshot button
+                    if (!empty($ticketData['screenshot_url'])) {
+                        $buttons[] = Html::button('<i class="fas fa-image"></i> Screenshot', [
+                            'class' => 'btn btn-orange btn-xs view-screenshot mb-1',
+                            'data-src' => $ticketData['screenshot_url'],
                             'title' => 'View Screenshot'
                         ]);
-                    } else {
-                        return '<span class="text-muted">No screenshot</span>';
                     }
+                    
+                    // Voice note button
+                    if (!empty($ticketData['voice_note_url'])) {
+                        $buttons[] = Html::button('<i class="fas fa-microphone"></i> Voice Note', [
+                            'class' => 'btn btn-info btn-xs view-voice-note mb-1',
+                            'data-src' => $ticketData['voice_note_url'],
+                            'title' => 'Play Voice Note'
+                        ]);
+                    }
+                    
+                    if (empty($buttons)) {
+                        return '<span class="text-muted">No attachments</span>';
+                    }
+                    
+                    return implode('<br>', $buttons);
                 },
-                'label' => 'Screenshot',
-                'contentOptions' => ['class' => 'text-center'],
+                'contentOptions' => ['class' => 'text-center', 'style' => 'min-width:120px;'],
             ],
             [
                 'class' => 'yii\grid\ActionColumn',
@@ -115,6 +138,29 @@ $this->params['breadcrumbs'][] = $this->title;
 
     <?php Pjax::end(); ?>
 
+</div>
+
+<!-- Update the voice note modal structure -->
+<div class="modal fade" id="voiceNoteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Voice Note</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center">
+                <audio id="voiceNotePlayer" controls class="w-100">
+                    <source src="" type="audio/wav">
+                    Your browser does not support the audio element.
+                </audio>
+                <div class="mt-3">
+                    <a id="downloadVoiceNote" href="" download class="btn btn-sm btn-primary">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -203,107 +249,49 @@ $this->params['breadcrumbs'][] = $this->title;
         max-height: 60vh;
     }
 }
+
+/* Add these new styles */
+#voiceNoteModal .modal-body {
+    padding: 20px;
+}
+
+#voiceNotePlayer {
+    width: 100%;
+    max-width: 100%;
+    margin-bottom: 10px;
+}
+
+.btn-xs {
+    margin: 2px;
+    min-width: 100px;
+}
+
+.modal-dialog {
+    max-width: 500px;
+}
+
+.audio-controls {
+    margin-top: 10px;
+}
+
+#downloadVoiceNote {
+    text-decoration: none;
+    margin-top: 10px;
+}
+
+#voiceNoteModal .modal-content {
+    border-radius: 8px;
+}
+
+#voiceNoteModal .modal-header {
+    border-bottom: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+}
 </style>
 
 <?php
 $this->registerJs("
-    $(document).ready(function() {
-        $(document).on('click', '.close-ticket', function(e) {
-            e.preventDefault();
-            const ticketId = $(this).data('id');
-            const button = $(this);
-            
-            Swal.fire({
-                title: 'Close Ticket',
-                text: 'Are you sure you want to close this ticket?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#ffc107',
-                cancelButtonColor: '#6c757d',
-                confirmButtonText: 'Yes, close it!',
-                cancelButtonText: 'Cancel'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    Swal.fire({
-                        title: 'Processing...',
-                        text: 'Please wait while we close the ticket',
-                        allowOutsideClick: false,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        }
-                    });
-
-                    $.ajax({
-                        url: '" . Yii::$app->urlManager->createUrl(['ticket/close']) . "',
-                        type: 'POST',
-                        data: {
-                            id: ticketId,
-                            _csrf: '" . Yii::$app->request->csrfToken . "'
-                        },
-                        dataType: 'json'
-                    })
-                    .done(function(response) {
-                        if (response.success) {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Ticket Closed!',
-                                text: 'The ticket has been successfully closed.',
-                                showConfirmButton: false,
-                                timer: 1500
-                            }).then(() => {
-                                button.replaceWith('<span class=\"badge bg-secondary\">Closed</span>');
-                                button.closest('tr').find('td:nth-child(5)').html(
-                                    '<span class=\"badge bg-secondary\">closed</span>'
-                                );
-                            });
-                        } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                text: response.message || 'Failed to close ticket'
-                            });
-                        }
-                    })
-                    .fail(function(jqXHR) {
-                        let errorMessage = 'An error occurred while closing the ticket.';
-                        try {
-                            const response = JSON.parse(jqXHR.responseText);
-                            if (response.message) {
-                                errorMessage = response.message;
-                            }
-                        } catch (e) {
-                            console.error('Error parsing response:', e);
-                        }
-
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: errorMessage
-                        });
-                    });
-                }
-            });
-        });
-    });
-
-    function showFullImage(src) {
-        Swal.fire({
-            imageUrl: src,
-            imageAlt: 'Full size screenshot',
-            showCloseButton: true,
-            showConfirmButton: false,
-            width: '80%',
-            padding: '1em',
-            background: '#fff',
-            backdrop: `
-                rgba(0,0,123,0.4)
-                url('/images/nyan-cat.gif')
-                left top
-                no-repeat
-            `
-        });
-    }
-
+    // Screenshot viewer
     $(document).on('click', '.view-screenshot', function() {
         const imageUrl = $(this).data('src');
         Swal.fire({
@@ -314,6 +302,110 @@ $this->registerJs("
             showConfirmButton: false,
             customClass: {
                 image: 'swal-image-custom'
+            }
+        });
+    });
+
+    // Voice note player
+    $(document).on('click', '.view-voice-note', function() {
+        const audioUrl = $(this).data('src');
+        const player = document.getElementById('voiceNotePlayer');
+        const downloadBtn = document.getElementById('downloadVoiceNote');
+        
+        // Set the audio source
+        player.src = audioUrl;
+        
+        // Set download link
+        downloadBtn.href = audioUrl;
+        
+        // Show modal
+        const voiceNoteModal = new bootstrap.Modal(document.getElementById('voiceNoteModal'));
+        voiceNoteModal.show();
+        
+        // Play the audio
+        player.load(); // Reload the audio element
+        
+        // Reset audio when modal is closed
+        $('#voiceNoteModal').on('hidden.bs.modal', function () {
+            player.pause();
+            player.currentTime = 0;
+        });
+    });
+
+    // Close ticket functionality
+    $(document).on('click', '.close-ticket', function(e) {
+        e.preventDefault();
+        const ticketId = $(this).data('id');
+        const button = $(this);
+        
+        Swal.fire({
+            title: 'Close Ticket',
+            text: 'Are you sure you want to close this ticket?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#ffc107',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, close it!',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({
+                    title: 'Processing...',
+                    text: 'Please wait while we close the ticket',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                $.ajax({
+                    url: '" . Yii::$app->urlManager->createUrl(['ticket/close']) . "',
+                    type: 'POST',
+                    data: {
+                        id: ticketId,
+                        _csrf: '" . Yii::$app->request->csrfToken . "'
+                    },
+                    dataType: 'json'
+                })
+                .done(function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Ticket Closed!',
+                            text: 'The ticket has been successfully closed.',
+                            showConfirmButton: false,
+                            timer: 1500
+                        }).then(() => {
+                            button.replaceWith('<span class=\"badge bg-secondary\">Closed</span>');
+                            button.closest('tr').find('td:nth-child(5)').html(
+                                '<span class=\"badge bg-secondary\">closed</span>'
+                            );
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.message || 'Failed to close ticket'
+                        });
+                    }
+                })
+                .fail(function(jqXHR) {
+                    let errorMessage = 'An error occurred while closing the ticket.';
+                    try {
+                        const response = JSON.parse(jqXHR.responseText);
+                        if (response.message) {
+                            errorMessage = response.message;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing response:', e);
+                    }
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: errorMessage
+                    });
+                });
             }
         });
     });

@@ -11,7 +11,7 @@ $this->title = 'Ticket #' . $model->id;
 $this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
 
-$ticketData = Yii::$app->db->createCommand('SELECT module, issue, screenshot_url FROM ticket WHERE id = :id')
+$ticketData = Yii::$app->db->createCommand('SELECT module, issue, screenshot_url, voice_note_url FROM ticket WHERE id = :id')
     ->bindValue(':id', $model->id)
     ->queryOne();
 
@@ -49,12 +49,6 @@ Yii::debug('Raw ticket data from DB: ' . print_r($ticketData, true));
         'model' => $model,
         'attributes' => [
             'id',
-            // [
-            //     'attribute' => 'company_name',
-            //     'value' => function($model) use ($ticketData) {
-            //         return !empty($ticketData['company_name']) ? $ticketData['company_name'] : '(not set)';
-            //     },
-            // ],
             [
                 'attribute' => 'module',
                 'value' => function($model) use ($ticketData) {
@@ -85,17 +79,30 @@ Yii::debug('Raw ticket data from DB: ' . print_r($ticketData, true));
                     return '<span class="text-muted">No screenshot available</span>';
                 },
             ],
+            [
+                'attribute' => 'voice_note_url',
+                'format' => 'raw',
+                'value' => function ($model) use ($ticketData) {
+                    $voiceNoteUrl = !empty($ticketData['voice_note_url']) ? $ticketData['voice_note_url'] : null;
+                    if ($voiceNoteUrl) {
+                        return '
+                            <div class="voice-note-player">
+                                <audio controls class="audio-player">
+                                    <source src="' . Html::encode($voiceNoteUrl) . '" type="audio/wav">
+                                    Your browser does not support the audio element.
+                                </audio>
+                                <a href="' . Html::encode($voiceNoteUrl) . '" 
+                                   class="btn btn-sm btn-outline-primary ms-2" 
+                                   target="_blank">
+                                    <i class="fas fa-download"></i> Download
+                                </a>
+                            </div>';
+                    }
+                    return '<span class="text-muted">No voice note available</span>';
+                },
+            ],
         ],
     ]) ?>
-
-    <h2>Ticket Details</h2>
-    <p><strong>Voice Note URL:</strong> 
-        <?php if (!empty($model->voice_note_url)): ?>
-            <a href="<?= Html::encode($model->voice_note_url) ?>" target="_blank">Listen to Voice Note</a>
-        <?php else: ?>
-            No voice note available
-        <?php endif; ?>
-    </p>
 
 </div>
 
@@ -214,6 +221,21 @@ $this->registerJs($script);
 
 .swal2-popup {
     padding: 1em;
+}
+
+.voice-note-player {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.audio-player {
+    max-width: 300px;
+    height: 40px;
+}
+
+.voice-note-player .btn {
+    white-space: nowrap;
 }
 </style>
 

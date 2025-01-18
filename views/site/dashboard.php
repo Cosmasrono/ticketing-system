@@ -135,7 +135,6 @@ $this->registerJs("
                         <thead>
                             <tr>
                                 <th>Company</th>
-                                <th>Requested By</th>
                                 <th>Current End Date</th>
                                 <th>Extension</th>
                                 <th>New End Date</th>
@@ -149,7 +148,6 @@ $this->registerJs("
                             <?php foreach ($renewals as $renewal): ?>
                                 <tr>
                                     <td><?= Html::encode($renewal->company->company_name) ?></td>
-                                    <td><?= Html::encode($renewal->requestedBy->username) ?></td>
                                     <td><?= Yii::$app->formatter->asDate($renewal->current_end_date) ?></td>
                                     <td><?= $renewal->extension_period ?> months</td>
                                     <td><?= Yii::$app->formatter->asDate($renewal->new_end_date) ?></td>
@@ -213,29 +211,32 @@ $this->registerJs("
 
 <div class="client-list">
     <h2>Our Clients</h2>
-    <p>Total Clients: <?= htmlspecialchars($clientCount) ?></p>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Company Name</th>
-                <th>Email</th>
-                <th>Created At</th>
-                <th>Updated At</th>
-            </tr>
-        </thead>
-        <tbody>
-            <?php foreach ($clients as $client): ?>
+    <p>Total Clients: <?= Html::encode($clientCount) ?></p>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
                 <tr>
-                    <td><?= htmlspecialchars($client->id) ?></td>
-                    <td><?= htmlspecialchars($client->company_name) ?></td>
-                    <td><?= htmlspecialchars($client->company_email) ?></td>
-                    <td><?= htmlspecialchars($client->created_at) ?></td>
-                    <td><?= htmlspecialchars($client->updated_at) ?></td>
+                    <th>ID</th>
+                    <th>Company Name</th>
+                    <th>Email</th>
+                    <th>Created At</th>
+                    <th>Updated At</th>
+ 
                 </tr>
-            <?php endforeach; ?>
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                <?php foreach ($clients as $client): ?>
+                    <tr>
+                        <td><?= Html::encode($client->id) ?></td>
+                        <td><?= Html::encode($client->company_name) ?></td>
+                        <td><?= Html::encode($client->company_email) ?></td>
+                        <td><?= Yii::$app->formatter->asDatetime($client->created_at) ?></td>
+                        <td><?= Yii::$app->formatter->asDatetime($client->updated_at) ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
 </div>
 
 

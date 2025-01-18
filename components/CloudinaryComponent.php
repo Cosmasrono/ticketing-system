@@ -16,7 +16,9 @@ class CloudinaryComponent extends Component
     public function init()
     {
         parent::init();
-        $config = Configuration::instance([
+        
+        // Configure Cloudinary
+        Configuration::instance([
             'cloud' => [
                 'cloud_name' => $this->cloud_name,
                 'api_key' => $this->api_key,
@@ -26,27 +28,26 @@ class CloudinaryComponent extends Component
                 'secure' => true
             ]
         ]);
-        $this->_cloudinary = new Cloudinary($config);
+
+        $this->_cloudinary = new Cloudinary();
     }
 
-    public function uploadImage($tmpFile)
+    public function upload($filePath, $options = [])
     {
         try {
-            $result = $this->_cloudinary->uploadApi()->upload($tmpFile, [
-                'folder' => 'support_tickets',
-                'overwrite' => true,
-                'resource_type' => 'image'
-            ]);
-
+            // Upload the file to Cloudinary
+            $result = $this->_cloudinary->uploadApi()->upload($filePath, $options);
+            
             return [
                 'success' => true,
-                'url' => $result['secure_url'],
+                'secure_url' => $result['secure_url'],
                 'public_id' => $result['public_id']
             ];
         } catch (\Exception $e) {
+            \Yii::error('Cloudinary upload error: ' . $e->getMessage());
             return [
                 'success' => false,
-                'error' => $e->getMessage()
+                'message' => $e->getMessage()
             ];
         }
     }

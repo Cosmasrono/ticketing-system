@@ -1750,8 +1750,11 @@ public function actionDashboard()
     }
 
     // Get client data
-    $clients = \app\models\Company::find()->all(); // Assuming you have a Company model
-    $clientCount = count($clients);
+    $clients = Client::find()
+        ->orderBy(['created_at' => SORT_DESC])
+        ->all();
+    
+    $clientCount = Client::find()->count();
 
     $ticketStats = [
         'total' => Ticket::find()->count(),
@@ -1792,8 +1795,8 @@ public function actionDashboard()
         'ticketStatusData' => $ticketStatusData,
         'developerStats' => $developerStats,
         'users' => $users,
-        'clients' => $clients,          // Add this line
-        'clientCount' => $clientCount,  // Add this line
+        'clients' => $clients,
+        'clientCount' => $clientCount,
     ]);
 }
 public function actionToggleStatus()

@@ -121,6 +121,8 @@ class Ticket extends ActiveRecord
             }, 'whenClient' => "function (attribute, value) {
                 return $('#ticket-status').val() === 'reassigned';
             }"],
+            [['screenshot_url'], 'string', 'max' => 255],
+            [['screenshot_url'], 'safe'],
         ];
     }
 

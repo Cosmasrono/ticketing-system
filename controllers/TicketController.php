@@ -32,10 +32,12 @@ use app\jobs\SendTicketAssignmentEmail;
 use app\models\Notification;
 use yii\web\UploadedFile;
 use yii\helpers\FileHelper;
-use Cloudinary\Cloudinary;
+use Cloudinary;
+use Cloudinary\Uploader;
 use app\models\Company;
 use yii\helpers\Json;
 use yii\web\JsonResponse;
+ 
  
  
  
@@ -1279,9 +1281,10 @@ public function actionClose()
             // Find the ticket model
             $ticket = $this->findModel($id);
 
-            // Check if the current user is authorized to close the ticket
-            // Allow users with role 3 to close the ticket
-            if ($ticket->assigned_to !== Yii::$app->user->id && Yii::$app->user->identity->role !== 3) {
+            // Allow both admin (role 3) and regular users who created the ticket to close it
+            if ($ticket->user_id !== Yii::$app->user->id && 
+                Yii::$app->user->identity->role !== 3 && 
+                $ticket->assigned_to !== Yii::$app->user->id) {
                 return [
                     'success' => false,
                     'message' => 'You are not authorized to close this ticket'
@@ -1297,7 +1300,9 @@ public function actionClose()
             }
 
             // Close the ticket
-            $ticket->status = 'closed'; // Assuming 'closed' is the status for closed tickets
+            $ticket->status = 'closed';
+            $ticket->closed_by = Yii::$app->user->id;
+            $ticket->closed_at = date('Y-m-d H:i:s');
 
             // Save the ticket status
             if (!$ticket->save(false)) {
@@ -1307,15 +1312,19 @@ public function actionClose()
                 ];
             }
 
+            // Log the action
+            Yii::info('Ticket #' . $id . ' closed by user ID: ' . Yii::$app->user->id);
+
             return [
                 'success' => true,
                 'message' => 'Ticket has been closed successfully'
             ];
+
         } catch (\Exception $e) {
             Yii::error('Close ticket error: ' . $e->getMessage() . ' | Stack trace: ' . $e->getTraceAsString());
             return [
                 'success' => false,
-                'message' => 'An error occurred while closing the ticket. Please check the logs for more details.'
+                'message' => 'An error occurred while closing the ticket'
             ];
         }
     }
@@ -1538,45 +1547,28 @@ public function actionClose()
     }
 
 
+
     public function actionCreate()
     {
         $model = new Ticket();
 
-        // Log the start of ticket creation
-        Yii::info('Starting ticket creation process', 'ticket-create');
-
-        // Fetch user's company email from users table
-        $userCompanyEmail = Yii::$app->db->createCommand('
-            SELECT company_email 
-            FROM users 
-            WHERE id = :user_id
-        ')
-        ->bindValue(':user_id', Yii::$app->user->id)
-        ->queryScalar();
-
-        // Log fetched email
-        Yii::info("Fetched company email: $userCompanyEmail", 'ticket-create');
-
-        // Fetch and prepare modules list
-        $userModules = Yii::$app->db->createCommand('
-            SELECT modules 
+        // Get user's modules from database
+        $userInfo = Yii::$app->db->createCommand('
+            SELECT company_email, modules 
             FROM users 
             WHERE id = :user_id
         ')
         ->bindValue(':user_id', Yii::$app->user->id)
         ->queryOne();
 
-        // Log fetched modules
-        Yii::info('Fetched user modules:', 'ticket-create');
-        Yii::info($userModules, 'ticket-create');
-
-        $modulesList = [];
-        if (!empty($userModules['modules'])) {
-            $modules = explode(',', $userModules['modules']);
+        // Prepare modules list
+        $companyModules = [];
+        if (!empty($userInfo['modules'])) {
+            $modules = explode(',', $userInfo['modules']);
             foreach ($modules as $module) {
                 $module = trim($module);
                 if (!empty($module)) {
-                    $modulesList[$module] = $module;
+                    $companyModules[$module] = $module;
                 }
             }
         }
@@ -1584,143 +1576,107 @@ public function actionClose()
         // Get module issues
         $moduleIssues = $this->getModuleIssues();
 
-        // Handle POST request for ticket creation
         if (Yii::$app->request->isPost) {
             try {
-                // Log received POST data
-                Yii::info('Received POST data:', 'ticket-create');
-                Yii::info(Yii::$app->request->post(), 'ticket-create');
+                // Load POST data first
+                $model->load(Yii::$app->request->post());
 
-                // Load POST data
-                if (!$model->load(Yii::$app->request->post())) {
-                    throw new \Exception('Failed to load form data');
+                // Handle screenshot upload
+                if (isset($_FILES['Ticket']) && isset($_FILES['Ticket']['tmp_name']['screenshot'])) {
+                    $tempFile = $_FILES['Ticket']['tmp_name']['screenshot'];
+                    
+                    if (is_uploaded_file($tempFile)) {
+                        // Upload to Cloudinary
+                        $screenshotUrl = $this->uploadToCloudinary($tempFile);
+                        
+                        // Log the URL for debugging
+                        Yii::info('Cloudinary URL received: ' . $screenshotUrl);
+
+                        // Directly update the model's screenshot_url
+                        $model->setAttribute('screenshot_url', $screenshotUrl);
+                        
+                        // Double-check the attribute was set
+                        Yii::info('Model screenshot_url after setting: ' . $model->screenshot_url);
+                    }
                 }
 
-                // Get the module and issue from POST data directly
-                $postData = Yii::$app->request->post('Ticket');
-                $selectedModule = isset($postData['module']) ? $postData['module'] : null;
-                $selectedIssue = isset($postData['issue']) ? $postData['issue'] : null;
-
-                // Log the selected values
-                Yii::info('Selected Module: ' . $selectedModule, 'ticket-create');
-                Yii::info('Selected Issue: ' . $selectedIssue, 'ticket-create');
-
-                // Set all attributes explicitly
+                // Set other required attributes
                 $model->setAttributes([
                     'user_id' => Yii::$app->user->id,
                     'created_by' => Yii::$app->user->id,
                     'created_at' => date('Y-m-d H:i:s'),
-                    'company_name' => Yii::$app->user->identity->company_name ?? '(not set)',
-                    'company_email' => $userCompanyEmail,
                     'status' => 'pending',
-                    'severity_level' => $model->severity ?? 1,
-                    'module' => $selectedModule,  // Explicitly set module
-                    'issue' => $selectedIssue,    // Explicitly set issue
-                    'description' => $postData['description'] ?? null
+                    'company_name' => Yii::$app->user->identity->company_name ?? '(not set)',
+                    'company_email' => $userInfo['company_email'] ?? null,
                 ]);
 
-                // Log model attributes after setting
-                Yii::info('Model attributes after setting:', 'ticket-create');
-                Yii::info($model->attributes, 'ticket-create');
-
-                // Validate essential fields
-                if (empty($model->module)) {
-                    throw new \Exception('Module is required');
-                }
-                if (empty($model->issue)) {
-                    throw new \Exception('Issue is required');
-                }
-
-                // Handle screenshot upload
-                if (isset($_FILES['Ticket']) && isset($_FILES['Ticket']['tmp_name']['screenshot'])) {
-                    Yii::info('Processing screenshot upload', 'ticket-create');
-                    $tempFile = $_FILES['Ticket']['tmp_name']['screenshot'];
-                    
-                    if (is_uploaded_file($tempFile)) {
-                        try {
-                            $cloudinary = new \Cloudinary\Cloudinary([
-                                'cloud' => [
-                                    'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
-                                    'api_key' => Yii::$app->params['cloudinary']['api_key'],
-                                    'api_secret' => Yii::$app->params['cloudinary']['api_secret']
-                                ]
-                            ]);
-                            
-                            $result = $cloudinary->uploadApi()->upload($tempFile, [
-                                'folder' => 'tickets/images',
-                                'resource_type' => 'auto',
-                                'unique_filename' => true,
-                                'overwrite' => false,
-                                'allowed_formats' => ['jpg', 'jpeg', 'png', 'gif'],
-                            ]);
-                            
-                            if (isset($result['secure_url'])) {
-                                $model->screenshot_url = $result['secure_url'];
-                                Yii::info('Screenshot uploaded successfully: ' . $result['secure_url'], 'ticket-create');
-                            }
-                        } catch (\Exception $e) {
-                            Yii::error('Screenshot upload error: ' . $e->getMessage(), 'ticket-create');
-                            $model->screenshot_url = 'No screenshot available';
-                        }
-                    }
-                }
-
-                // Validate the model
-                if (!$model->validate()) {
-                    Yii::error('Validation failed:', 'ticket-create');
-                    Yii::error($model->errors, 'ticket-create');
-                    throw new \Exception('Validation failed: ' . json_encode($model->errors));
-                }
-
-                // Log final model state before save
-                Yii::info('Final model state before save:', 'ticket-create');
-                Yii::info($model->attributes, 'ticket-create');
-
-                // Save the model
+                // Try to save and log any errors
                 if (!$model->save()) {
-                    Yii::error('Save failed:', 'ticket-create');
-                    Yii::error($model->errors, 'ticket-create');
+                    Yii::error('Failed to save ticket: ' . json_encode($model->errors));
                     throw new \Exception('Failed to save ticket: ' . json_encode($model->errors));
                 }
 
-                // Log successful save
-                Yii::info('Ticket saved successfully with ID: ' . $model->id, 'ticket-create');
+                // Verify the save by doing a direct database query
+                $saved = Yii::$app->db->createCommand('SELECT screenshot_url FROM ticket WHERE id = :id')
+                    ->bindValue(':id', $model->id)
+                    ->queryOne();
+                
+                Yii::info('Saved screenshot_url in database: ' . ($saved['screenshot_url'] ?? 'null'));
 
-                // Return success response
-                if (Yii::$app->request->isAjax) {
-                    return $this->asJson([
-                        'success' => true,
-                        'ticket_id' => $model->id,
-                        'title' => 'Success!',
-                        'text' => 'Ticket created successfully',
-                        'redirectUrl' => Url::to(['view', 'id' => $model->id]),
-                        'saved_data' => $model->attributes
-                    ]);
+                // If the URL wasn't saved properly, try a direct database update
+                if (empty($saved['screenshot_url']) && !empty($screenshotUrl)) {
+                    Yii::$app->db->createCommand()
+                        ->update('ticket', 
+                            ['screenshot_url' => $screenshotUrl],
+                            ['id' => $model->id])
+                        ->execute();
+                    
+                    Yii::info('Performed direct database update for screenshot_url');
                 }
 
-                Yii::$app->session->setFlash('success', 'Ticket created successfully.');
                 return $this->redirect(['view', 'id' => $model->id]);
 
             } catch (\Exception $e) {
-                Yii::error('Error in ticket creation: ' . $e->getMessage(), 'ticket-create');
-                
-                if (Yii::$app->request->isAjax) {
-                    return $this->asJson([
-                        'success' => false,
-                        'message' => YII_DEBUG ? $e->getMessage() : 'Failed to create ticket'
-                    ]);
-                }
-                
-                Yii::$app->session->setFlash('error', YII_DEBUG ? $e->getMessage() : 'Failed to create ticket');
+                Yii::error('Error in ticket creation: ' . $e->getMessage());
+                throw $e;
             }
         }
 
-        // Render the form
         return $this->render('create', [
             'model' => $model,
-            'companyModules' => $modulesList,
+            'companyModules' => $companyModules,
             'moduleIssues' => $moduleIssues
         ]);
+    }
+
+    private function uploadToCloudinary($tempFile)
+    {
+        try {
+            // Initialize Cloudinary
+            $cloudinary = new \Cloudinary\Cloudinary([
+                'cloud' => [
+                    'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
+                    'api_key' => Yii::$app->params['cloudinary']['api_key'],
+                    'api_secret' => Yii::$app->params['cloudinary']['api_secret']
+                ]
+            ]);
+
+            // Upload file and get result
+            $result = $cloudinary->uploadApi()->upload($tempFile, [
+                'folder' => 'tickets/screenshots',
+                'resource_type' => 'image'
+            ]);
+
+            // Log the full result
+            Yii::info('Cloudinary upload result: ' . json_encode($result));
+
+            // Return the secure URL
+            return $result['secure_url'] ?? null;
+
+        } catch (\Exception $e) {
+            Yii::error('Cloudinary upload error: ' . $e->getMessage());
+            throw $e;
+        }
     }
 
     public function actionAssigned()
@@ -1735,6 +1691,15 @@ public function actionClose()
         ]);
     }
 
+   
+   
+     
+
+
+
+
+
+
     public function actionViewImage($id)
     {
         $model = Ticket::findOne($id);
@@ -1745,102 +1710,6 @@ public function actionClose()
         }
         return 'No image available';
     }
-
-    public function actionUploadToCloudinary()
-    {
-        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-        
-        try {
-            if (!isset($_FILES['file'])) {
-                return [
-                    'success' => false,
-                    'message' => 'No file uploaded'
-                ];
-            }
-
-            $file = $_FILES['file'];
-            
-            // Validate file size (5MB limit)
-            if ($file['size'] > 5 * 1024 * 1024) {
-                return [
-                    'success' => false,
-                    'message' => 'File size must not exceed 5MB'
-                ];
-            }
-
-            // Validate file type
-            $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-            if (!in_array($file['type'], $allowedTypes)) {
-                return [
-                    'success' => false,
-                    'message' => 'Only JPG, PNG and GIF files are allowed'
-                ];
-            }
-
-            $cloudinary = new Cloudinary([
-                'cloud' => [
-                    'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
-                    'api_key' => Yii::$app->params['cloudinary']['api_key'],
-                    'api_secret' => Yii::$app->params['cloudinary']['api_secret']
-                ]
-            ]);
-
-            $response = $cloudinary->uploadApi()->upload(
-                $file['tmp_name'],
-                [
-                    'folder' => 'tickets',
-                    'resource_type' => 'image'
-                ]
-            );
-
-            return [
-                'success' => true,
-                'url' => $response['secure_url'],
-                'public_id' => $response['public_id']
-            ];
-
-        } catch (\Exception $e) {
-            \Yii::error('Cloudinary upload error: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => 'Upload failed: ' . $e->getMessage()
-            ];
-        }
-    }
-
-    public function actionUpload()
-    {
-        try {
-            if (!isset($_FILES['file'])) {
-                return $this->asJson(['error' => 'No file uploaded']);
-            }
-
-            $cloudinary = new Cloudinary([
-                'cloud' => [
-                    'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
-                    'api_key' => Yii::$app->params['cloudinary']['api_key'],
-                    'api_secret' => Yii::$app->params['cloudinary']['api_secret']
-                ]
-            ]);
-
-            $response = $cloudinary->uploadApi()->upload(
-                $_FILES['file']['tmp_name'],
-                ['folder' => 'tickets'] // Optional: specify folder
-            );
-
-            return $this->asJson([
-                'success' => true,
-                'url' => $response['secure_url']
-            ]);
-
-        } catch (\Exception $e) {
-            return $this->asJson([
-                'success' => false,
-                'error' => $e->getMessage()
-            ]);
-        }
-    }
-
     protected function getModuleIssues()
     {
         return [
@@ -2001,7 +1870,7 @@ public function actionClose()
             }
 
             // Initialize Cloudinary
-            $cloudinary = new Cloudinary([
+            $cloudinary = new \Cloudinary\Cloudinary([
                 'cloud' => [
                     'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
                     'api_key' => Yii::$app->params['cloudinary']['api_key'],
@@ -2037,13 +1906,6 @@ public function actionClose()
             ];
         }
     }
-
-    /**
-     * Sends email notification to admin when a new ticket is created
-     * @param Ticket $ticket
-     * @return bool
-     */
-  
 
 }
 

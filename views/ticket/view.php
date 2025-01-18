@@ -11,7 +11,7 @@ $this->title = 'Ticket #' . $model->id;
 $this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
 
-$ticketData = Yii::$app->db->createCommand('SELECT module, issue FROM ticket WHERE id = :id')
+$ticketData = Yii::$app->db->createCommand('SELECT module, issue, screenshot_url FROM ticket WHERE id = :id')
     ->bindValue(':id', $model->id)
     ->queryOne();
 
@@ -49,12 +49,12 @@ Yii::debug('Raw ticket data from DB: ' . print_r($ticketData, true));
         'model' => $model,
         'attributes' => [
             'id',
-            [
-                'attribute' => 'company_name',
-                'value' => function($model) use ($ticketData) {
-                    return !empty($ticketData['company_name']) ? $ticketData['company_name'] : '(not set)';
-                },
-            ],
+            // [
+            //     'attribute' => 'company_name',
+            //     'value' => function($model) use ($ticketData) {
+            //         return !empty($ticketData['company_name']) ? $ticketData['company_name'] : '(not set)';
+            //     },
+            // ],
             [
                 'attribute' => 'module',
                 'value' => function($model) use ($ticketData) {
@@ -71,20 +71,20 @@ Yii::debug('Raw ticket data from DB: ' . print_r($ticketData, true));
             'status',
             'created_at:datetime',
             [
-                'attribute' => 'screenshotUrl',
+                'attribute' => 'screenshot_url',
                 'format' => 'raw',
-                'value' => function ($model) {
-                    if (!empty($model->screenshotUrl)) {
-                        return Html::button('View Screenshot', [
+                'value' => function ($model) use ($ticketData) {
+                    $screenshotUrl = !empty($ticketData['screenshot_url']) ? $ticketData['screenshot_url'] : null;
+                    if ($screenshotUrl) {
+                        return Html::button('<i class="fas fa-eye"></i> View', [
                             'class' => 'btn btn-info btn-sm view-screenshot',
-                            'data-src' => $model->screenshotUrl,
+                            'data-src' => $screenshotUrl,
                             'title' => 'View Screenshot'
                         ]);
                     }
                     return '<span class="text-muted">No screenshot available</span>';
                 },
             ],
- 
         ],
     ]) ?>
 
@@ -112,7 +112,7 @@ $(document).on('click', '.view-screenshot', function() {
     Swal.fire({
         imageUrl: imageUrl,
         imageAlt: 'Screenshot',
-        width: '60%',
+        width: '80%',
         showCloseButton: true,
         showConfirmButton: false,
         customClass: {
@@ -184,6 +184,19 @@ function closeTicket() {
         }
     });
 }
+
+function showFullImage(url) {
+    Swal.fire({
+        imageUrl: url,
+        imageAlt: 'Screenshot',
+        width: '80%',
+        showCloseButton: true,
+        showConfirmButton: false,
+        customClass: {
+            image: 'swal-image-custom'
+        }
+    });
+}
 JS;
 $this->registerJs($script);
 ?>
@@ -191,17 +204,16 @@ $this->registerJs($script);
 <style>
 .swal-image-custom {
     max-width: 100%;
-    max-height: 70vh;
+    max-height: 80vh;
     object-fit: contain;
+}
+
+.view-screenshot {
+    min-width: 80px;
 }
 
 .swal2-popup {
     padding: 1em;
-}
-
-.view-screenshot {
-    padding: 0.25rem 0.5rem;
-    font-size: 0.875rem;
 }
 </style>
 

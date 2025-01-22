@@ -63,6 +63,13 @@ $this->params['breadcrumbs'][] = $this->title;
                 }
             ],
             [
+                'attribute' => 'feedback',
+                'value' => function($model) {
+                    return !empty($model->feedback) ? $model->feedback : '(no feedback)';
+                },
+                'contentOptions' => ['style' => 'max-width:200px; overflow:hidden; text-overflow:ellipsis;'],
+            ],
+            [
                 'attribute' => 'created_at',
                 'format' => 'datetime',
             ],
@@ -340,8 +347,9 @@ $this->registerJs("
         
         Swal.fire({
             title: 'Close Ticket',
-            text: 'Are you sure you want to close this ticket?',
-            icon: 'warning',
+            text: 'Please provide a comment before closing this ticket:',
+            input: 'textarea',
+            inputPlaceholder: 'Enter your comment here...',
             showCancelButton: true,
             confirmButtonColor: '#ffc107',
             cancelButtonColor: '#6c757d',
@@ -349,6 +357,7 @@ $this->registerJs("
             cancelButtonText: 'Cancel'
         }).then((result) => {
             if (result.isConfirmed) {
+                const comment = result.value; // Get the comment from the input
                 Swal.fire({
                     title: 'Processing...',
                     text: 'Please wait while we close the ticket',
@@ -363,6 +372,7 @@ $this->registerJs("
                     type: 'POST',
                     data: {
                         id: ticketId,
+                        comment: comment, // Send the comment with the request
                         _csrf: '" . Yii::$app->request->csrfToken . "'
                     },
                     dataType: 'json'

@@ -41,6 +41,8 @@ use app\models\UserProfile;
 use app\models\ContractRenewal;
 use DateTime;
 use app\models\Renewal;
+use app\models\TicketActivity;
+ 
 
 class SiteController extends Controller
 
@@ -57,13 +59,15 @@ class SiteController extends Controller
                         'actions' => ['index', 'login', 'signup', 'change-password'],
                         'allow' => true,
                         'roles' => ['@'], // Allow authenticated users
-                        'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->role == User::ROLE_SUPER_ADMIN; // Check if the user is a super admin
-                        },
                     ],
                     [
                         'actions' => ['admin', 'approve', 'cancel', 'assign', 'dashboard'], // Include admin, ticket actions, and dashboard
                         'allow' => true,
+                        'matchCallback' => function ($rule, $action) {
+                            // Check if the user role is 'admin', 'superadmin', 1, or 4
+                            $role = Yii::$app->user->identity->role;
+                            return in_array($role, ['admin', 'superadmin', 1, 4]);
+                        },
                     ],
                     [
                         'allow' => false, // Deny all other actions
@@ -121,6 +125,13 @@ public function actionCreateUser()
         $model = new Company();
         $model->role = 'user';
 
+        // Get all companies with their modules
+        $clientCompanies = (new \yii\db\Query())
+            ->select(['company_name', 'company_email', 'module'])
+            ->from('client')
+            ->all();
+
+        // Handle form submission
         if ($model->load(Yii::$app->request->post())) {
             try {
                 $post = Yii::$app->request->post('Company');
@@ -129,82 +140,40 @@ public function actionCreateUser()
                 $transaction = Yii::$app->db->beginTransaction();
 
                 try {
-                    // Make company name unique by combining company name and user name
-                    $uniqueCompanyName = $post['company_name'] . '-' . $post['name'];
-
-                    // Remove any special characters and spaces, replace with dashes
-                    $uniqueCompanyName = preg_replace('/[^A-Za-z0-9\-]/', '-', $uniqueCompanyName);
-                    // Convert to lowercase
-                    $uniqueCompanyName = strtolower($uniqueCompanyName);
-                    // Remove multiple consecutive dashes
-                    $uniqueCompanyName = preg_replace('/-+/', '-', $uniqueCompanyName);
-                    // Trim dashes from beginning and end
-                    $uniqueCompanyName = trim($uniqueCompanyName, '-');
-
-                    // Insert into company table
-                    $sql = "INSERT INTO company (
-                        name, 
-                        company_email, 
-                        start_date, 
-                        end_date, 
-                        role, 
-                        status, 
-                        company_name,
-                        created_at, 
-                        updated_at,
-                        modules
-                    ) VALUES (
-                        :name,
-                        :email,
-                        :start_date,
-                        :end_date,
-                        :role,
-                        :status,
-                        :company_name,
-                        NOW(),
-                        NOW(),
-                        :modules
-                    )";
-
                     // Convert modules array to comma-separated string
                     $modules = isset($post['modules']) ? implode(',', $post['modules']) : '';
 
-                    $result = Yii::$app->db->createCommand($sql)
-                        ->bindValues([
-                            ':name' => $post['name'],
-                            ':email' => $post['company_email'],
-                            ':start_date' => $post['start_date'],
-                            ':end_date' => $post['end_date'],
-                            ':role' => 'user',
-                            ':status' => 1,
-                            ':company_name' => $uniqueCompanyName,
-                            ':modules' => $modules
-                        ])
-                        ->execute();
+                    // Insert into company table
+                    $result = Yii::$app->db->createCommand()->insert('company', [
+                        'name' => $post['name'],
+                        'company_name' => $post['company_name'], // Use company name directly
+                        'company_email' => $post['company_email'],
+                        'start_date' => $post['start_date'],
+                        'end_date' => $post['end_date'],
+                        'role' => 'user',
+                        'status' => 1,
+                        'modules' => $modules,
+                        'created_at' => new \yii\db\Expression('NOW()'),
+                        'updated_at' => new \yii\db\Expression('NOW()')
+                    ])->execute();
 
                     $transaction->commit();
+                    
                     Yii::$app->session->setFlash('success', 'Company user created successfully.');
                     return $this->redirect(['admin']);
 
                 } catch (\Exception $e) {
                     $transaction->rollBack();
-                    throw $e;
+                    Yii::$app->session->setFlash('error', 'Database Error: ' . $e->getMessage());
                 }
-
             } catch (\Exception $e) {
                 Yii::$app->session->setFlash('error', 'Error creating user: ' . $e->getMessage());
             }
         }
 
-        // Get modules for selection
-        $modules = (new \yii\db\Query())
-            ->select(['module_code', 'module_name'])
-            ->from('module_list')
-            ->all();
-
         return $this->render('create-company', [
             'model' => $model,
-            'modules' => $modules,
+            'clientCompanies' => $clientCompanies,
         ]);
     }
     /**
@@ -214,7 +183,7 @@ public function actionCreateUser()
      */
   
 
-    // public function actionApproveTicket()
+  // public function actionApproveTicket()
     // {
     //     Yii::$app->response->format = Response::FORMAT_JSON;
     //     $id = Yii::$app->request->post('id');
@@ -660,8 +629,8 @@ public function actionDeveloperDashboard()
 
 public function actionAdmin()
 {
-    // Check if the user is logged in and has the required role
-    if (Yii::$app->user->isGuest || !in_array(Yii::$app->user->identity->role, [1, 4])) {
+    // Check if the user is a guest or does not have the admin or superadmin role
+    if (Yii::$app->user->isGuest || !in_array(Yii::$app->user->identity->role, ['admin', 'superadmin', 1, 4])) {
         throw new \yii\web\ForbiddenHttpException('You are not allowed to access this page.');
     }
 
@@ -1342,8 +1311,8 @@ public function actionCreateUserForCompany($company_id)
         if ($emailSent) {
             $transaction->commit();
             Yii::$app->session->setFlash('success', 
-                'User account created and instructions sent to ' . $company->company_email . 
-                '<br>Direct link: <a href="' . $resetUrl . '">Click here to set password</a>'
+                'User account created and instructions sent to ' . $company->company_email 
+                
             );
         } else {
             throw new \Exception('Failed to send email');
@@ -1735,68 +1704,193 @@ public function actionToggleUserStatus()
 
 public function actionDashboard()
 {
-    // Check if user is logged in
-    if (Yii::$app->user->isGuest) {
-        return $this->redirect(['site/login']);
+    // Fetch tickets from the database
+    $tickets = Ticket::find()->all(); // Fetch all tickets or apply any necessary conditions
+
+    // Fetch client count
+    $clientCount = Client::find()->count(); // Count the total number of clients
+
+    // Fetch users from the database
+    $users = User::find()->all(); // Assuming you have a User model to fetch users
+
+    // Fetch developer statistics
+    $developerStats = []; // Initialize the variable
+    $developers = User::find()->where(['role' => 'developer'])->all(); // Assuming you have a role field
+    foreach ($developers as $developer) {
+        $activeTickets = Ticket::find()->where(['assigned_to' => $developer->id, 'status' => 'active'])->count();
+        $developerStats[] = [
+            'name' => $developer->name,
+            'active_tickets' => $activeTickets,
+        ];
     }
 
-    // Get user role
-    $userRole = Yii::$app->user->identity->role;
+    // Fetch recent tickets
+    $recentTickets = Ticket::find()->orderBy(['created_at' => SORT_DESC])->limit(5)->all(); // Fetch the 5 most recent tickets
 
-    // Check if user has permission (role 1 or 4)
-    if ($userRole != 1 && $userRole != 4) {
-        Yii::$app->session->setFlash('error', 'You do not have permission to access this page.');
-        return $this->redirect(['site/index']);
-    }
+    // Fetch ticket status data
+    $ticketStatusData = [
+        'total' => Ticket::find()->count(),
+        'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
+        'assigned' => Ticket::find()->where(['status' => 'assigned'])->count(),
+        'resolved' => Ticket::find()->where(['status' => 'resolved'])->count(),
+        'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
+    ];
 
-    // Get client data
-    $clients = Client::find()
-        ->orderBy(['created_at' => SORT_DESC])
-        ->all();
-    
-    $clientCount = Client::find()->count();
-
+    // Other data you might want to pass to the view
     $ticketStats = [
         'total' => Ticket::find()->count(),
         'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
         'assigned' => Ticket::find()->where(['status' => 'assigned'])->count(),
-        'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
+        // Add other stats as needed
     ];
 
-    // Prepare data for the doughnut chart
-    $ticketStatusData = [
-        'Pending' => $ticketStats['pending'],
-        'Assigned' => $ticketStats['assigned'],
-        'Closed' => $ticketStats['closed'],
-    ];
+    // Assuming you have a way to get the logged-in user's company name
+    $loggedInUserCompanyName = Yii::$app->user->identity->company_name; // Adjust this line as necessary
 
-    // Get recent tickets
-    $recentTickets = Ticket::find()
-        ->orderBy(['created_at' => SORT_DESC])
+    // Prepare chart data
+    $responseTimeLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    $responseTimeData = [4, 3, 5, 2, 4, 3, 4]; // Example data, replace with actual response times
+
+    $categoryLabels = ['Technical', 'Billing', 'Feature Request', 'Bug', 'Other'];
+    $categoryData = [30, 25, 20, 15, 10]; // Example data, replace with actual category counts
+
+    // Get tickets grouped by severity level
+    $severityQuery = Ticket::find()
+        ->select(['severity_level', 'COUNT(*) as count'])
+        ->groupBy('severity_level')
+        ->asArray()
+        ->all();
+
+    // Initialize arrays for chart data
+    $severityLabels = ['Critical', 'High', 'Medium', 'Low'];
+    $severityCount = array_fill(0, 4, 0); // Initialize with zeros
+
+    // Map the query results to our fixed array positions
+    foreach ($severityQuery as $data) {
+        switch (strtolower($data['severity_level'])) {
+            case 'critical':
+                $severityCount[0] = (int)$data['count'];
+                break;
+            case 'high':
+                $severityCount[1] = (int)$data['count'];
+                break;
+            case 'medium':
+                $severityCount[2] = (int)$data['count'];
+                break;
+            case 'low':
+                $severityCount[3] = (int)$data['count'];
+                break;
+        }
+    }
+
+    // Debug data
+    Yii::debug([
+        'labels' => $severityLabels,
+        'counts' => $severityCount
+    ], 'chart-data');
+
+    // Get response time data for the last 7 days using last_update_at
+    $lastWeek = date('Y-m-d', strtotime('-6 days'));
+    $responseTimeData = Ticket::find()
+        ->select([
+            'DATE(created_at) as date', 
+            'AVG(TIMESTAMPDIFF(HOUR, created_at, last_update_at)) as avg_response'
+        ])
+        ->where(['>=', 'created_at', $lastWeek])
+        ->andWhere(['IS NOT', 'last_update_at', null])
+        ->groupBy('date')
+        ->orderBy('date')
+        ->asArray()
+        ->all();
+
+    // Prepare response time data for charts
+    $responseTimeLabels = [];
+    $responseTimeDuration = [];
+    foreach ($responseTimeData as $data) {
+        $responseTimeLabels[] = date('D', strtotime($data['date']));
+        $responseTimeDuration[] = round($data['avg_response'] ?? 0, 1);
+    }
+
+    // Get recent updates
+    $recentUpdates = Ticket::find()
+        ->where(['IS NOT', 'last_update_at', null])
+        ->orderBy(['last_update_at' => SORT_DESC])
         ->limit(5)
         ->all();
 
-    // Get developer statistics
-    $developerStats = (new \yii\db\Query())
-        ->select(['users.id', 'users.name', 
-                  'active_tickets' => new \yii\db\Expression('COUNT(CASE WHEN ticket.status != "closed" THEN 1 END)')])
-        ->from('users')
-        ->leftJoin('ticket', 'ticket.assigned_to = users.id')
-        ->where(['users.role' => 'developer'])
-        ->groupBy(['users.id', 'users.name'])
-        ->all();
+    // Calculate average response time
+    $avgResponseTime = Ticket::find()
+        ->select(['AVG(TIMESTAMPDIFF(HOUR, created_at, last_update_at)) as avg_time'])
+        ->where(['IS NOT', 'last_update_at', null])
+        ->andWhere(['>=', 'created_at', date('Y-m-d', strtotime('-30 days'))])
+        ->scalar();
 
-    // Get all users
-    $users = User::find()->all();
+    // Calculate ticket statistics with last update information
+    $ticketStats = [
+        'total' => Ticket::find()->count(),
+        'critical' => Ticket::find()->where(['severity_level' => 'Critical'])->count(),
+        'high' => Ticket::find()->where(['severity_level' => 'High'])->count(),
+        'medium' => Ticket::find()->where(['severity_level' => 'Medium'])->count(),
+        'low' => Ticket::find()->where(['severity_level' => 'Low'])->count(),
+        'updated_today' => Ticket::find()
+            ->where(['>=', 'last_update_at', date('Y-m-d')])
+            ->count(),
+        'avg_response_time' => round($avgResponseTime ?? 0, 1),
+    ];
+
+    // Get tickets grouped by status
+    $ticketStatusData = Ticket::find()
+        ->select(['status', 'COUNT(*) as count'])
+        ->groupBy('status')
+        ->indexBy('status')
+        ->column();
+
+    // Ensure all possible statuses have a value
+    $allStatuses = ['New', 'In Progress', 'Pending', 'Resolved', 'Closed'];
+    foreach ($allStatuses as $status) {
+        if (!isset($ticketStatusData[$status])) {
+            $ticketStatusData[$status] = 0;
+        }
+    }
+
+    // Simplified severity data collection
+    $severityStats = [
+        'Critical' => Ticket::find()->where(['severity_level' => 'Critical'])->count(),
+        'High' => Ticket::find()->where(['severity_level' => 'High'])->count(),
+        'Medium' => Ticket::find()->where(['severity_level' => 'Medium'])->count(),
+        'Low' => Ticket::find()->where(['severity_level' => 'Low'])->count(),
+    ];
+
+    // Get response time data for the last 7 days
+    $responseTimeData = [];
+    $responseTimeLabels = [];
+    
+    for ($i = 6; $i >= 0; $i--) {
+        $date = date('Y-m-d', strtotime("-$i days"));
+        $nextDate = date('Y-m-d', strtotime("-".($i-1)." days"));
+        
+        // Calculate average response time for each day
+        $avgTime = Ticket::find()
+            ->where(['between', 'created_at', $date, $nextDate])
+            ->andWhere(['IS NOT', 'last_update_at', null])
+            ->average('TIMESTAMPDIFF(HOUR, created_at, last_update_at)');
+        
+        $responseTimeLabels[] = date('D', strtotime($date));
+        $responseTimeData[] = round($avgTime ?? 0, 1);
+    }
 
     return $this->render('dashboard', [
+        'tickets' => $tickets,
         'ticketStats' => $ticketStats,
-        'recentTickets' => $recentTickets,
-        'ticketStatusData' => $ticketStatusData,
-        'developerStats' => $developerStats,
-        'users' => $users,
-        'clients' => $clients,
+        'loggedInUserCompanyName' => $loggedInUserCompanyName,
         'clientCount' => $clientCount,
+        'users' => $users,
+        'developerStats' => $developerStats,
+        'severityStats' => $severityStats,
+        'ticketStatusData' => $ticketStatusData,
+        'responseTimeLabels' => $responseTimeLabels,
+        'responseTimeData' => $responseTimeData,
+        'recentUpdates' => $recentUpdates,
     ]);
 }
 public function actionToggleStatus()
@@ -2024,20 +2118,24 @@ public function actionCreateDeveloper()
 public function actionProfile($id)
 {
     $user = User::findOne($id);
-    if (!$user) {
-        throw new NotFoundHttpException('The requested user does not exist.');
+    
+    if ($user === null) {
+        throw new \yii\web\NotFoundHttpException('User not found.');
     }
 
-    $profile = $user->profile ?? new UserProfile(['user_id' => $user->id]);
+    // Log the company name being used
+    Yii::info("Fetching company for user: " . $user->company_name, __METHOD__);
 
-    if ($profile->load(Yii::$app->request->post()) && $profile->save()) {
-        Yii::$app->session->setFlash('success', 'Profile updated successfully.');
-        return $this->refresh();
+    $company = Company::findOne(['company_name' => $user->company_name]);
+
+    if ($company === null) {
+        Yii::error("Company not found for user: " . $user->company_name, __METHOD__);
+        throw new \yii\web\NotFoundHttpException('Company not found.');
     }
 
     return $this->render('profile', [
         'user' => $user,
-        'profile' => $profile,
+        'company' => $company,
     ]);
 }
 
@@ -2276,6 +2374,76 @@ public function actionResetFirstPassword()
 
     return $this->render('reset-first-password', [
         'model' => $model
+    ]);
+}
+
+public function actionAddClient()
+{
+    $model = new Client();
+
+    if ($model->load(Yii::$app->request->post())) {
+        try {
+            $post = Yii::$app->request->post('Client');
+            // $post= Yii::$app=request=post
+            
+            // Get the selected modules and convert to string
+            $modules = isset($post['modules']) ? implode(', ', $post['modules']) : '';
+
+            // Direct insert into client table
+            $result = Yii::$app->db->createCommand()->insert('client', [
+                'company_name' => $post['company_name'],
+                'company_email' => $post['company_email'],
+                'module' => $modules,
+                'created_at' => new \yii\db\Expression('NOW()'),
+                'updated_at' => new \yii\db\Expression('NOW()')
+            ])->execute();
+
+            if ($result) {
+                Yii::$app->session->setFlash('success', 'Client added successfully to client table.');
+                return $this->redirect(['admin']);
+            }
+
+        } catch (\Exception $e) {
+            Yii::$app->session->setFlash('error', 'Error adding client: ' . $e->getMessage());
+        }
+    }
+
+    return $this->render('add-client', [
+        'model' => $model,
+    ]);
+}
+
+// public function actionAddClientDirect()
+// {
+//     $model = new Client(); // Create a new instance of the Client model
+
+//     // Set the attributes directly
+//     $model->company_id = 1; // Set the company ID (replace with the actual ID)
+//     $model->company_name = 'New Company Name'; // Set the company name
+//     $model->company_email = 'newcompany@example.com'; // Set the company email
+//     $model->created_at = date('Y-m-d H:i:s'); // Set the created_at timestamp
+//     $model->updated_at = date('Y-m-d H:i:s'); // Set the updated_at timestamp
+
+//     // Save the model to the database
+//     if ($model->save()) {
+//         // Redirect or return a success message
+//         return $this->redirect(['dashboard']); // Redirect to the dashboard after saving
+//     } else {
+//         // Handle the error
+//         Yii::$app->session->setFlash('error', 'Failed to add client: ' . implode(', ', $model->getFirstErrors()));
+//         return $this->redirect(['dashboard']); // Redirect to the dashboard or another page
+//     }
+// }
+
+public function actionActiveContracts()
+{
+    // Fetch active contracts from the contract_renewal table
+    $activeContracts = ContractRenewal::find()
+        ->where(['status' => 'active']) // Assuming 'status' is the column that indicates active contracts
+        ->all();
+
+    return $this->render('active-contracts', [
+        'activeContracts' => $activeContracts,
     ]);
 }
 

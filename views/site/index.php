@@ -1058,6 +1058,9 @@ html {
     /* cliant creatinn */
     /* profile  */
     /* developer collaboration */
+    /* data driven */
+
+    /* filtering  */
 
     /* reports  */
 /* Glowing Text Effect */
@@ -1581,6 +1584,12 @@ html {
 .social-icon:hover {
     color: var(--secondary-color);
     transform: scale(1.1);
+}
+
+.btn.disabled {
+    pointer-events: none;
+    opacity: 0.65;
+    cursor: not-allowed;
 }
 </style>
 

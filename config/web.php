@@ -91,11 +91,13 @@ $config = [
                 'site/reset-password' => 'site/reset-password',
                 'site/create-user-for-company' => 'site/create-user-for-company',
                 'developer/view/<id:\d+>' => 'developer/view',
+                'ticket/search' => 'ticket/search',
             ],
         ],
         'session' => [
             'class' => 'yii\web\Session',
             'cookieParams' => ['httponly' => true],
+            'timeout' => 2400, // 40 minutes in seconds
         ],
         'authManager' => [
             'class' => 'yii\rbac\DbManager',

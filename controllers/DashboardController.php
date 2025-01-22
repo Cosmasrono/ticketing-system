@@ -6,6 +6,7 @@ use Yii;
 use yii\web\Controller;
 use yii\web\ForbiddenHttpException;
 use yii\db\Query;
+use app\models\Ticket;
 
 class DashboardController extends Controller
 {
@@ -82,12 +83,15 @@ class DashboardController extends Controller
             ->from('company')
             ->count();
 
+        $tickets = Ticket::find()->select(['id', 'comments', 'status', 'created_at'])->all();
+
         return $this->render('index', [
             'developerStats' => $developerStats,
             'ticketStatusData' => $ticketStatusData,
             'recentActivity' => $recentActivity,
             'topCompanies' => $topCompanies,
             'totalCompanies' => $totalCompanies,
+            'tickets' => $tickets,
         ]);
     }
 } 

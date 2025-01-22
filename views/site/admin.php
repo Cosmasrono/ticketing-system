@@ -23,50 +23,46 @@ $clients = Client::find()->select(['company_name', 'company_email'])->all();
 
 // Count the number of clients
 $clientCount = Client::find()->count();
+
+// Modify the query to filter by ticket name if provided
+if ($ticketName = Yii::$app->request->get('ticket_name')) {
+    $dataProvider->query->andFilterWhere(['like', 'issue', $ticketName]);
+}
 ?>
 
+<div class="container">
+    <h1><?= Html::encode($this->title) ?></h1>
 
-
-
-<!-- Add this button in a suitable location in your admin view -->
- 
-
-    
-<div class="row mb-4">
-        <div class="col">
-            <?= Html::a('Create New User', ['site/create-user'], [
-                'class' => 'btn btn-success',
-                'style' => 'margin-right: 10px;'
-            ]) ?>
-            
-           
+    <!-- Action Buttons Section -->
+    <div class="action-buttons-container mb-4">
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div class="left-buttons">
+                            <?= Html::a('<i class="fas fa-user-plus me-2"></i>Create New User', ['site/create-user'], [
+                                'class' => 'btn btn-gradient-success btn-lg hover-lift',
+                            ]) ?>
+                        </div>
+                        <div class="right-buttons">
+                            <?= Html::a('<i class="fas fa-tachometer-alt me-2"></i>Dashboard', ['site/dashboard'], [
+                                'class' => 'btn btn-gradient-info btn-lg hover-lift me-2'
+                            ]) ?>
+                            <?= Html::a('<i class="fas fa-users me-2"></i>Create Users', '#', [
+                                'class' => 'btn btn-gradient-primary btn-lg hover-lift',
+                                'id' => 'create-user-btn',
+                                'data-bs-toggle' => 'modal',
+                                'data-bs-target' => '#roleSelectionModal'
+                            ]) ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-
-<div class="row mb-2">
-    <div class="col text-end">
-        <?= Html::a('Dashboard', ['site/dashboard'], ['class' => 'btn btn-info me-2']) ?>
-  <!-- company create button -->
-  <?= Html::a('Create users', '#', [
-    'class' => 'btn btn-primary',
-    'id' => 'create-user-btn',
-    'data-bs-toggle' => 'modal',
-    'data-bs-target' => '#roleSelectionModal'
-]) ?>
     </div>
-</div>
-<div class="admin-index container mt-5">
-    <h1 class="text-center"><?= Html::encode($this->title) ?></h1>
 
     <!-- Ticket Count Cards -->
-     <!-- just lik any other button -->
-     <div class="row text-center mb-4">
-    
-   
     <div class="row text-center mb-4">
-
-
-
-    
         <?php
         $statuses = [
             ['title' => 'Pending Tickets', 'count' => $ticketCounts['pending'] ?? 0, 'bg' => 'primary'],
@@ -107,7 +103,6 @@ $clientCount = Client::find()->count();
             </div>
         </div>
     </div>
-
 
     <!-- Tickets GridView -->
     <?= GridView::widget([
@@ -158,12 +153,7 @@ $clientCount = Client::find()->count();
                 }
                 
             ],
-            [
-                'attribute' => 'company_email',
-                'value' => function ($model) {
-                    return $model->company_email ?: 'Not Set';
-                }
-            ],
+            
             [
                 'attribute' => 'created_at',
                 'label' => 'Created At (EAT)',
@@ -201,35 +191,35 @@ $clientCount = Client::find()->count();
             ],
             [
                 'class' => 'yii\grid\ActionColumn',
-    'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel}</div>',
-    'buttons' => [
-        'approve' => function ($url, $model, $key) {
-            $isDisabled = $model->status === Ticket::STATUS_APPROVED ||
-                         $model->status === Ticket::STATUS_CANCELLED ||
-                         $model->status === Ticket::STATUS_ESCALATED ||
-                         $model->status === Ticket::STATUS_CLOSED ||
-                         $model->status === Ticket::STATUS_REASSIGNED;
+                'template' => '<div class="btn-group action-buttons">{approve} {assign} {cancel} {close}</div>',
+                'buttons' => [
+                    'approve' => function ($url, $model, $key) {
+                        $isDisabled = $model->status === Ticket::STATUS_APPROVED ||
+                                     $model->status === Ticket::STATUS_CANCELLED ||
+                                     $model->status === Ticket::STATUS_ESCALATED ||
+                                     $model->status === Ticket::STATUS_CLOSED ||
+                                     $model->status === Ticket::STATUS_REASSIGNED;
                         //  disable assign button if the ticket is already assigned to the current user
-            
-            $tooltipText = '';
-            if ($model->status === Ticket::STATUS_CANCELLED) {
-                $tooltipText = 'Cannot approve cancelled ticket';
-            } elseif ($model->status === Ticket::STATUS_APPROVED) {
-                $tooltipText = 'Ticket already approved';
-            } elseif ($model->status === Ticket::STATUS_ESCALATED) {
-                $tooltipText = 'Cannot approve escalated ticket';
-            } elseif ($model->status === Ticket::STATUS_CLOSED) {
-                $tooltipText = 'Cannot approve closed ticket';
-            }
+                        
+                        $tooltipText = '';
+                        if ($model->status === Ticket::STATUS_CANCELLED) {
+                            $tooltipText = 'Cannot approve cancelled ticket';
+                        } elseif ($model->status === Ticket::STATUS_APPROVED) {
+                            $tooltipText = 'Ticket already approved';
+                        } elseif ($model->status === Ticket::STATUS_ESCALATED) {
+                            $tooltipText = 'Cannot approve escalated ticket';
+                        } elseif ($model->status === Ticket::STATUS_CLOSED) {
+                            $tooltipText = 'Cannot approve closed ticket';
+                        }
 
-            return Html::button('Approve', [
-                'class' => 'btn btn-success btn-sm' . ($isDisabled ? ' disabled' : ''),
-                'onclick' => !$isDisabled ? "approveTicket({$model->id})" : 'return false;',
-                'data-id' => $model->id,
-                'title' => $tooltipText ?: 'Approve ticket',
-            ]);
-        },
-                  'assign' => function ($url, $model, $key) {
+                        return Html::button('Approve', [
+                            'class' => 'btn btn-success btn-sm' . ($isDisabled ? ' disabled' : ''),
+                            'onclick' => !$isDisabled ? "approveTicket({$model->id})" : 'return false;',
+                            'data-id' => $model->id,
+                            'title' => $tooltipText ?: 'Approve ticket',
+                        ]);
+                    },
+                    'assign' => function ($url, $model, $key) {
                         $isEscalated = $model->status === Ticket::STATUS_ESCALATED;
                         $isAlreadyAssigned = $model->assigned_to !== null && !$isEscalated;
                         $isCancelled = $model->status === Ticket::STATUS_CANCELLED;
@@ -291,22 +281,43 @@ $clientCount = Client::find()->count();
                             'title' => $tooltipText ?: 'Cancel ticket',
                         ]);
                     },
+                    'close' => function ($url, $model, $key) {
+                        // Check if current user is admin (1) or superadmin (4)
+                        $isAdminOrSuperAdmin = !Yii::$app->user->isGuest && 
+                                             (Yii::$app->user->identity->role == 1 || 
+                                              Yii::$app->user->identity->role == 4);
 
-                    // add admin  to close the ticket 
+                        // Only proceed if user is admin/superadmin
+                        if (!$isAdminOrSuperAdmin) {
+                            return ''; // Don't show button for non-admin users
+                        }
 
-                  'close' => function ($url, $model, $key) {
-    if ($model->status !== 'closed') {
-        return Html::button('<i class="fas fa-times-circle"></i> Close', [
-            'class' => 'btn btn-warning btn-xs close-ticket',
-            'data-id' => $model->id,
-            'type' => 'button',
-            'title' => 'Close this ticket'
-        ]);
-    }
-    return '<span class="badge bg-secondary">Closed</span>';
-},
+                        $isApprovedOrAssigned = $model->status === Ticket::STATUS_APPROVED || 
+                                               $model->assigned_to !== null;
 
+                        $isDisabled = !$isApprovedOrAssigned || 
+                                     $model->status === Ticket::STATUS_CLOSED || 
+                                     $model->status === Ticket::STATUS_CANCELLED;
+                        
+                        $tooltipText = '';
+                        if ($model->status === Ticket::STATUS_CLOSED) {
+                            $tooltipText = 'Ticket already closed';
+                        } elseif ($model->status === Ticket::STATUS_CANCELLED) {
+                            $tooltipText = 'Cannot close cancelled ticket';
+                        } elseif (!$isApprovedOrAssigned) {
+                            $tooltipText = 'Ticket must be either approved or assigned first';
+                        }
+
+                        return Html::button('<i class="fas fa-times-circle"></i> Close', [
+                            'class' => 'btn btn-warning btn-sm' . ($isDisabled ? ' disabled' : ''),
+                            'onclick' => !$isDisabled ? "closeTicket({$model->id})" : 'return false;',
+                            'data-id' => $model->id,
+                            'title' => $tooltipText ?: 'Close ticket',
+                            'style' => 'margin-left: 5px;'
+                        ]);
+                    },
                 ],
+                'contentOptions' => ['style' => 'min-width:280px;'],
             ],
         ],
     ]); ?>
@@ -840,6 +851,110 @@ body {
     0%, 100% { opacity: 0.5; }
     50% { opacity: 0.8; }
 }
+
+/* Button Container Styling */
+.action-buttons-container {
+    margin-top: 1.5rem;
+}
+
+.action-buttons-container .card {
+    border: none;
+    background: #ffffff;
+    border-radius: 15px;
+    transition: all 0.3s ease;
+}
+
+.action-buttons-container .card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1) !important;
+}
+
+/* Button Styling */
+.btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: 10px;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+/* Gradient Buttons */
+.btn-gradient-success {
+    background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
+    color: white;
+}
+
+.btn-gradient-info {
+    background: linear-gradient(135deg, #36b9cc 0%, #258391 100%);
+    color: white;
+}
+
+.btn-gradient-primary {
+    background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);
+    color: white;
+}
+
+/* Hover Effects */
+.hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    color: white;
+}
+
+.btn-gradient-success:hover {
+    background: linear-gradient(135deg, #13855c 0%, #1cc88a 100%);
+}
+
+.btn-gradient-info:hover {
+    background: linear-gradient(135deg, #258391 0%, #36b9cc 100%);
+}
+
+.btn-gradient-primary:hover {
+    background: linear-gradient(135deg, #224abe 0%, #4e73df 100%);
+}
+
+/* Icon Styling */
+.btn i {
+    font-size: 1rem;
+    vertical-align: middle;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .action-buttons-container .card-body {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .right-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        width: 100%;
+    }
+    
+    .btn-lg {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .me-2 {
+        margin-right: 0 !important;
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Button Focus States */
+.btn:focus {
+    box-shadow: none;
+    outline: none;
+}
+
+/* Active State */
+.btn:active {
+    transform: translateY(1px);
+}
 </style>
 
 <!-- Add this modal -->
@@ -865,8 +980,8 @@ body {
             </div>
         </div>
     </div>
+    <h1 class="text-center"><?= Html::encode($this->title) ?></h1>
 </div>
-
 <?php
 $js = <<<JS
     // Optional: Add animation when hovering over buttons
@@ -903,9 +1018,6 @@ $js = <<<JS
 JS;
 $this->registerJs($js);
 ?>
-
-
-
- 
+</div>
 
 

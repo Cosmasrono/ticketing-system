@@ -4,11 +4,12 @@ use yii\widgets\DetailView;
 use yii\bootstrap5\ActiveForm;
 use app\models\Ticket;
 use app\models\User;
+use app\models\Company;
 
 $this->title = 'User Profile: ' . $user->name;
 
 // Get the associated company data
-$company = \app\models\Company::findOne(['company_name' => $user->company_name]);
+$company = Company::findOne(['company_name' => $user->company_name]);
 
 // Check if company data is found
 if ($company === null) {
@@ -57,21 +58,20 @@ if ($remainingTime->invert) {
     </div>';
 }
 
-// Fetch the user's role from the user table
-$roleName = 'Unknown Role'; // Default role name
-if (isset($user->role)) { // Assuming 'role' is a field in the User model
-    $userRole = $user->role; // Fetch the role from the user
-    switch ($userRole) {
-        case User::ROLE_ADMIN:
+// Fetch the user's role from the users table
+$roleName = 'Unknown Role';
+if (isset($user->role)) {
+    switch ($user->role) {
+        case 1:
             $roleName = 'Admin';
             break;
-        case User::ROLE_USER:
+        case 2:
             $roleName = 'User';
             break;
-        case User::ROLE_DEVELOPER:
+        case 3:
             $roleName = 'Developer';
             break;
-        case User::ROLE_SUPER_ADMIN:
+        case 4:
             $roleName = 'Super Admin';
             break;
         default:
@@ -98,7 +98,7 @@ $recentTickets = Ticket::find()
     <div class="row">
         <div class="col-lg-8 offset-lg-2">
             <div class="card shadow">
-                <div class="card-header bg-primary text-white">
+                <div class="card-header" style="background-color: #FF9800; color: white;">
                     <h1 class="card-title h3 mb-0"><?= Html::encode($this->title) ?></h1>
                 </div>
                 <div class="card-body">
@@ -110,16 +110,16 @@ $recentTickets = Ticket::find()
 
                     <!-- User Details -->
                     <div class="mb-4">
-                        <h4>User Information</h4>
+                        <h4 style="color: #FF9800;">User Information</h4>
                         <?= DetailView::widget([
                             'model' => $user,
                             'attributes' => [
-                                'name',
                                 'company_name',
-                                'company_email',
+                                // 'company_email',
                                 [
                                     'label' => 'Role',
-                                    'value' => $roleName, // Display the human-readable role
+                                    'value' => $roleName,
+                                    'contentOptions' => ['class' => 'text-primary'],
                                 ],
                                 [
                                     'label' => 'Contract Status',
@@ -134,7 +134,7 @@ $recentTickets = Ticket::find()
 
                     <!-- Company Duration -->
                     <div class="mb-4">
-                        <h4>Company Duration</h4>
+                        <h4 style="color: #FF9800;">Company Duration</h4>
                         <?= DetailView::widget([
                             'model' => $company,
                             'attributes' => [
@@ -156,7 +156,7 @@ $recentTickets = Ticket::find()
 
                     <!-- Ticket Statistics Section -->
                     <div class="mb-4">
-                        <h4>Ticket Statistics</h4>
+                        <h4 style="color: #FF9800;">Ticket Statistics</h4>
                         <ul class="list-group">
                             <li class="list-group-item">Total Tickets Created: <?= Html::encode($totalTickets) ?></li>
                             <li class="list-group-item">Total Tickets Assigned: <?= Html::encode($totalAssignedTickets) ?></li>
@@ -167,7 +167,7 @@ $recentTickets = Ticket::find()
 
                     <!-- Recent Tickets Section -->
                     <div class="mb-4">
-                        <h4>Recent Tickets</h4>
+                        <h4 style="color: #FF9800;">Recent Tickets</h4>
                         <div class="list-group">
                             <?php foreach ($recentTickets as $ticket): ?>
                                 <div class="list-group-item">
@@ -181,7 +181,7 @@ $recentTickets = Ticket::find()
 
                     <!-- User Activity Log Section -->
                     <div class="mb-4">
-                        <h4>User Activity Log</h4>
+                        <h4 style="color: #FF9800;">User Activity Log</h4>
                         <ul class="list-group">
                             <!-- Example static log entries; replace with dynamic data as needed -->
                             <li class="list-group-item">Created a ticket on <?= date('Y-m-d H:i:s') ?></li>
@@ -192,7 +192,7 @@ $recentTickets = Ticket::find()
 
                     <!-- Support Information Section -->
                     <div class="mb-4">
-                        <h4>Support Information</h4>
+                        <h4 style="color: #FF9800;">Support Information</h4>
                         <p>If you need assistance, please contact our support team:</p>
                         <p>Email: support@example.com</p>
                         <p>Phone: +1234567890</p>
@@ -201,7 +201,7 @@ $recentTickets = Ticket::find()
                     <!-- Modules Section -->
                     <?php if ($user->modules): ?>
                     <div class="mb-4">
-                        <h4>Assigned Modules</h4>
+                        <h4 style="color: #FF9800;">Assigned Modules</h4>
                         <div class="list-group">
                             <?php foreach (explode(',', $user->modules) as $module): ?>
                                 <div class="list-group-item"><?= Html::encode($module) ?></div>

@@ -169,21 +169,9 @@ class TicketController extends Controller
                         }
                     ],
 
-                    // Allow developers to close their own tickets
+                    // Allow all authenticated users to close tickets
                     [
                         'actions' => ['close'],
-                        'allow' => true,
-                        'roles' => ['@'],
-                        'matchCallback' => function ($rule, $action) {
-                            $ticketId = Yii::$app->request->get('id') ?? Yii::$app->request->post('id');
-                            $ticket = Ticket::findOne($ticketId);
-                            return $ticket && (Yii::$app->user->identity->role === 3 || $ticket->user_id == Yii::$app->user->id);
-                        }
-                    ],
-
-                    // API Endpoints
-                    [
-                        'actions' => ['get-issues'],
                         'allow' => true,
                         'roles' => ['@'],
                     ]
@@ -742,21 +730,41 @@ class TicketController extends Controller
                 // Add debug logging for the received developer ID
                 Yii::debug("Received developer ID: " . $developerId);
     
-                // Fetch developer with explicit query and debug logging
+                // Fetch developer with company_email from users table
                 $selectedDeveloper = User::find()
-                    ->where(['id' => $developerId])
+                    ->select(['users.id', 'users.name', 'users.company_email']) // Explicitly select fields
+                    ->from('users')
+                    ->where(['users.id' => $developerId])
+                    ->andWhere(['users.status' => 10])
                     ->one();
     
                 if (!$selectedDeveloper) {
                     throw new \Exception('Selected developer is not valid');
                 }
     
-                // Debug log the developer details
-                Yii::debug("Developer found: " . print_r([
+                // Debug log to verify the data
+                Yii::debug("Developer data fetched: " . print_r([
                     'id' => $selectedDeveloper->id,
                     'name' => $selectedDeveloper->name,
-                    'all_attributes' => $selectedDeveloper->attributes
+                    'company_email' => $selectedDeveloper->company_email,
                 ], true));
+    
+                // Verify company_email exists
+                if (empty($selectedDeveloper->company_email)) {
+                    // Check if the email exists in database directly
+                    $developerEmail = Yii::$app->db->createCommand('
+                        SELECT company_email 
+                        FROM users 
+                        WHERE id = :id', 
+                        [':id' => $developerId]
+                    )->queryScalar();
+    
+                    if ($developerEmail) {
+                        $selectedDeveloper->company_email = $developerEmail;
+                    } else {
+                        throw new \Exception("No company email found for developer {$selectedDeveloper->name}");
+                    }
+                }
     
                 $originalTicket = Ticket::findOne($ticket->id);
     
@@ -771,11 +779,21 @@ class TicketController extends Controller
                 $ticket->escalation_comment = $originalTicket->escalation_comment;
     
                 if ($ticket->save(false)) {
-                    $message = 'Developer assigned successfully';
-                    $transaction->commit();
-                    
-                    // Use selectedDeveloper for email notification
+                    // Send email notification with detailed error logging
                     try {
+                        Yii::debug('Attempting to send email notification');
+                        
+                        if (empty($selectedDeveloper->company_email)) {
+                            throw new \Exception("No company email found for developer {$selectedDeveloper->name}");
+                        }
+
+                        // Debug email parameters without accessing transport properties
+                        Yii::debug("Email Parameters: " . print_r([
+                            'from' => Yii::$app->params['senderEmail'],
+                            'to' => $selectedDeveloper->company_email,
+                            'subject' => "Ticket Assignment #{$ticket->id} - {$ticket->company_name}"
+                        ], true));
+
                         $emailSent = Yii::$app->mailer->compose('assignmentNotification', [
                             'developer_name' => $selectedDeveloper->name,
                             'ticket_id' => $ticket->id,
@@ -788,20 +806,26 @@ class TicketController extends Controller
                         ->setTo([$selectedDeveloper->company_email => $selectedDeveloper->name])
                         ->setSubject("Ticket Assignment #{$ticket->id} - {$ticket->company_name}")
                         ->send();
-    
+
                         if (!$emailSent) {
-                            Yii::error('Failed to send email notification to developer: ' . $selectedDeveloper->name);
+                            throw new \Exception("Failed to send email to {$selectedDeveloper->company_email}");
                         }
+
+                        $message = 'Developer assigned successfully and notification sent';
+                        
                     } catch (\Exception $e) {
-                        Yii::error('Email sending failed for developer ' . $selectedDeveloper->name . ': ' . $e->getMessage());
-                        // Continue execution even if email fails
+                        Yii::error('Email sending error details: ' . $e->getMessage());
+                        $message = 'Developer assigned successfully but email notification failed: ' . $e->getMessage();
                     }
-    
+
+                    $transaction->commit();
+                    
                     return [
                         'success' => true,
                         'message' => $message,
                         'newStatus' => $ticket->status,
-                        'ticketId' => $ticket->id
+                        'ticketId' => $ticket->id,
+                        'emailStatus' => isset($emailSent) && $emailSent
                     ];
                 }
                 
@@ -1236,27 +1260,28 @@ protected function sendEscalationNotifications($ticket, $targetType, $originalAs
 
     public function actionAdmin()
     {
-        // Get current user's role
-        $currentUserRole = Yii::$app->user->identity->role;
+        // Create base query
+        $query = Ticket::find();
+        
+        // Get filter value
+        $company_name = Yii::$app->request->get('company_name');
+        
 
-        // Create query
-        $query = Ticket::find()
-            ->orderBy(['created_at' => SORT_DESC]); // Sort by created_at in descending order
-
+        // Create data provider
         $dataProvider = new ActiveDataProvider([
             'query' => $query,
             'pagination' => [
-                'pageSize' => 10, // Adjust page size as needed
+                'pageSize' => 20,
             ],
             'sort' => [
-                'defaultOrder' => [
-                    'created_at' => SORT_DESC,
-                ]
-            ]
+                'defaultOrder' => ['created_at' => SORT_DESC]
+            ],
         ]);
 
+        // Render view
         return $this->render('admin', [
             'dataProvider' => $dataProvider,
+            'company_name' => $company_name,
         ]);
     }
   
@@ -1265,68 +1290,25 @@ protected function sendEscalationNotifications($ticket, $targetType, $originalAs
 
 public function actionClose()
     {
-        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-
-        try {
-            $id = Yii::$app->request->post('id');
-
-            // Validate request
-            if (empty($id)) {
-                return [
-                    'success' => false,
-                    'message' => 'Missing required parameters'
-                ];
-            }
+        $request = Yii::$app->request;
+        if ($request->isAjax && $request->isPost) {
+            $ticketId = $request->post('id');
+            $comment = $request->post('comment'); // Get the comment from the request
 
             // Find the ticket model
-            $ticket = $this->findModel($id);
+            $ticket = Ticket::findOne($ticketId);
+            if ($ticket) {
+                $ticket->status = 'closed';
+                $ticket->comments = $comment; // Save the comment to the comments field
 
-            // Allow both admin (role 3) and regular users who created the ticket to close it
-            if ($ticket->user_id !== Yii::$app->user->id && 
-                Yii::$app->user->identity->role !== 3 && 
-                $ticket->assigned_to !== Yii::$app->user->id) {
-                return [
-                    'success' => false,
-                    'message' => 'You are not authorized to close this ticket'
-                ];
+                if ($ticket->save()) {
+                    return $this->asJson(['success' => true]);
+                } else {
+                    return $this->asJson(['success' => false, 'message' => 'Failed to close ticket.']);
+                }
             }
-
-            // Check if the ticket is already closed
-            if ($ticket->status === 'closed') {
-                return [
-                    'success' => false,
-                    'message' => 'This ticket is already closed'
-                ];
-            }
-
-            // Close the ticket
-            $ticket->status = 'closed';
-            $ticket->closed_by = Yii::$app->user->id;
-            $ticket->closed_at = date('Y-m-d H:i:s');
-
-            // Save the ticket status
-            if (!$ticket->save(false)) {
-                return [
-                    'success' => false,
-                    'message' => 'Failed to close the ticket'
-                ];
-            }
-
-            // Log the action
-            Yii::info('Ticket #' . $id . ' closed by user ID: ' . Yii::$app->user->id);
-
-            return [
-                'success' => true,
-                'message' => 'Ticket has been closed successfully'
-            ];
-
-        } catch (\Exception $e) {
-            Yii::error('Close ticket error: ' . $e->getMessage() . ' | Stack trace: ' . $e->getTraceAsString());
-            return [
-                'success' => false,
-                'message' => 'An error occurred while closing the ticket'
-            ];
         }
+        return $this->asJson(['success' => false, 'message' => 'Invalid request.']);
     }
 
     public function actionCancel()
@@ -1412,7 +1394,8 @@ public function actionClose()
         }
     }
 
-    public function actionReopen()
+
+ function actionReopen()
     {
         Yii::$app->response->format = Response::FORMAT_JSON;
         
@@ -1905,6 +1888,17 @@ public function actionClose()
                 'message' => YII_DEBUG ? $e->getMessage() : 'Failed to upload voice note'
             ];
         }
+    }
+
+    public function actionSearch()
+    {
+        $searchModel = new TicketSearch();
+        $dataProvider = $searchModel->search(Yii::$app->request->queryParams);
+
+        return $this->render('search', [
+            'searchModel' => $searchModel,
+            'dataProvider' => $dataProvider,
+        ]);
     }
 
 }

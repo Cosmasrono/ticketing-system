@@ -1,102 +1,80 @@
 <?php
 use yii\helpers\Html;
 use yii\bootstrap5\ActiveForm;
+use yii\helpers\ArrayHelper;
+use yii\helpers\Json;
 
 $this->title = 'Create New User';
+
+// Prepare companies for dropdown
+$companyList = ArrayHelper::map($clientCompanies, 'company_name', 'company_name');
+
+// Prepare companies data for JavaScript
+$companiesForJs = [];
+foreach ($clientCompanies as $company) {
+    $companiesForJs[$company['company_name']] = [
+        'email' => $company['company_email'],
+        'modules' => array_filter(array_map('trim', explode(',', $company['module'])))
+    ];
+}
+$companiesJson = Json::encode($companiesForJs);
 ?>
 
 <div class="create-user">
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <div class="card shadow-lg">
-                <div class="card-header bg-primary text-white py-3">
-                    <h2 class="text-center mb-0"><?= Html::encode($this->title) ?></h2>
+    <div class="card">
+        <div class="card-header">
+            <h2><?= Html::encode($this->title) ?></h2>
+        </div>
+        <div class="card-body">
+            <?php $form = ActiveForm::begin(['id' => 'create-user-form']); ?>
+
+            <?= $form->field($model, 'name')->textInput(['maxlength' => true]) ?>
+
+            <?= $form->field($model, 'company_name')->dropDownList(
+                $companyList,
+                [
+                    'prompt' => 'Select Company',
+                    'id' => 'company-dropdown',
+                    'class' => 'form-control'
+                ]
+            ) ?>
+
+            <?= $form->field($model, 'company_email')->textInput([
+                'id' => 'company-email',
+                'readonly' => true
+            ]) ?>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <?= $form->field($model, 'start_date')->input('date', [
+                        'class' => 'form-control',
+                        'required' => true,
+                        'min' => date('Y-m-d'),
+                        'id' => 'start-date-input'
+                    ]) ?>
                 </div>
-                <div class="card-body">
-                    <?php $form = ActiveForm::begin(['id' => 'create-user-form']); ?>
-
-             
-
-                    <!-- Common Fields -->
-                    <div class="row g-3">
-                        <div class="col-md-12 mb-3">
-                            <?= $form->field($model, 'name')->textInput([
-                                'class' => 'form-control',
-                                'placeholder' => 'Enter name'
-                            ]) ?>
-                        </div>
-
-                        <div class="col-md-12">
-                            <?= $form->field($model, 'company_email')->textInput([
-                                'type' => 'email',
-                                'class' => 'form-control',
-                                'placeholder' => 'Enter email'
-                            ]) ?>
-                        </div>
-
-                        <!-- Company-specific fields -->
-                        <div id="company-fields" style="display: none;" class="col-12">
-                            <div class="col-md-12 mb-3">
-                                <?= $form->field($model, 'company_name')->textInput([
-                                    'class' => 'form-control',
-                                    'placeholder' => 'Enter company name'
-                                ]) ?>
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <?= $form->field($model, 'start_date')->input('date', [
-                                        'class' => 'form-control',
-                                        'min' => date('Y-m-d')
-                                    ]) ?>
-                                </div>
-                                <div class="col-md-6">
-                                    <?= $form->field($model, 'end_date')->input('date', [
-                                        'class' => 'form-control',
-                                        'min' => date('Y-m-d')
-                                    ]) ?>
-                                </div>
-                            </div>
-
-                            <!-- Modules Selection -->
-                            <div class="modules-section">
-                                <h4 class="section-title">Select Modules</h4>
-                                <div class="row g-3">
-                                    <?php foreach ($modules as $module): ?>
-                                        <div class="col-md-4">
-                                            <div class="module-card">
-                                                <div class="form-check">
-                                                    <?= Html::checkbox(
-                                                        "Company[modules][]",
-                                                        false,
-                                                        [
-                                                            'value' => $module['module_code'],
-                                                            'id' => 'module-' . $module['module_code'],
-                                                            'class' => 'form-check-input module-checkbox'
-                                                        ]
-                                                    ) ?>
-                                                    <label class="form-check-label" for="module-<?= $module['module_code'] ?>">
-                                                        <?= Html::encode($module['module_name']) ?>
-                                                    </label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-group text-center mt-4">
-                        <?= Html::submitButton('Create User', [
-                            'class' => 'btn btn-primary btn-lg px-5',
-                            'name' => 'create-user-button'
-                        ]) ?>
-                    </div>
-
-                    <?php ActiveForm::end(); ?>
+                <div class="col-md-6">
+                    <?= $form->field($model, 'end_date')->input('date', [
+                        'class' => 'form-control',
+                        'required' => true,
+                        'min' => date('Y-m-d'),
+                        'id' => 'end-date-input'
+                    ]) ?>
                 </div>
             </div>
+
+            <div class="modules-section" style="display: none;">
+                <h4>Company Modules</h4>
+                <div id="modules-container" class="row">
+                    <!-- Modules will be displayed here -->
+                </div>
+            </div>
+
+            <div class="form-group">
+                <?= Html::submitButton('Save', ['class' => 'btn btn-success']) ?>
+            </div>
+
+            <?php ActiveForm::end(); ?>
         </div>
     </div>
 </div>
@@ -104,14 +82,54 @@ $this->title = 'Create New User';
 <?php
 $js = <<<JS
 $(document).ready(function() {
-    // Show all company fields and modules by default
-    $('#company-fields').show();
-    $('.modules-section').show();
+    const companies = {$companiesJson};
+    
+    $('#company-dropdown').change(function() {
+        const selectedCompany = $(this).val();
+        const modulesContainer = $('#modules-container');
+        const emailField = $('#company-email');
+        
+        // Clear previous data
+        emailField.val('');
+        modulesContainer.empty();
+        $('.modules-section').hide();
+        
+        if (selectedCompany && companies[selectedCompany]) {
+            // Set email
+            emailField.val(companies[selectedCompany].email);
+            
+            // Display modules
+            const modules = companies[selectedCompany].modules;
+            if (modules && modules.length > 0) {
+                modules.forEach(function(module) {
+                    if (module.trim()) {
+                        const moduleId = module.replace(/[^a-zA-Z0-9]/g, '_');
+                        const moduleHtml = `
+                            <div class="col-md-4 mb-3">
+                                <div class="form-check">
+                                    <input type="checkbox" 
+                                           name="Company[modules][]" 
+                                           value="\${module}" 
+                                           id="module-\${moduleId}" 
+                                           class="form-check-input"
+                                           checked>
+                                    <label class="form-check-label" for="module-\${moduleId}">
+                                        \${module}
+                                    </label>
+                                </div>
+                            </div>
+                        `;
+                        modulesContainer.append(moduleHtml);
+                    }
+                });
+                $('.modules-section').show();
+            }
+        }
+    });
 
-    // Date validation
-    $('#company-end-date').on('change', function() {
-        var startDate = new Date($('#company-start-date').val());
-        var endDate = new Date($(this).val());
+    $('#company-end-date').change(function() {
+        const startDate = new Date($('#company-start-date').val());
+        const endDate = new Date($(this).val());
         
         if (endDate <= startDate) {
             alert('End date must be after start date');
@@ -120,5 +138,6 @@ $(document).ready(function() {
     });
 });
 JS;
+
 $this->registerJs($js);
-?> 
+?>

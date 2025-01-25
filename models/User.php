@@ -27,6 +27,7 @@ class User extends ActiveRecord implements IdentityInterface
     public $modules;
     // public $email_verified_at;
     public $company_email;
+    public $isExpired; // Add this line to define the property
 
 
     const SCENARIO_SIGNUP = 'signup';
@@ -67,7 +68,7 @@ public function isUser()
      */
     public static function tableName()
     {
-        return '{{%users}}';
+        return 'users'; // Ensure this matches your users table name
     }
 
     /**
@@ -638,7 +639,7 @@ public function verify($token, $companyEmail)
 
     public function getCompany()
     {
-        return $this->hasOne(Company::class, ['id' => 'company_id']);
+        return $this->hasOne(Company::class, ['company_name' => 'company_name']); // Adjust according to your foreign key
     }
 
     // public function getCompanyName()

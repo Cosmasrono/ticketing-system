@@ -1,4 +1,5 @@
 <?php
+// use Yii;
 use yii\helpers\Html;
 use yii\widgets\DetailView;
 use yii\bootstrap5\ActiveForm;
@@ -6,10 +7,20 @@ use app\models\Ticket;
 use app\models\User;
 use app\models\Company;
 
+
 $this->title = 'User Profile: ' . $user->name;
 
-// Get the associated company data
+// Get the associated company data with email
 $company = Company::findOne(['company_name' => $user->company_name]);
+
+// Fetch user's company email from users table
+$companyEmail = Yii::$app->db->createCommand('
+    SELECT company_email 
+    FROM users 
+    WHERE id = :user_id
+')
+->bindValue(':user_id', $user->id)
+->queryScalar();
 
 // Check if company data is found
 if ($company === null) {
@@ -59,26 +70,22 @@ if ($remainingTime->invert) {
 }
 
 // Fetch the user's role from the users table
-$roleName = 'Unknown Role';
-if (isset($user->role)) {
-    switch ($user->role) {
-        case 1:
-            $roleName = 'Admin';
-            break;
-        case 2:
-            $roleName = 'User';
-            break;
-        case 3:
-            $roleName = 'Developer';
-            break;
-        case 4:
-            $roleName = 'Super Admin';
-            break;
-        default:
-            $roleName = 'Unknown Role';
-            break;
-    }
-}
+$roleName = Yii::$app->db->createCommand('
+    SELECT role 
+    FROM users 
+    WHERE id = :user_id
+')
+->bindValue(':user_id', $user->id)
+->queryScalar();
+
+// Convert role to display name
+$roleDisplay = match($roleName) {
+    'admin' => 'Admin',
+    'user' => 'User',
+    'developer' => 'Developer',
+    'super_admin' => 'Super Admin',
+    default => 'Unknown Role'
+};
 
 // Fetch ticket statistics for the user
 $totalTickets = Ticket::find()->where(['created_by' => $user->id])->count();
@@ -92,6 +99,27 @@ $recentTickets = Ticket::find()
     ->orderBy(['created_at' => SORT_DESC])
     ->limit(5)
     ->all();
+
+// Check contract expiration and update user status
+$today = new DateTime();
+$endDate = new DateTime($company->end_date);
+$isExpired = $today > $endDate;
+
+if ($isExpired) {
+    // Deactivate user if contract is expired
+    Yii::$app->db->createCommand()
+        ->update('users', ['status' => 0], ['id' => $user->id])
+        ->execute();
+}
+
+// Fetch current user status
+$userStatus = Yii::$app->db->createCommand('
+    SELECT status 
+    FROM users 
+    WHERE id = :user_id
+')
+->bindValue(':user_id', $user->id)
+->queryScalar();
 ?>
 
 <div class="user-profile">
@@ -115,11 +143,22 @@ $recentTickets = Ticket::find()
                             'model' => $user,
                             'attributes' => [
                                 'company_name',
-                                // 'company_email',
+                                [
+                                    'label' => 'Company Email',
+                                    'value' => $companyEmail ?? '(not set)',
+                                    'contentOptions' => ['class' => 'text-primary'],
+                                ],
                                 [
                                     'label' => 'Role',
-                                    'value' => $roleName,
+                                    'value' => $roleDisplay,
                                     'contentOptions' => ['class' => 'text-primary'],
+                                ],
+                                [
+                                    'label' => 'Account Status',
+                                    'value' => $userStatus ? 'Active' : 'Deactivated',
+                                    'contentOptions' => [
+                                        'class' => $userStatus ? 'text-success' : 'text-danger'
+                                    ],
                                 ],
                                 [
                                     'label' => 'Contract Status',
@@ -194,8 +233,8 @@ $recentTickets = Ticket::find()
                     <div class="mb-4">
                         <h4 style="color: #FF9800;">Support Information</h4>
                         <p>If you need assistance, please contact our support team:</p>
-                        <p>Email: support@example.com</p>
-                        <p>Phone: +1234567890</p>
+                        <p>Email: <?= Yii::$app->params['adminEmail'] ?></p>
+                        <p></p>
                     </div>
 
                     <!-- Modules Section -->

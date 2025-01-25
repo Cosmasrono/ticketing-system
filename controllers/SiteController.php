@@ -42,6 +42,7 @@ use app\models\ContractRenewal;
 use DateTime;
 use app\models\Renewal;
 use app\models\TicketActivity;
+use app\models\Contract;
  
 
 class SiteController extends Controller
@@ -125,10 +126,16 @@ public function actionCreateUser()
         $model = new Company();
         $model->role = 'user';
 
-        // Get all companies with their modules
+        // Get all companies with their modules and associated client names
         $clientCompanies = (new \yii\db\Query())
-            ->select(['company_name', 'company_email', 'module'])
-            ->from('client')
+            ->select([
+                'c.company_name', 
+                'c.company_email', 
+                'c.module',
+                'cl.name'  // Add client name to the selection
+            ])
+            ->from(['c' => 'client'])
+            ->leftJoin(['cl' => 'client'], 'c.company_name = cl.company_name')
             ->all();
 
         // Handle form submission
@@ -1704,247 +1711,183 @@ public function actionToggleUserStatus()
 
 public function actionDashboard()
 {
-    // Fetch tickets from the database
-    $tickets = Ticket::find()->all(); // Fetch all tickets or apply any necessary conditions
-
-    // Fetch client count
-    $clientCount = Client::find()->count(); // Count the total number of clients
-
-    // Fetch users from the database
-    $users = User::find()->all(); // Assuming you have a User model to fetch users
-
-    // Fetch developer statistics
-    $developerStats = []; // Initialize the variable
-    $developers = User::find()->where(['role' => 'developer'])->all(); // Assuming you have a role field
-    foreach ($developers as $developer) {
-        $activeTickets = Ticket::find()->where(['assigned_to' => $developer->id, 'status' => 'active'])->count();
-        $developerStats[] = [
-            'name' => $developer->name,
-            'active_tickets' => $activeTickets,
-        ];
-    }
-
-    // Fetch recent tickets
-    $recentTickets = Ticket::find()->orderBy(['created_at' => SORT_DESC])->limit(5)->all(); // Fetch the 5 most recent tickets
-
-    // Fetch ticket status data
-    $ticketStatusData = [
-        'total' => Ticket::find()->count(),
-        'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
-        'assigned' => Ticket::find()->where(['status' => 'assigned'])->count(),
-        'resolved' => Ticket::find()->where(['status' => 'resolved'])->count(),
-        'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
-    ];
-
-    // Other data you might want to pass to the view
-    $ticketStats = [
-        'total' => Ticket::find()->count(),
-        'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
-        'assigned' => Ticket::find()->where(['status' => 'assigned'])->count(),
-        // Add other stats as needed
-    ];
-
-    // Assuming you have a way to get the logged-in user's company name
-    $loggedInUserCompanyName = Yii::$app->user->identity->company_name; // Adjust this line as necessary
-
-    // Prepare chart data
-    $responseTimeLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    $responseTimeData = [4, 3, 5, 2, 4, 3, 4]; // Example data, replace with actual response times
-
-    $categoryLabels = ['Technical', 'Billing', 'Feature Request', 'Bug', 'Other'];
-    $categoryData = [30, 25, 20, 15, 10]; // Example data, replace with actual category counts
-
-    // Get tickets grouped by severity level
-    $severityQuery = Ticket::find()
-        ->select(['severity_level', 'COUNT(*) as count'])
-        ->groupBy('severity_level')
-        ->asArray()
-        ->all();
-
-    // Initialize arrays for chart data
-    $severityLabels = ['Critical', 'High', 'Medium', 'Low'];
-    $severityCount = array_fill(0, 4, 0); // Initialize with zeros
-
-    // Map the query results to our fixed array positions
-    foreach ($severityQuery as $data) {
-        switch (strtolower($data['severity_level'])) {
-            case 'critical':
-                $severityCount[0] = (int)$data['count'];
-                break;
-            case 'high':
-                $severityCount[1] = (int)$data['count'];
-                break;
-            case 'medium':
-                $severityCount[2] = (int)$data['count'];
-                break;
-            case 'low':
-                $severityCount[3] = (int)$data['count'];
-                break;
+    // Handle contract renewal status changes
+    if (Yii::$app->request->isPost) {
+        $id = Yii::$app->request->get('id');
+        $action = Yii::$app->request->get('action');
+        
+        if ($id && $action) {
+            $model = ContractRenewal::findOne($id);
+            if ($model && $model->renewal_status === 'pending') {
+                $model->renewal_status = ($action === 'approve') ? 'approved' : 'rejected';
+                
+                // If approved, update the company's end date
+                if ($action === 'approve') {
+                    // Find the company
+                    $company = \app\models\Company::findOne($model->company_id);
+                    if ($company) {
+                        // Calculate new end date based on extension period
+                        $currentEndDate = new \DateTime($model->current_end_date);
+                        $currentEndDate->modify("+{$model->extension_period} months");
+                        
+                        // Update company end date using updateAttributes to skip validation
+                        $success = $company->updateAttributes([
+                            'end_date' => $currentEndDate->format('Y-m-d')
+                        ]);
+                        
+                        if (!$success) {
+                            Yii::$app->session->setFlash('error', 'Failed to update company end date.');
+                            return $this->redirect(['dashboard']);
+                        }
+                    }
+                }
+                
+                if ($model->save()) {
+                    Yii::$app->session->setFlash('success', 
+                        $action === 'approve' 
+                            ? 'Contract renewal approved and company end date updated.' 
+                            : 'Contract renewal rejected.'
+                    );
+                } else {
+                    Yii::$app->session->setFlash('error', 'Failed to update contract renewal status.');
+                }
+            }
         }
     }
 
-    // Debug data
-    Yii::debug([
-        'labels' => $severityLabels,
-        'counts' => $severityCount
-    ], 'chart-data');
+    // Fetch counts for various contract statuses
+    $activeContractsCount = Contract::find()->where(['status' => 'active'])->count();
+    $expiringCount = Contract::find()->where(['<', 'end_date', date('Y-m-d', strtotime('+30 days'))])->count();
+    $renewedCount = ContractRenewal::find()->where(['MONTH(renewed_at)' => date('n')])->count(); // Count renewals this month
+    $expiredCount = Contract::find()->where(['status' => 'expired'])->count();
 
-    // Get response time data for the last 7 days using last_update_at
-    $lastWeek = date('Y-m-d', strtotime('-6 days'));
-    $responseTimeData = Ticket::find()
-        ->select([
-            'DATE(created_at) as date', 
-            'AVG(TIMESTAMPDIFF(HOUR, created_at, last_update_at)) as avg_response'
-        ])
-        ->where(['>=', 'created_at', $lastWeek])
-        ->andWhere(['IS NOT', 'last_update_at', null])
-        ->groupBy('date')
-        ->orderBy('date')
-        ->asArray()
-        ->all();
+    // Fetch all contracts
+    $contracts = Contract::find()->where(['status' => 'active'])->with('client')->all(); // Assuming 'client' is a relation in your Contract model
 
-    // Prepare response time data for charts
-    $responseTimeLabels = [];
-    $responseTimeDuration = [];
-    foreach ($responseTimeData as $data) {
-        $responseTimeLabels[] = date('D', strtotime($data['date']));
-        $responseTimeDuration[] = round($data['avg_response'] ?? 0, 1);
-    }
+    // Fetch all contract renewals
+    $contractRenewals = ContractRenewal::find()->all(); // Fetch all contract renewals
 
-    // Get recent updates
-    $recentUpdates = Ticket::find()
-        ->where(['IS NOT', 'last_update_at', null])
-        ->orderBy(['last_update_at' => SORT_DESC])
-        ->limit(5)
-        ->all();
+    // Fetch total users count
+    $totalUsers = User::find()->count(); // Assuming you have a User model
 
-    // Calculate average response time
-    $avgResponseTime = Ticket::find()
-        ->select(['AVG(TIMESTAMPDIFF(HOUR, created_at, last_update_at)) as avg_time'])
-        ->where(['IS NOT', 'last_update_at', null])
-        ->andWhere(['>=', 'created_at', date('Y-m-d', strtotime('-30 days'))])
-        ->scalar();
+    // Fetch active users count
+    $activeCount = User::find()->where(['status' => 'active'])->count(); // Assuming 'status' is a column in your users table
 
-    // Calculate ticket statistics with last update information
-    $ticketStats = [
-        'total' => Ticket::find()->count(),
-        'critical' => Ticket::find()->where(['severity_level' => 'Critical'])->count(),
-        'high' => Ticket::find()->where(['severity_level' => 'High'])->count(),
-        'medium' => Ticket::find()->where(['severity_level' => 'Medium'])->count(),
-        'low' => Ticket::find()->where(['severity_level' => 'Low'])->count(),
-        'updated_today' => Ticket::find()
-            ->where(['>=', 'last_update_at', date('Y-m-d')])
-            ->count(),
-        'avg_response_time' => round($avgResponseTime ?? 0, 1),
-    ];
+    // Fetch inactive users count
+    $inactiveCount = User::find()->where(['status' => 'inactive'])->count(); // Assuming 'status' is a column in your users table
 
-    // Get tickets grouped by status
+    // Fetch all users
+    $allUsers = User::find()->all(); // Retrieve all users
+
+    // Fetch tickets
+    $tickets = Ticket::find()->all(); // Assuming you have a Ticket model
+
+    // Fetch client count
+    $clientCount = Client::find()->count(); // Assuming you have a Client model
+
+    // Fetch clients
+    $clients = Client::find()->all(); // Assuming you have a Client model
+
+    // Calculate ticket status data
     $ticketStatusData = Ticket::find()
         ->select(['status', 'COUNT(*) as count'])
         ->groupBy('status')
         ->indexBy('status')
-        ->column();
+        ->column(); // This will give you an associative array of status counts
 
-    // Ensure all possible statuses have a value
-    $allStatuses = ['New', 'In Progress', 'Pending', 'Resolved', 'Closed'];
-    foreach ($allStatuses as $status) {
-        if (!isset($ticketStatusData[$status])) {
-            $ticketStatusData[$status] = 0;
+    // Calculate response time data
+    $responseTimes = Ticket::find()->select('response_time')->column(); // Replace with actual field
+    $responseTimeLabels = []; // Define your labels based on your data
+    $responseTimeData = []; // Prepare your data for the chart
+
+    // Example: Assuming you want to categorize response times into ranges
+    foreach ($responseTimes as $time) {
+        // Categorize response times and populate labels and data
+        if ($time < 1) {
+            $responseTimeLabels[] = 'Less than 1 hour';
+            $responseTimeData[0] = ($responseTimeData[0] ?? 0) + 1;
+        } elseif ($time < 2) {
+            $responseTimeLabels[] = '1-2 hours';
+            $responseTimeData[1] = ($responseTimeData[1] ?? 0) + 1;
+        } else {
+            $responseTimeLabels[] = 'More than 2 hours';
+            $responseTimeData[2] = ($responseTimeData[2] ?? 0) + 1;
         }
     }
 
-    // Simplified severity data collection
-    $severityStats = [
-        'Critical' => Ticket::find()->where(['severity_level' => 'Critical'])->count(),
-        'High' => Ticket::find()->where(['severity_level' => 'High'])->count(),
-        'Medium' => Ticket::find()->where(['severity_level' => 'Medium'])->count(),
-        'Low' => Ticket::find()->where(['severity_level' => 'Low'])->count(),
-    ];
-
-    // Get response time data for the last 7 days
-    $responseTimeData = [];
-    $responseTimeLabels = [];
-    
-    for ($i = 6; $i >= 0; $i--) {
-        $date = date('Y-m-d', strtotime("-$i days"));
-        $nextDate = date('Y-m-d', strtotime("-".($i-1)." days"));
-        
-        // Calculate average response time for each day
-        $avgTime = Ticket::find()
-            ->where(['between', 'created_at', $date, $nextDate])
-            ->andWhere(['IS NOT', 'last_update_at', null])
-            ->average('TIMESTAMPDIFF(HOUR, created_at, last_update_at)');
-        
-        $responseTimeLabels[] = date('D', strtotime($date));
-        $responseTimeData[] = round($avgTime ?? 0, 1);
-    }
-
+    // Render the dashboard view with the fetched data
     return $this->render('dashboard', [
-        'tickets' => $tickets,
-        'ticketStats' => $ticketStats,
-        'loggedInUserCompanyName' => $loggedInUserCompanyName,
-        'clientCount' => $clientCount,
-        'users' => $users,
-        'developerStats' => $developerStats,
-        'severityStats' => $severityStats,
-        'ticketStatusData' => $ticketStatusData,
-        'responseTimeLabels' => $responseTimeLabels,
+        'activeContractsCount' => $activeContractsCount,
+        'expiringCount' => $expiringCount,
+        'renewedCount' => $renewedCount,
+        'expiredCount' => $expiredCount,
+        'contracts' => $contracts, // Pass the contracts to the view
+        'contractRenewals' => $contractRenewals, // Pass the contract renewals to the view
+        'totalUsers' => $totalUsers, // Pass the total users count to the view
+        'activeCount' => $activeCount, // Pass the active users count to the view
+        'inactiveCount' => $inactiveCount, // Pass the inactive users count to the view
+        'allUsers' => $allUsers, // Pass all users to the view
+        'tickets' => $tickets, // Pass tickets to the view
+        'clientCount' => $clientCount, // Pass client count to the view
+        'ticketStatusData' => $ticketStatusData, // Pass ticket status data to the view
+        'responseTimeLabels' => $responseTimeLabels, // Pass response time labels to the view
         'responseTimeData' => $responseTimeData,
-        'recentUpdates' => $recentUpdates,
+        'clients' => $clients, // Pass response time data to the view
     ]);
 }
+
+// Update toggle status action to use correct status values
 public function actionToggleStatus()
 {
-    // Clear any existing output buffers
-    while (ob_get_level() > 0) {
-        ob_end_clean();
-    }
-    
-    Yii::$app->response->format = Response::FORMAT_JSON;
-    Yii::$app->response->headers->set('Content-Type', 'application/json; charset=UTF-8');
+    \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
     
     try {
-        $id = Yii::$app->request->post('id');
-        
-        if (!$id) {
-            return $this->asJson([
-                'success' => false,
-                'message' => 'User ID is required'
-            ]);
+        if (!\Yii::$app->request->isAjax) {
+            throw new \Exception('Invalid request method');
         }
 
-        $user = User::findOne($id);
-        if (!$user) {
-            return $this->asJson([
-                'success' => false,
-                'message' => 'User not found'
-            ]);
+        $id = \Yii::$app->request->post('id');
+        
+        // First, get the current status
+        $currentUser = (new \yii\db\Query())
+            ->select(['status'])
+            ->from('users')
+            ->where(['id' => $id])
+            ->one();
+
+        if (!$currentUser) {
+            throw new \Exception('User not found');
         }
 
-        $user->status = ($user->status == 10) ? 0 : 10;
-        
-        if ($user->save(false)) {
-            $statusText = $user->status == 10 ? 'activated' : 'deactivated';
-            return $this->asJson([
+        // Set the new status based on current status
+        $newStatus = $currentUser['status'] == \app\models\User::STATUS_ACTIVE ? 
+            \app\models\User::STATUS_INACTIVE : 
+            \app\models\User::STATUS_ACTIVE;
+
+        // Update the status
+        $success = (new \yii\db\Query())
+            ->createCommand()
+            ->update('users', 
+                ['status' => $newStatus],
+                ['id' => $id])
+            ->execute();
+
+        if ($success) {
+            return [
                 'success' => true,
-                'message' => "User successfully {$statusText}",
-                'newStatus' => $user->status,
-                'userId' => $user->id
-            ]);
+                'message' => $newStatus == \app\models\User::STATUS_ACTIVE ? 
+                    'User activated successfully' : 
+                    'User deactivated successfully',
+                'newStatus' => $newStatus
+            ];
+        } else {
+            throw new \Exception('Failed to update user status');
         }
-
-        return $this->asJson([
-            'success' => false,
-            'message' => 'Failed to update user status'
-        ]);
-
     } catch (\Exception $e) {
-        Yii::error('Error toggling user status: ' . $e->getMessage());
-        return $this->asJson([
+        return [
             'success' => false,
-            'message' => 'An error occurred while updating user status'
-        ]);
-        
+            'message' => $e->getMessage()
+        ];
     }
 }
 
@@ -2150,37 +2093,19 @@ public function actionRenewContract($id)
         throw new NotFoundHttpException('Company not found.');
     }
 
-    if (Yii::$app->request->isPost) {
-        $renewal = new ContractRenewal();
-        $renewal->company_id = $company->id;
-
-        // Get the current user ID
-        $userId = Yii::$app->user->id;
-        Yii::info('Current user ID: ' . $userId);
-
-        // Check if the user ID exists in the users table
-        if (!User::find()->where(['id' => $userId])->exists()) {
-            Yii::$app->session->setFlash('error', 'Invalid user.');
-            return $this->redirect(['profile', 'id' => $userId]);
-        }
-
-        $renewal->requested_by = $userId;
-        $renewal->extension_period = Yii::$app->request->post('extension_period');
-        $renewal->notes = Yii::$app->request->post('notes');
-        $renewal->current_end_date = $company->end_date;
-        $renewal->renewal_status = 'pending';
-
-        // Calculate new end date
-        $currentEndDate = strtotime($company->end_date);
-        $newEndDate = strtotime("+{$renewal->extension_period} months", $currentEndDate);
-        $renewal->new_end_date = date('Y-m-d', $newEndDate);
+    $renewal = new ContractRenewal();
+    if ($renewal->load(Yii::$app->request->post())) {
+        // Set the company ID and requested by user ID
+        $renewal->company_id = $company->id; // Set the company ID
+        $renewal->requested_by = Yii::$app->user->id; // Assuming you have user ID
+        $renewal->current_end_date = $company->end_date; // Set the current end date
 
         // Log the attributes being saved
         Yii::info('Saving ContractRenewal with data: ' . json_encode($renewal->attributes));
 
         if ($renewal->save()) {
             Yii::$app->session->setFlash('success', 'Contract renewal request submitted successfully.');
-            return $this->redirect(['profile', 'id' => $userId]);
+            return $this->redirect(['profile', 'id' => Yii::$app->user->id]);
         } else {
             Yii::error('Failed to save renewal: ' . json_encode($renewal->errors));
             Yii::$app->session->setFlash('error', 'Failed to submit contract renewal.');
@@ -2189,6 +2114,7 @@ public function actionRenewContract($id)
 
     return $this->render('renew-contract', [
         'company' => $company,
+        'renewal' => $renewal,
     ]);
 }
 
@@ -2198,39 +2124,25 @@ public function actionApproveRenewal($id)
 {
     $renewal = ContractRenewal::findOne($id);
     if (!$renewal) {
-        Yii::$app->session->setFlash('error', 'Renewal request not found.');
-        return $this->redirect(['admin']);
+        throw new NotFoundHttpException('Renewal request not found.');
     }
 
-    $transaction = Yii::$app->db->beginTransaction();
-    try {
-        // Update renewal status
-        $renewal->renewal_status = 'approved';
-        
-        if (!$renewal->save()) {
-            throw new \Exception('Failed to update renewal status: ' . json_encode($renewal->errors));
+    // Find the associated company
+    $company = Company::findOne($renewal->company_id);
+    if ($company) {
+        // Update the company's end period
+        $company->end_period = date('Y-m-d', strtotime("+{$renewal->requested_extension} months", strtotime($company->end_period)));
+        if ($company->save()) {
+            // Optionally update the renewal status
+            $renewal->status = 'approved';
+            $renewal->save();
+            Yii::$app->session->setFlash('success', 'Contract renewal approved successfully.');
+        } else {
+            Yii::$app->session->setFlash('error', 'Failed to update company end period.');
         }
-
-        // Update company end date using direct DB update to bypass validation
-        $affected = Yii::$app->db->createCommand()
-            ->update('company', 
-                ['end_date' => $renewal->new_end_date], 
-                ['id' => $renewal->company_id])
-            ->execute();
-
-        if (!$affected) {
-            throw new \Exception('Failed to update company end date');
-        }
-
-        $transaction->commit();
-        Yii::$app->session->setFlash('success', 'Renewal request approved successfully.');
-    } catch (\Exception $e) {
-        $transaction->rollBack();
-        Yii::error('Renewal approval error: ' . $e->getMessage());
-        Yii::$app->session->setFlash('error', 'Failed to approve renewal: ' . $e->getMessage());
     }
 
-    return $this->redirect(['admin']);
+    return $this->redirect(['profile', 'id' => Yii::$app->user->id]);
 }
 
 public function actionRejectRenewal($id)
@@ -2446,5 +2358,242 @@ public function actionActiveContracts()
         'activeContracts' => $activeContracts,
     ]);
 }
+
+public function beforeAction($action)
+{
+    if (!parent::beforeAction($action)) {
+        return false;
+    }
+
+    // Only check if user is logged in
+    if (!Yii::$app->user->isGuest) {
+        $this->checkContractStatus();
+    }
+
+    return true;
+}
+
+protected function checkContractStatus()
+{
+    $user = Yii::$app->user->identity;
+    
+    // Get company end date
+    $company = Company::findOne(['company_name' => $user->company_name]);
+    
+    if ($company) {
+        $today = new DateTime();
+        $endDate = new DateTime($company->end_date);
+        
+        if ($today > $endDate) {
+            // Deactivate user
+            Yii::$app->db->createCommand()
+                ->update('users', ['status' => 0], ['id' => $user->id])
+                ->execute();
+                
+            // Force logout if contract expired
+            Yii::$app->user->logout();
+            
+            // Set flash message
+            Yii::$app->session->setFlash('error', 'Your contract has expired. Please contact support for renewal.');
+            
+            // Redirect to login page
+            Yii::$app->response->redirect(['site/login'])->send();
+            return false;
+        }
+    }
+    
+    return true;
+}
+
+// public function actionLogin()
+// {
+//     if (!Yii::$app->user->isGuest) {
+//         return $this->goHome();
+//     }
+
+//     $model = new LoginForm();
+//     if ($model->load(Yii::$app->request->post()) && $model->login()) {
+//         // Check user status after successful login
+//         $user = Yii::$app->user->identity;
+//         $userStatus = Yii::$app->db->createCommand('
+//             SELECT status 
+//             FROM users 
+//             WHERE id = :user_id
+//         ')
+//         ->bindValue(':user_id', $user->id)
+//         ->queryScalar();
+
+//         if (!$userStatus) {
+//             Yii::$app->user->logout();
+//             Yii::$app->session->setFlash('error', 'Your account has been deactivated. Please contact support.');
+//             return $this->redirect(['site/login']);
+//         }
+
+//         return $this->goBack();
+//     }
+
+//     $model->password = '';
+//     return $this->render('login', [
+//         'model' => $model,
+//     ]);
+// }
+
+public function actionExtendContract()
+{
+    Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+    
+    if (!Yii::$app->request->isAjax) {
+        return ['success' => false, 'message' => 'Invalid request method'];
+    }
+
+    $userId = Yii::$app->request->post('userId');
+    $companyName = Yii::$app->request->post('companyName');
+    $extensionPeriod = (int)Yii::$app->request->post('extensionPeriod');
+
+    // Start transaction
+    $transaction = Yii::$app->db->beginTransaction();
+
+    try {
+        // Find the company
+        $company = \app\models\Company::findOne(['company_name' => $companyName]);
+        if (!$company) {
+            throw new \Exception('Company not found');
+        }
+
+        // Calculate new end date
+        $currentEndDate = new \DateTime($company->end_date);
+        $currentEndDate->modify("+{$extensionPeriod} months");
+        $newEndDate = $currentEndDate->format('Y-m-d');
+
+        // Update company end date
+        $company->end_date = $newEndDate;
+        if (!$company->save()) {
+            throw new \Exception('Failed to update company contract');
+        }
+
+        // Create contract renewal record
+        $renewal = new \app\models\ContractRenewal([
+            'company_id' => $company->id,
+            'requested_by' => Yii::$app->user->id,
+            'extension_period' => $extensionPeriod,
+            'current_end_date' => $company->end_date,
+            'new_end_date' => $newEndDate,
+            'renewal_status' => 'approved',
+            'created_at' => new \yii\db\Expression('NOW()'),
+        ]);
+
+        if (!$renewal->save()) {
+            throw new \Exception('Failed to create renewal record');
+        }
+
+        $transaction->commit();
+        
+        return [
+            'success' => true,
+            'message' => "Contract extended successfully until " . Yii::$app->formatter->asDate($newEndDate)
+        ];
+
+    } catch (\Exception $e) {
+        $transaction->rollBack();
+        Yii::error("Contract extension error: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => $e->getMessage()
+        ];
+    }
+}
+
+public function actionGetCompanyExpiry()
+{
+    Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+    
+    $companyName = Yii::$app->request->get('companyName');
+    $company = \app\models\Company::findOne(['company_name' => $companyName]);
+    
+    if ($company) {
+        return [
+            'success' => true,
+            'expiryDate' => Yii::$app->formatter->asDate($company->end_date)
+        ];
+    }
+    
+    return [
+        'success' => false,
+        'message' => 'Company not found'
+    ];
+}
+
+
+// public function actionApprove($id)
+// {
+//     Yii::info("Approve action called with ID: $id"); // Log the ID
+
+//     // Find the contract renewal by ID
+//     $contractRenewal = ContractRenewal::findOne($id);
+    
+//     if ($contractRenewal === null) {
+//         Yii::info("Contract renewal not found for ID: $id"); // Log if not found
+//         throw new \yii\web\NotFoundHttpException("The requested contract renewal does not exist.");
+//     }
+
+//     // Check if the status is already approved
+//     if ($contractRenewal->status === 'approved') {
+//         Yii::$app->session->setFlash('error', 'This contract renewal has already been approved.');
+//         return $this->redirect(['site/dashboard']);
+//     }
+
+//     // Find the associated contract
+//     $contract = Contract::findOne($contractRenewal->contract_id); // Assuming contract_id is a field in ContractRenewal
+
+//     if ($contract === null) {
+//         throw new \yii\web\NotFoundHttpException("The associated contract does not exist.");
+//     }
+
+//     // Extend the end date of the contract
+//     $newEndDate = date('Y-m-d', strtotime($contract->end_date . ' + ' . $contractRenewal->extension_period . ' days')); // Assuming extension_period is in days
+//     $contract->end_date = $newEndDate; // Update the end date
+
+//     // Save the updated contract
+//     if ($contract->save()) {
+//         // Update the status of the contract renewal
+//         $contractRenewal->status = 'approved'; // Update status to approved
+//         $contractRenewal->save(); // Save the renewal status
+
+//         Yii::$app->session->setFlash('success', 'Contract renewal approved and end date extended successfully.');
+//     } else {
+//         Yii::$app->session->setFlash('error', 'Failed to approve contract renewal and extend end date.');
+//     }
+
+//     return $this->redirect(['site/dashboard']); // Redirect to the dashboard or another page
+// }
+ 
+
+// public function actionUpdateStatus($id)
+// {
+//     Yii::info("Update status action called with ID: $id"); // Log the ID
+
+//     // Find the contract renewal by ID
+//     $contractRenewal = ContractRenewal::findOne($id);
+    
+//     if ($contractRenewal === null) {
+//         Yii::info("Contract renewal not found for ID: $id"); // Log if not found
+//         return $this->asJson(['success' => false, 'message' => 'The requested contract renewal does not exist.']);
+//     }
+
+//     // Check if the status is already approved
+//     if ($contractRenewal->status === 'approved') {
+//         return $this->asJson(['success' => false, 'message' => 'This contract renewal has already been approved.']);
+//     }
+
+//     // Update the status of the contract renewal
+//     $contractRenewal->status = 'approved'; // Update status to approved
+
+//     if ($contractRenewal->save()) {
+//         Yii::$app->session->setFlash('success', 'Contract renewal approved successfully.');
+//         return $this->asJson(['success' => true, 'message' => 'Contract renewal approved successfully.']);
+//     } else {
+//         return $this->asJson(['success' => false, 'message' => 'Failed to approve contract renewal.']);
+//     }
+// }
 
 }

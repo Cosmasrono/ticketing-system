@@ -40,7 +40,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                 <div class="card shadow-sm">
                     <div class="card-body d-flex justify-content-between align-items-center">
                         <div class="left-buttons">
-                            <?= Html::a('<i class="fas fa-user-plus me-2"></i>Create New User', ['site/create-user'], [
+                            <?= Html::a('<i class="fas fa-user-plus me-2"></i>Invite users  ', ['site/create-user'], [
                                 'class' => 'btn btn-gradient-success btn-lg hover-lift',
                             ]) ?>
                         </div>
@@ -100,6 +100,112 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                 <div class="card-body">
                     <h5 class="card-title"><?= $ticketCounts['total'] ?? 0 ?></h5>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add this search form above the GridView -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <?php
+            // Get unique company names for dropdown
+            $companies = \app\models\Client::find()
+                ->select(['company_name'])
+                ->distinct()
+                ->column();
+            ?>
+            <div class="row align-items-end mb-3">
+                <div class="col-md-4">
+                    <label class="form-label">Search by Company</label>
+                    <select class="form-select" id="companySearch">
+                        <option value="">All Companies</option>
+                        <?php foreach ($companies as $company): ?>
+                            <option value="<?= Html::encode($company) ?>">
+                                <?= Html::encode($company) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-secondary" id="resetSearch">
+                        <i class="fas fa-undo"></i> Reset
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add this section after company selection -->
+    <div class="card mb-4" id="companyTicketsSection" style="display: none;">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-ticket-alt me-2"></i>
+                <span id="selectedCompanyName"></span> - Tickets Overview
+            </h5>
+            <div class="btn-group">
+                <button class="btn btn-light btn-sm" id="exportExcel">
+                    <i class="fas fa-file-excel me-1"></i> Export to Excel
+                </button>
+                <button class="btn btn-light btn-sm ms-2" id="printTickets">
+                    <i class="fas fa-print me-1"></i> Print
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <!-- Company Statistics -->
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-info text-white">
+                        <div class="card-body">
+                            <h6>Total Tickets</h6>
+                            <h3 id="companyTotalTickets">0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h6>Resolved Tickets</h6>
+                            <h3 id="companyResolvedTickets">0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-white">
+                        <div class="card-body">
+                            <h6>Pending Tickets</h6>
+                            <h3 id="companyPendingTickets">0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <h6>Critical Tickets</h6>
+                            <h3 id="companyCriticalTickets">0</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filtered Tickets Table -->
+            <div class="table-responsive mt-3">
+                <table class="table table-hover" id="companyTicketsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Module</th>
+                            <th>Issue</th>
+                            <th>Status</th>
+                            <th>Created At</th>
+                            <th>Assigned To</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Tickets will be populated here -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -955,6 +1061,97 @@ body {
 .btn:active {
     transform: translateY(1px);
 }
+
+/* Add these styles for the search form */
+.form-select {
+    padding: 0.5rem;
+    border: 1px solid #e0e7ff;
+    border-radius: 8px;
+    width: 100%;
+    color: #2E4374;
+    background-color: white;
+}
+
+.form-select:focus {
+    border-color: #2E4374;
+    box-shadow: 0 0 0 0.2rem rgba(46, 67, 116, 0.25);
+    outline: none;
+}
+
+.form-label {
+    font-weight: 600;
+    color: #2E4374;
+    margin-bottom: 0.5rem;
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, #858796 0%, #6e707e 100%);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.card {
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border-radius: 10px;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+/* Add these styles for the new section */
+.badge {
+    padding: 0.5em 0.8em;
+    font-weight: 500;
+}
+
+.card-header {
+    border-bottom: 0;
+}
+
+.btn-light {
+    background: white;
+    border: 1px solid #dee2e6;
+}
+
+.btn-light:hover {
+    background: #f8f9fa;
+}
+
+#companyTicketsTable {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+#companyTicketsTable th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+#companyTicketsTable td, #companyTicketsTable th {
+    padding: 1rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+@media print {
+    .btn-group, .dashboard-nav {
+        display: none !important;
+    }
+    
+    .card {
+        border: none !important;
+        box-shadow: none !important;
+    }
+}
 </style>
 
 <!-- Add this modal -->
@@ -1019,5 +1216,138 @@ JS;
 $this->registerJs($js);
 ?>
 </div>
+
+<?php
+// Register JavaScript for search functionality
+$this->registerJs("
+    // Function to filter the GridView
+    $('#companySearch').on('change', function() {
+        var companyName = $(this).val().toLowerCase();
+        
+        $('.grid-view table tbody tr').each(function() {
+            var row = $(this);
+            var rowCompany = row.find('td:eq(5)').text().toLowerCase(); // Adjust index based on company column
+            
+            if (companyName === '' || rowCompany.includes(companyName)) {
+                row.show();
+            } else {
+                row.hide();
+            }
+        });
+        
+        // Update ticket counts
+        updateTicketCounts();
+    });
+
+    // Reset search
+    $('#resetSearch').on('click', function() {
+        $('#companySearch').val('');
+        $('.grid-view table tbody tr').show();
+        updateTicketCounts();
+    });
+
+    // Function to update ticket counts
+    function updateTicketCounts() {
+        var visibleRows = $('.grid-view table tbody tr:visible');
+        
+        // Update total tickets count
+        $('.card-title:contains(\"Total Tickets\")').text(visibleRows.length);
+        
+        // Count tickets by status
+        var statusCounts = {
+            'pending': 0,
+            'approved': 0,
+            'cancelled': 0,
+            'assigned': 0,
+            'closed': 0,
+            'reopen': 0,
+            'escalated': 0,
+            'reassigned': 0
+        };
+        
+        visibleRows.each(function() {
+            var status = $(this).find('td:eq(4)').text().toLowerCase().trim();
+            if (statusCounts.hasOwnProperty(status)) {
+                statusCounts[status]++;
+            }
+        });
+        
+        // Update status cards
+        Object.keys(statusCounts).forEach(function(status) {
+            $('.card-header:contains(\"' + status.charAt(0).toUpperCase() + status.slice(1) + ' Tickets\")')
+                .siblings('.card-body')
+                .find('.card-title')
+                .text(statusCounts[status]);
+        });
+    }
+");
+?>
+
+<?php
+// Update the JavaScript
+$this->registerJs("
+    $('#companySearch').on('change', function() {
+        var companyName = $(this).val();
+        if (companyName) {
+            // Show company tickets section
+            $('#companyTicketsSection').show();
+            $('#selectedCompanyName').text(companyName);
+            
+            // Filter tickets and update statistics
+            var visibleRows = $('.grid-view table tbody tr').filter(function() {
+                return $(this).find('td:eq(5)').text().toLowerCase() === companyName.toLowerCase();
+            });
+
+            // Update statistics
+            $('#companyTotalTickets').text(visibleRows.length);
+            $('#companyResolvedTickets').text(visibleRows.filter(':contains(\"closed\")').length);
+            $('#companyPendingTickets').text(visibleRows.filter(':contains(\"pending\")').length);
+            $('#companyCriticalTickets').text(visibleRows.filter(':contains(\"escalated\")').length);
+
+            // Populate company tickets table
+            $('#companyTicketsTable tbody').empty();
+            visibleRows.each(function() {
+                var row = $(this);
+                var newRow = $('<tr>').append(
+                    $('<td>').text(row.find('td:eq(0)').text()),
+                    $('<td>').text(row.find('td:eq(1)').text()),
+                    $('<td>').text(row.find('td:eq(2)').text()),
+                    $('<td>').html(getStatusBadge(row.find('td:eq(4)').text())),
+                    $('<td>').text(row.find('td:eq(6)').text()),
+                    $('<td>').text(row.find('td:eq(7)').text()),
+                    $('<td>').html(row.find('td:last').html())
+                );
+                $('#companyTicketsTable tbody').append(newRow);
+            });
+        } else {
+            $('#companyTicketsSection').hide();
+        }
+    });
+
+    // Function to generate status badge
+    function getStatusBadge(status) {
+        const badges = {
+            'pending': 'warning',
+            'approved': 'info',
+            'closed': 'success',
+            'escalated': 'danger',
+            'cancelled': 'secondary'
+        };
+        const type = badges[status.toLowerCase()] || 'primary';
+        return '<span class=\"badge bg-' + type + '\">' + status + '</span>';
+    }
+
+    // Export to Excel functionality
+    $('#exportExcel').on('click', function() {
+        var company = $('#companySearch').val();
+        window.location.href = '" . Url::to(['site/export-tickets']) . "?company=' + encodeURIComponent(company);
+    });
+
+    // Print functionality
+    $('#printTickets').on('click', function() {
+        window.print();
+    });
+");
+?>
 
 

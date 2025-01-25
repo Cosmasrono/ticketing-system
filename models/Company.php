@@ -18,7 +18,7 @@ class Company extends ActiveRecord
 
     public static function tableName()
     {
-        return '{{%company}}';
+        return 'company'; // Your actual table name
     }
 
     public function rules()
@@ -34,6 +34,10 @@ class Company extends ActiveRecord
             ['company_name', 'unique', 'targetClass' => self::class, 'message' => 'This Company Name has already been taken.'],
             ['company_email', 'unique', 'targetClass' => self::class, 'message' => 'This Company Email has already been taken.'],
             ['role', 'string'],
+            [['name'], 'string', 'max' => 255],
+            [['start_date', 'end_date'], 'required'],
+            [['start_date', 'end_date'], 'date', 'format' => 'php:Y-m-d'],
+            ['end_date', 'safe'],  // Make sure end_date is in your rules
         ];
     }
 
@@ -61,6 +65,7 @@ class Company extends ActiveRecord
             'modules' => 'Modules',
             'status' => 'Status',
             'role' => 'User Type',
+            'name' => 'Name',
         ];
     }
 

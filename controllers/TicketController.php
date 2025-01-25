@@ -768,16 +768,17 @@ class TicketController extends Controller
     
                 $originalTicket = Ticket::findOne($ticket->id);
     
-                // Check the ticket's current status
+                // Update only assigned_to by default
+                $ticket->assigned_to = $developerId;
+                $ticket->assigned_at = date('Y-m-d H:i:s');
+
+                // Only update escalated_to if the ticket is escalated
                 if ($ticket->status === 'escalated') {
                     $ticket->status = 'reassigned';
+                    $ticket->escalated_to = $developerId;
+                    $ticket->escalation_comment = $originalTicket->escalation_comment;
                 }
-    
-                // Just assign the developer ID
-                $ticket->escalated_to = $developerId;
-                $ticket->assigned_to = $developerId;
-                $ticket->escalation_comment = $originalTicket->escalation_comment;
-    
+
                 if ($ticket->save(false)) {
                     // Send email notification with detailed error logging
                     try {
@@ -825,6 +826,7 @@ class TicketController extends Controller
                         'message' => $message,
                         'newStatus' => $ticket->status,
                         'ticketId' => $ticket->id,
+                        'assignedAt' => $ticket->assigned_at,
                         'emailStatus' => isset($emailSent) && $emailSent
                     ];
                 }
@@ -1293,20 +1295,43 @@ public function actionClose()
         $request = Yii::$app->request;
         if ($request->isAjax && $request->isPost) {
             $ticketId = $request->post('id');
-            $comment = $request->post('comment'); // Get the comment from the request
+            $comment = $request->post('comment');
 
             // Find the ticket model
             $ticket = Ticket::findOne($ticketId);
             if ($ticket) {
-                $ticket->status = 'closed';
-                $ticket->comments = $comment; // Save the comment to the comments field
+                // Calculate time taken from assigned_at to now
+                if ($ticket->assigned_at) {
+                    $assignedAt = new \DateTime($ticket->assigned_at);
+                    $closedAt = new \DateTime();
+                    $timeDiff = $assignedAt->diff($closedAt);
+                    
+                    // Convert to hours with decimal points
+                    $hoursTotal = $timeDiff->days * 24 + $timeDiff->h + 
+                                ($timeDiff->i / 60) + ($timeDiff->s / 3600);
+                    
+                    // Update ticket
+                    $ticket->status = 'closed';
+                    $ticket->comments = $comment;
+                    $ticket->closed_at = $closedAt->format('Y-m-d H:i:s');
+                    $ticket->time_taken = round($hoursTotal, 2); // Round to 2 decimal places
+                    $ticket->closed_by = Yii::$app->user->identity->username;
 
-                if ($ticket->save()) {
-                    return $this->asJson(['success' => true]);
+                    if ($ticket->save()) {
+                        return $this->asJson([
+                            'success' => true,
+                            'timeTaken' => $ticket->time_taken,
+                            'message' => 'Ticket closed. Time taken: ' . $ticket->time_taken . ' hours'
+                        ]);
+                    }
                 } else {
-                    return $this->asJson(['success' => false, 'message' => 'Failed to close ticket.']);
+                    return $this->asJson([
+                        'success' => false,
+                        'message' => 'Ticket was never assigned a start time.'
+                    ]);
                 }
             }
+            return $this->asJson(['success' => false, 'message' => 'Failed to close ticket.']);
         }
         return $this->asJson(['success' => false, 'message' => 'Invalid request.']);
     }
@@ -1703,81 +1728,86 @@ public function actionClose()
     protected function getModuleIssues()
     {
         return [
-            'MOBILE' => [
-                'Member Registration Failed',
-                'Profile Update Issues',
-                'Access Denied',
-                'Data Sync Problems',
-                'Member Search Not Working',
-                'Member Verification Failed',
-                'Document Upload Issues',
-                'Member Status Update Failed'
-            ],
-            'DASH' => [
-                'Loading Issues',
-                'Data Not Updating',
-                'Widget Problems',
-                'Performance Issues',
-                'Access Problems'
-            ],
-            'BI' => [
-                'Report Loading',
-                'Data Refresh',
-                'Visualization Error',
-                'Export Issues',
-                'Connection Error'
-            ],
-            'REPORTS' => [
-                'Generation Failed',
-                'Download Issues',
-                'Format Problems',
-                'Missing Data',
-                'Scheduling Issues'
-            ],
-            'ADMIN' => [
-                'User Management',
-                'Permission Error',
-                'Settings Issues',
-                'Audit Log',
-                'Configuration'
-            ],
-            'FIN' => [
-                'Transaction Error',
-                'Report Issues',
-                'Calculation Error',
-                'Integration Issue',
-                'Balance Mismatch'
+            'Finance' => [
+                'General Ledger Issues',
+                'Transaction Processing',
+                'Financial Reports',
+                'Bank Reconciliation',
+                'Budget Management'
             ],
             'HR' => [
                 'Employee Records',
                 'Leave Management',
-                'Payroll Issues',
-                'Document Upload',
-                'Attendance System'
+                'Performance Reviews',
+                'Recruitment Process',
+                'Training Management'
             ],
-            'CREDIT' => [
+            'Payroll' => [
+                'Salary Processing',
+                'Deduction Calculation',
+                'Tax Computation',
+                'Payslip Generation',
+                'Statutory Reports'
+            ],
+            'BOSA' => [
+                'Member Registration',
                 'Loan Processing',
-                'Credit Score',
-                'Application Error',
-                'Payment Issues',
-                'Document Verify'
+                'Dividend Calculation',
+                'Share Management',
+                'Guarantor Management'
             ],
-            'MEMBERS' => [
+            'FOSA' => [
+                'Account Opening',
+                'Transaction Processing',
+                'ATM Management',
+                'Standing Orders',
+                'Statement Generation'
+            ],
+            'EDMS' => [
+                'Document Upload',
+                'File Retrieval',
+                'Document Indexing',
+                'Access Rights',
+                'Version Control'
+            ],
+            'Member Portal' => [
                 'Login Issues',
-                'Profile Update',
-                'Statement Error',
-                'Service Access',
-                'Password Reset'
+                'Account Access',
+                'Online Services',
+                'Password Reset',
+                'Profile Updates'
+            ],
+            'Mobile App' => [
+                'App Installation',
+                'Login Problems',
+                'Transaction Failures',
+                'Balance Inquiry',
+                'App Navigation'
+            ],
+            'Procurement' => [
+                'Purchase Orders',
+                'Vendor Management',
+                'Inventory Control',
+                'Requisition Process',
+                'Contract Management'
+            ],
+            'CRM' => [
+                'Member Inquiries',
+                'Service Requests',
+                'Communication Issues',
+                'Feedback Management',
+                'Campaign Management'
             ],
             'USSD' => [
-                'Session Error',
-                'Menu Issues',
-                'Transaction Failed',
-                'Response Delay',
-                'Service Access'
+                'General Ledger Issues',
+                'Transaction Processing',
+                'Financial Reports',
+                'Bank Reconciliation',
+                'Budget Management'
             ]
         ];
     }
+    
 
 
     private function sendTicketNotification($model)

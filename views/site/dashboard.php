@@ -3,6 +3,11 @@ use yii\helpers\Html;
 use yii\helpers\Url;
 use yii\web\JqueryAsset;
 use app\models\ContractRenewal;
+use app\models\User;
+// grid
+use yii\grid\GridView;
+use yii\data\arrayDataProvider;
+// use app\models\ContractRenewal;
 
 $this->title = 'Help Desk Analytics Dashboard';
 
@@ -26,7 +31,7 @@ $this->registerJsFile('https://code.jquery.com/jquery-3.6.0.min.js', ['position'
 
 // Register the JavaScript in POS_HEAD to ensure it's available before DOM elements
 $this->registerJs("
-    window.toggleUserStatus = function(userId) {
+    window.toggleUserStatus = function(userId, status) {
         Swal.fire({
             title: 'Are you sure?',
             text: 'Do you want to change this user\'s status?',
@@ -43,61 +48,24 @@ $this->registerJs("
                     dataType: 'json',
                     data: {
                         id: userId,
+                        status: status,
                         _csrf: yii.getCsrfToken()
                     },
-                    beforeSend: function() {
-                        // Clear any previous output
-                        console.clear();
-                    },
                     success: function(response) {
-                        try {
-                            if (response && response.success) {
-                                Swal.fire({
-                                    title: 'Success!',
-                                    text: response.message,
-                                    icon: 'success'
-                                }).then(() => {
-                                    window.location.reload();
-                                });
-                            } else {
-                                throw new Error(response.message || 'Unknown error');
-                            }
-                        } catch (e) {
-                            console.error('Response parsing error:', e);
-                            Swal.fire({
-                                title: 'Error!',
-                                text: e.message,
-                                icon: 'error'
+                        if (response.success) {
+                            Swal.fire('Success!', response.message, 'success').then(() => {
+                                window.location.reload();
                             });
+                        } else {
+                            Swal.fire('Error!', response.message || 'Unknown error', 'error');
                         }
                     },
-                    error: function(xhr, status, error) {
-                        console.error('Ajax error:', {xhr, status, error});
+                    error: function(xhr) {
                         let errorMessage = 'An error occurred while processing your request';
-                        
-                        try {
-                            // Try to get response text if it exists
-                            const response = xhr.responseText;
-                            if (response) {
-                                // Remove any debug output before JSON
-                                const jsonStart = response.indexOf('{');
-                                if (jsonStart >= 0) {
-                                    const cleanJson = response.substring(jsonStart);
-                                    const parsed = JSON.parse(cleanJson);
-                                    if (parsed.message) {
-                                        errorMessage = parsed.message;
-                                    }
-                                }
-                            }
-                        } catch (e) {
-                            console.error('Error parsing response:', e);
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            errorMessage = xhr.responseJSON.message;
                         }
-
-                        Swal.fire({
-                            title: 'Error!',
-                            text: errorMessage,
-                            icon: 'error'
-                        });
+                        Swal.fire('Error!', errorMessage, 'error');
                     }
                 });
             }
@@ -107,216 +75,471 @@ $this->registerJs("
 ?>
 
 <style>
-.dashboard-container {
-    display: flex;
-    min-height: 100vh;
+/* Fixed Navigation Styles */
+.dashboard-nav {
+    position: fixed;
+    top: 60px; /* Adjust based on your main header height */
+    left: 0;
+    right: 0;
+    width: 100%;
+    background: #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    padding: 0 20px;
+    z-index: 1000;
 }
 
-.dashboard-sidebar {
-    width: 250px;
+/* Add padding to content to prevent overlap */
+.dashboard-container {
+    width: 100%;
+    padding-top: 70px; /* Height of nav + some spacing */
+}
+
+.nav-trigger {
+    display: none;
+    padding: 15px 20px;
     background: #2E4374;
-    padding: 20px 0;
-    height: 100vh;
-    position: fixed;
+    color: white;
+    cursor: pointer;
+    align-items: center;
+    gap: 10px;
+}
+
+.nav-links {
+    display: flex;
+    gap: 20px;
+    padding: 15px 0;
+    margin: 0;
+    list-style: none;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 24px;
+    color: #1a1a1a;
+    text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.nav-link:hover, .nav-link.active {
+    background: #e0e7ff;
+    color: #2E4374;
+}
+
+/* Client Dashboard Styles */
+.dashboard-container {
+    width: 100%;
+    padding: 0;
 }
 
 .dashboard-content {
-    flex: 1;
-    margin-left: 250px;
+    width: 100%;
     padding: 20px;
-    background: #f8f9fc;
 }
 
-.dash-nav-item {
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.client-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+.card-header {
+    padding: 20px;
+    background: #2E4374;
+    color: white;
+    border-radius: 12px 12px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Table Styles */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    min-width: 1000px;
+}
+
+.table th {
+    background: #f8f9fc;
+    padding: 15px;
+    font-weight: 600;
+}
+
+.table td {
+    padding: 15px;
+    vertical-align: middle;
+    border-bottom: 1px solid #f1f5f9;
+}
+
+/* Status and Badge Styles */
+.badge-module {
+    background: #e0e7ff;
+    color: #2E4374;
+    padding: 0.4em 1em;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    margin: 0.2rem;
+    display: inline-block;
+}
+
+.status-active {
+    color: #10b981;
+}
+
+.status-inactive {
+    color: #ef4444;
+}
+
+.avatar-circle {
+    width: 35px;
+    height: 35px;
+    background: #e0e7ff;
+    color: #2E4374;
+    border-radius: 50%;
     display: flex;
     align-items: center;
-    padding: 12px 25px;
-    color: white;
-    text-decoration: none;
-    transition: all 0.3s;
-    margin-bottom: 5px;
-}
-
-.dash-nav-item:hover {
-    background: #FF6B35;
-    color: white;
-    text-decoration: none;
-    border-left: 4px solid #FF9B35;
-}
-
-.dash-nav-item.active {
-    background: #FF6B35;
-    border-left: 4px solid #FF9B35;
-}
-
-.dash-nav-item i {
+    justify-content: center;
     margin-right: 10px;
-    width: 20px;
-    text-align: center;
 }
 
-.nav-section {
-    margin-bottom: 20px;
-    border-bottom: 1px solid rgba(255,255,255,0.1);
-    padding-bottom: 10px;
+/* Action Buttons */
+.action-buttons {
+    display: flex;
+    gap: 8px;
 }
 
-.nav-section-title {
-    color: #FF9B35;
-    padding: 10px 25px;
-    font-size: 0.8em;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .nav-trigger {
+        display: flex;
+    }
+
+    .nav-links {
+        display: none;
+    }
+
+    .nav-links.show {
+        display: block;
+    }
+
+    .dashboard-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .card-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .search-box {
+        width: 100%;
+    }
 }
 
-/* Content area styling */
-.content-section {
-    display: none;
+/* Update container and width styles */
+.dashboard-container {
+    width: 100%;
+    padding: 0;
+    margin: 0;
 }
 
-.content-section.active {
-    display: block;
+.dashboard-content {
+    width: 100%;
+    max-width: 100%;
+    padding: 20px;
+    margin: 0;
+}
+
+/* Update client dashboard styles */
+.client-dashboard {
+    padding: 0;
+    width: 100%;
+}
+
+.dashboard-header {
+    margin: 0 0 20px 0;
+    padding: 20px;
+    width: 100%;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.client-card {
+    width: 100%;
+    margin: 0;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+}
+
+/* Table responsive updates */
+.table-responsive {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: auto;
+}
+
+.table {
+    min-width: 1000px; /* Minimum width to prevent squishing */
+    width: 100%;
+}
+
+/* Adjust card padding */
+.card-body {
+    padding: 0; /* Remove default padding */
+}
+
+.card-header {
+    padding: 20px;
+    margin: 0;
+    width: 100%;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .dashboard-content {
+        padding: 15px;
+    }
+    
+    .dashboard-header {
+        padding: 15px;
+    }
+    
+    .card-header {
+        padding: 15px;
+    }
 }
 
 @media (max-width: 768px) {
-    .dashboard-sidebar {
-        width: 70px;
-    }
-    .dash-nav-item span {
-        display: none;
-    }
     .dashboard-content {
-        margin-left: 70px;
+        padding: 10px;
     }
-    .nav-section-title {
-        display: none;
+    
+    .dashboard-header {
+        padding: 15px;
     }
+    
+    .search-box {
+        width: 100%;
+    }
+}
+
+/* Navigation width adjustment */
+.dashboard-nav {
+    width: 100%;
+    max-width: 100%;
+    margin: 20px 0;
+    padding: 0 20px;
+}
+
+.nav-links {
+    max-width: 100%;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 15px 0;
+}
+
+/* Custom scrollbar for horizontal scroll */
+.nav-links::-webkit-scrollbar {
+    height: 6px;
+}
+
+.nav-links::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.nav-links::-webkit-scrollbar-thumb {
+    background: rgba(46, 67, 116, 0.3);
+    border-radius: 3px;
+}
+
+.nav-links::-webkit-scrollbar-thumb:hover {
+    background: rgba(46, 67, 116, 0.5);
 }
 </style>
 
-<div class="dashboard-container">
-    <!-- Dashboard Sidebar -->
-    <div class="dashboard-sidebar">
-        <div class="nav-section">
-            <div class="nav-section-title">Main</div>
-            <a href="#overview" class="dash-nav-item active" data-section="overview">
-                <i class="fas fa-th-large"></i>
-                <span>Overview</span>
-            </a>
-        </div>
+<div style="height: 60px;">
+    <!-- Spacer for main header -->
+</div>
 
-        <div class="nav-section">
-            <div class="nav-section-title">Client Management</div>
-            <a href="#clients" class="dash-nav-item" data-section="clients">
-                <i class="fas fa-users"></i>
-                <span>Our Clients</span>
-            </a>
-            <a href="#contracts" class="dash-nav-item" data-section="contracts">
-                <i class="fas fa-file-contract"></i>
-                <span>Contracts</span>
-            </a>
-        </div>
-
-        <div class="nav-section">
-            <div class="nav-section-title">Support</div>
-            <a href="#tickets" class="dash-nav-item" data-section="tickets">
-                <i class="fas fa-ticket-alt"></i>
-                <span>Active Tickets</span>
-            </a>
-            <a href="#reports" class="dash-nav-item" data-section="reports">
-                <i class="fas fa-chart-line"></i>
-                <span>Reports</span>
-            </a>
-        </div>
+<div class="dashboard-nav">
+    <div class="nav-trigger">
+        <i class="fas fa-bars"></i> Dashboard Menu
     </div>
+    <ul class="nav-links">
+        <li><a href="#overview" class="nav-link active" data-section="overview">
+            <i class="fas fa-chart-line"></i> <span>Overview</span>
+        </a></li>
+        <li><a href="#clients" class="nav-link" data-section="clients">
+            <i class="fas fa-building"></i> <span>Clients</span>
+        </a></li>
+        <li><a href="#tickets" class="nav-link" data-section="tickets">
+            <i class="fas fa-ticket-alt"></i> <span>Tickets</span>
+        </a></li>
+        <li><a href="#contracts" class="nav-link" data-section="contracts">
+            <i class="fas fa-file-contract"></i> <span>Contracts</span>
+        </a></li>
+        <li><a href="#users" class="nav-link" data-section="users">
+            <i class="fas fa-users"></i> <span>Users</span>
+        </a></li>
+    </ul>
+</div>
 
-    <!-- Dashboard Content -->
-    <div class="dashboard-content">
+<div class="dashboard-container">
+    <!-- Users Section -->
+    <div id="users" class="content-section">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="text-gray-800">User Management</h2>
+            <div class="d-flex align-items-center">
+                <div class="input-group mr-3" style="width: 300px;">
+                    <input type="text" class="form-control" id="userSearch" placeholder="Search users...">
+                    <div class="input-group-append">
+                        <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    </div>
+                </div>
+             </div>
+        </div>
+
+        <div class="card-body">
+    <div class="table-responsive">
+        <table class="table table-hover" id="usersTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Company</th>
+                    
+                    <th>Role</th>
+                    <th>User Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php foreach ($allUsers as $user): ?>
+                    <tr>
+                        <td><?= Html::encode($user->name) ?></td>
+                        <td><?= Html::encode($user->company_name) ?></td>
+                         <td>
+                            <span class="badge bg-info">
+                                <?= Html::encode(ucfirst($user->role)) ?>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge <?= $user->status == User::STATUS_ACTIVE ? 'bg-success' : 'bg-danger' ?>">
+                                <?= $user->status == User::STATUS_ACTIVE ? 'Active' : 'Inactive' ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php if (isset($user->created_at) && $user->created_at): ?>
+                                <?= Yii::$app->formatter->asDate($user->created_at) ?>
+                            <?php else: ?>
+                                <span class="text-muted">N/A</span>
+                            <?php endif; ?>
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <?php if ($user->status == 10): // Check if status is active ?>
+                                    <button 
+                                        class="btn btn-sm btn-danger"
+                                        onclick="toggleUserStatus(<?= $user->id ?>, 0)"
+                                        title="Deactivate user">
+                                        <i class="fas fa-ban"></i> Deactivate
+                                    </button>
+                                <?php elseif ($user->status == 0): // Check if status is inactive ?>
+                                    <button 
+                                        class="btn btn-sm btn-success"
+                                        onclick="toggleUserStatus(<?= $user->id ?>, 1)"
+                                        title="Activate user">
+                                        Activate
+                                    </button>
+                                <?php else: ?>
+                                    <span class="text-muted">Not applicable</span>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function toggleUserStatus(userId, newStatus) {
+    $.ajax({
+        url: '/user/toggle-status',
+        method: 'POST',
+        data: {
+            id: userId,
+            status: newStatus
+        },
+        success: function(response) {
+            if (response.success) {
+                location.reload();
+            } else {
+                alert('Failed to update user status');
+            }
+        },
+        error: function() {
+            alert('Error updating user status');
+        }
+    });
+}
+</script>
+</div>
+
+<script>
+function toggleUserStatus(userId, newStatus) {
+    // AJAX call to update user status
+    $.ajax({
+        url: '/user/toggle-status',
+        method: 'POST',
+        data: {
+            id: userId,
+            status: newStatus
+        },
+        success: function(response) {
+            if (response.success) {
+                // Reload or update the table row
+                location.reload(); // Simple approach
+            } else {
+                alert('Failed to update user status');
+            }
+        },
+        error: function() {
+            alert('Error updating user status');
+        }
+    });
+}
+</script>
+        </div>
+
         <!-- Overview Section -->
         <div id="overview" class="content-section active">
             <h2>Dashboard Overview</h2>
             <!-- Add this section to your admin dashboard -->
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3>Contract Renewals</h3>
-                </div>
-                <div class="card-body">
-                    <?php
-                    $renewals = ContractRenewal::find()
-                        ->with(['company', 'requestedBy'])
-                        ->orderBy(['created_at' => SORT_DESC])
-                        ->all();
-                    ?>
-
-                    <?php if (!empty($renewals)): ?>
-                        <div class="table-responsive">
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Company</th>
-                                        <th>Current End Date</th>
-                                        <th>Extension</th>
-                                        <th>New End Date</th>
-                                        <th>Status</th>
-                                        <th>Requested On</th>
-                                        <th>Notes</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php foreach ($renewals as $renewal): ?>
-                                        <tr>
-                                            <td><?= Html::encode($renewal->company->company_name) ?></td>
-                                            <td><?= Yii::$app->formatter->asDate($renewal->current_end_date) ?></td>
-                                            <td><?= $renewal->extension_period ?> months</td>
-                                            <td><?= Yii::$app->formatter->asDate($renewal->new_end_date) ?></td>
-                                            <td>
-                                                <span class="badge bg-<?= $renewal->renewal_status == 'pending' ? 'warning' : 
-                                                    ($renewal->renewal_status == 'approved' ? 'success' : 'danger') ?>">
-                                                    <?= ucfirst($renewal->renewal_status) ?>
-                                                </span>
-                                            </td>
-                                            <td><?= Yii::$app->formatter->asDatetime($renewal->created_at) ?></td>
-                                            <td><?= Html::encode($renewal->notes) ?></td>
-                                            <td>
-                                                <?php if ($renewal->renewal_status === 'pending'): ?>
-                                                    <div class="btn-group">
-                                                        <?= Html::a('Approve', 
-                                                            ['approve-renewal', 'id' => $renewal->id], 
-                                                            [
-                                                                'class' => 'btn btn-success btn-sm',
-                                                                'data' => [
-                                                                    'confirm' => 'Are you sure you want to approve this renewal?',
-                                                                    'method' => 'post',
-                                                                ],
-                                                            ]
-                                                        ) ?>
-                                                        <?= Html::a('Reject', 
-                                                            ['reject-renewal', 'id' => $renewal->id], 
-                                                            [
-                                                                'class' => 'btn btn-danger btn-sm ms-1',
-                                                                'data' => [
-                                                                    'confirm' => 'Are you sure you want to reject this renewal?',
-                                                                    'method' => 'post',
-                                                                ],
-                                                            ]
-                                                        ) ?>
-                                                    </div>
-                                                <?php else: ?>
-                                                    <span class="text-muted">No actions available</span>
-                                                <?php endif; ?>
-                                            </td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php else: ?>
-                        <div class="alert alert-info">No contract renewal requests found.</div>
-                    <?php endif; ?>
-                </div>
-            </div>
-
+           
             <div class="card mb-4">
                 <div class="card-header">
                     <h3>Clients with Comments</h3>
@@ -346,12 +569,8 @@ $this->registerJs("
                                             </td>
                                             <td><?= Yii::$app->formatter->asDatetime($ticket->created_at) ?></td>
                                             <td><?= Html::encode($ticket->comments) ?></td>
-                                            <td>
-                                                <?= $ticket->user ? Html::encode($ticket->user->company_name) : 
-                                                    '<span class="text-muted">No Company</span>' ?>
-                                            </td>
-                                            <td><?= $ticket->closed_by ? Html::encode($ticket->closed_by) : 
-                                                '<span class="text-muted">Not Closed</span>' ?></td>
+                                            <td><?= Html::encode($ticket->company_name) ?></td>
+                                            <td><?= Html::encode($ticket->closed_by) ?></td>
                                         </tr>
                                     <?php endif; ?>
                                 <?php endforeach; ?>
@@ -369,398 +588,352 @@ $this->registerJs("
         </div>
 
         <!-- Clients Section -->
-        <div id="clients" class="content-section">
-            <h2>Our Clients</h2>
-            <p>Total Clients: <?= Html::encode($clientCount) ?></p>
+        
+        
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.getElementById('contractSearch').addEventListener('keyup', function() {
+    const searchValue = this.value.toLowerCase();
+    const rows = document.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+        const visible = Array.from(row.getElementsByTagName('td'))
+            .some(td => td.textContent.toLowerCase().includes(searchValue));
+        row.style.display = visible ? '' : 'none';
+    });
+});
+</script>
+
+
+<!-- contracts section -->
+<div id="contracts" class="content-section">
+    <h2>Contract Renewals</h2>
+    <p>Total Renewals: <?= Html::encode(count($contractRenewals)) ?></p>
+    <div>
+        <?= Html::a('View Renewals', ['contract/index'], ['class' => 'btn btn-primary']) ?>
+    </div>
+
+    <?php if (!empty($contractRenewals)): ?>
+        <?= GridView::widget([
+            'dataProvider' => new ArrayDataProvider([
+                'allModels' => $contractRenewals,
+                'pagination' => [
+                    'pageSize' => 10,
+                ],
+            ]),
+            'columns' => [
+                ['class' => 'yii\grid\SerialColumn'],
+                'company_id',
+                'requested_by',
+                'extension_period',
+                'current_end_date',
+                'new_end_date',
+                'notes',
+                [
+                    'attribute' => 'renewal_status',
+                    'format' => 'raw',
+                    'value' => function ($model) {
+                        $statusClass = [
+                            'approved' => 'text-success',
+                            'rejected' => 'text-danger',
+                            'pending' => 'text-warning',
+                        ];
+                        $class = isset($statusClass[$model->renewal_status]) ? $statusClass[$model->renewal_status] : '';
+                        return '<span class="' . $class . '">' . ucfirst($model->renewal_status) . '</span>';
+                    }
+                ],
+                'created_at',
+                'updated_at',
+                [
+                    'class' => 'yii\grid\ActionColumn',
+                    'template' => '{approve} {reject}',
+                    'buttons' => [
+                        'approve' => function ($url, $model) {
+                            if ($model->renewal_status === 'approved') {
+                                return '<button class="btn btn-success btn-sm" disabled>Approved</button>';
+                            }
+                            return Html::a('Approve', '#', [
+                                'class' => 'btn btn-success btn-sm',
+                                'onclick' => 'updateStatus(' . $model->id . ', "approved"); return false;',
+                            ]);
+                        },
+                        'reject' => function ($url, $model) {
+                            if ($model->renewal_status === 'approved') {
+                                return '';  // Hide reject button if approved
+                            }
+                            return Html::a('Reject', '#', [
+                                'class' => 'btn btn-danger btn-sm',
+                                'onclick' => 'updateStatus(' . $model->id . ', "rejected"); return false;',
+                            ]);
+                        },
+                    ],
+                ],
+            ],
+        ]); ?>
+    <?php else: ?>
+        <div class="alert alert-info">No contract renewals found.</div>
+    <?php endif; ?>
+</div>
+
+<?php
+$this->registerJs("
+    function updateStatus(id, status) {
+        if (confirm('Are you sure you want to ' + status + ' this contract?')) {
+            $.ajax({
+                url: '" . Yii::$app->urlManager->createUrl(['site/update-contract-status']) . "',
+                type: 'POST',
+                data: {
+                    id: id,
+                    status: status,
+                    _csrf: '" . Yii::$app->request->csrfToken . "'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Refresh the grid to show updated status
+                        $.pjax.reload({container:'#contract-grid'});
+                        // Show success message
+                        alert('Contract status updated successfully');
+                        location.reload();
+                    } else {
+                        alert('Failed to update status: ' + response.message);
+                    }
+                },
+                error: function() {
+                    alert('Error occurred while updating status');
+                }
+            });
+        }
+    }
+");
+?>
+
+         
+
+
+
+
+<div id="clients" class="content-section">
+    <h2>Clients</h2>
+    <!-- Clients content -->
+
+
+<style>
+.client-dashboard {
+    padding: 20px;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.client-card {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+}
+
+.card-header {
+    background: linear-gradient(45deg, #4e73df, #36b9cc);
+    color: white;
+    padding: 1rem 1.5rem;
+    border-radius: 8px 8px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.table {
+    margin: 0;
+}
+
+.table thead th {
+    background-color: #f8f9fc;
+    color: #4e73df;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    padding: 1rem;
+    border-bottom: 2px solid #e3e6f0;
+}
+
+.table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fc;
+}
+
+.table td {
+    padding: 1rem;
+    vertical-align: middle;
+}
+
+.badge-module {
+    background: #e3e6f0;
+    color: #4e73df;
+    padding: 0.4em 0.8em;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    margin: 0.2rem;
+    display: inline-block;
+}
+
+.status-active {
+    color: #1cc88a;
+}
+
+.status-inactive {
+    color: #e74a3b;
+}
+
+.search-box {
+    max-width: 300px;
+    margin-bottom: 1rem;
+}
+
+.action-buttons a {
+    margin-left: 0.5rem;
+}
+</style>
+
+<section id="clients" class="section">
+    <div class="client-dashboard">
+        <!-- Dashboard Header -->
+        <div class="dashboard-header">
             <div>
-                <?= Html::a('View Clients', ['client/index'], ['class' => 'btn btn-primary']) ?>
+                <h2><i class="fas fa-building"></i> Client Management</h2>
+                <p class="mb-0 text-gray-600">Manage your company clients</p>
+            </div>
+            <div>
+                <?= Html::a('<i class="fas fa-plus"></i> Add New Client', ['/site/add-client'], [
+                    'class' => 'btn btn-primary'
+                ]) ?>
             </div>
         </div>
 
-        <!-- Contracts Section -->
-        <div id="contracts" class="content-section">
-            <div class="section-header">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <div>
-                        <h2 class="text-gray-800">Contract Management</h2>
-                        <p class="text-gray-600">Manage and track all client contracts</p>
-                    </div>
-                    <div>
-                        <?= Html::a('<i class="fas fa-plus"></i> New Contract', ['contract/create'], [
-                            'class' => 'btn btn-primary'
-                        ]) ?>
-                    </div>
+        <!-- Client List Card -->
+        <div class="card client-card">
+            <div class="card-header">
+                <h3 class="mb-0">Client List</h3>
+                <div class="search-box">
+                    <input type="text" id="clientSearch" class="form-control" placeholder="Search clients...">
                 </div>
             </div>
-
-            <!-- Contract Stats Cards -->
-            <div class="row mb-4">
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-primary shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                        Active Contracts</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $activeContractsCount ?? 0 ?></div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-file-contract fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <?php 
+                    $clients = \app\models\Client::find()->all();
+                    if (!empty($clients)): 
+                    ?>
+                    <table class="table" id="clientTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Company Name</th>
+                                <th>Email</th>
+                                <th>Modules</th>
+                                <th>Status</th>
+                                <th>Created At</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($clients as $client): ?>
+                            <tr>
+                                <td><strong>#<?= Html::encode($client->id) ?></strong></td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="avatar-circle me-2">
+                                            <?= strtoupper(substr($client->company_name, 0, 1)) ?>
+                                        </div>
+                                        <?= Html::encode($client->company_name) ?>
+                                    </div>
+                                </td>
+                                <td>
+                                    <a href="mailto:<?= Html::encode($client->company_email) ?>">
+                                        <?= Html::encode($client->company_email) ?>
+                                    </a>
+                                </td>
+                                <td>
+                                    <?php
+                                    if (!empty($client->module)):
+                                        $modules = explode(',', $client->module);
+                                        foreach ($modules as $module):
+                                            if (trim($module)):
+                                    ?>
+                                        <span class="badge-module"><?= Html::encode(trim($module)) ?></span>
+                                    <?php
+                                            endif;
+                                        endforeach;
+                                    endif;
+                                    ?>
+                                </td>
+                                <td>
+                                    <?php 
+                                    // Check if status column exists, if not default to 'active'
+                                    $statusDisplay = isset($client->is_active) ? $client->is_active : 
+                                                   (isset($client->status_id) ? $client->status_id : 1);
+                                    $isActive = $statusDisplay == 1;
+                                    ?>
+                                    <span class="<?= $isActive ? 'status-active' : 'status-inactive' ?>">
+                                        <i class="fas fa-circle fa-sm"></i>
+                                        <?= $isActive ? 'Active' : 'Inactive' ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div><?= Yii::$app->formatter->asDate($client->created_at) ?></div>
+                                    <small class="text-muted">
+                                        <?= Yii::$app->formatter->asTime($client->created_at) ?>
+                                    </small>
+                                </td>
+                                <td class="action-buttons">
+                                    <?= Html::a('<i class="fas fa-edit"></i>', ['/client/update', 'id' => $client->id], [
+                                        'class' => 'btn btn-sm btn-outline-primary',
+                                        'title' => 'Edit Client'
+                                    ]) ?>
+                                    <?= Html::a('<i class="fas fa-eye"></i>', ['/client/view', 'id' => $client->id], [
+                                        'class' => 'btn btn-sm btn-outline-info',
+                                        'title' => 'View Details'
+                                    ]) ?>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    <?php else: ?>
+                        <div class="text-center py-4">
+                            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No clients found. Start by adding a new client.</p>
                         </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-warning shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                        Expiring Soon</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $expiringCount ?? 0 ?></div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-clock fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-success shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                        Renewed This Month</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $renewedCount ?? 0 ?></div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-sync fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-danger shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
-                                        Expired</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $expiredCount ?? 0 ?></div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Contracts Table -->
-            <div class="card shadow mb-4">
-                <div class="card-header py-3 d-flex justify-content-between align-items-center">
-                    <h6 class="m-0 font-weight-bold text-primary">Active Contracts</h6>
-                    <div class="input-group" style="width: 300px;">
-                        <input type="text" class="form-control" id="contractSearch" 
-                               placeholder="Search contracts...">
-                        <div class="input-group-append">
-                            <span class="input-group-text"><i class="fas fa-search"></i></span>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover" id="contractsTable">
-                            <thead>
-                                <tr>
-                                    <th>Client</th>
-                                    <th>Contract Type</th>
-                                    <th>Start Date</th>
-                                    <th>End Date</th>
-                                    <th>Status</th>
-                                    <th>Value</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($contracts ?? [] as $contract): ?>
-                                    <tr>
-                                        <td><?= Html::encode($contract->client->company_name) ?></td>
-                                        <td><?= Html::encode($contract->type) ?></td>
-                                        <td><?= Yii::$app->formatter->asDate($contract->start_date) ?></td>
-                                        <td><?= Yii::$app->formatter->asDate($contract->end_date) ?></td>
-                                        <td>
-                                            <span class="badge <?= $contract->getStatusBadgeClass() ?>">
-                                                <?= Html::encode($contract->status) ?>
-                                            </span>
-                                        </td>
-                                        <td><?= Yii::$app->formatter->asCurrency($contract->value) ?></td>
-                                        <td>
-                                            <div class="btn-group">
-                                                <?= Html::a('<i class="fas fa-eye"></i>', ['contract/view', 'id' => $contract->id], [
-                                                    'class' => 'btn btn-sm btn-info',
-                                                    'title' => 'View'
-                                                ]) ?>
-                                                <?= Html::a('<i class="fas fa-edit"></i>', ['contract/update', 'id' => $contract->id], [
-                                                    'class' => 'btn btn-sm btn-primary',
-                                                    'title' => 'Edit'
-                                                ]) ?>
-                                                <?= Html::a('<i class="fas fa-sync"></i>', ['contract/renew', 'id' => $contract->id], [
-                                                    'class' => 'btn btn-sm btn-success',
-                                                    'title' => 'Renew'
-                                                ]) ?>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
+    </div>
+</section>
 
-        <!-- Tickets Section -->
-        <div id="tickets" class="content-section">
-            <!-- Ticket Statistics Cards -->
-            <div class="row mb-4">
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-primary shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                        Total Active Tickets</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $activeTicketsCount ?? 0 ?></div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-ticket-alt fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+<?php
+// Register required assets
+$this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
 
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-warning shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                        Pending Response</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $pendingTicketsCount ?? 0 ?></div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-clock fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-danger shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">
-                                        Urgent Tickets</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $urgentTicketsCount ?? 0 ?></div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-exclamation-circle fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="card border-left-success shadow h-100 py-2">
-                        <div class="card-body">
-                            <div class="row no-gutters align-items-center">
-                                <div class="col mr-2">
-                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                        Resolved Today</div>
-                                    <div class="h5 mb-0 font-weight-bold text-gray-800"><?= $resolvedTodayCount ?? 0 ?></div>
-                                </div>
-                                <div class="col-auto">
-                                    <i class="fas fa-check-circle fa-2x text-gray-300"></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Quick Actions and Filters -->
-            <div class="row mb-4">
-                <div class="col-md-8">
-                    <div class="btn-group">
-                        <?= Html::a('<i class="fas fa-plus"></i> New Ticket', ['ticket/create'], [
-                            'class' => 'btn btn-primary'
-                        ]) ?>
-                        <?= Html::a('<i class="fas fa-filter"></i> Filter', '#', [
-                            'class' => 'btn btn-outline-primary',
-                            'data-toggle' => 'modal',
-                            'data-target' => '#filterModal'
-                        ]) ?>
-                        <?= Html::a('<i class="fas fa-download"></i> Export', ['ticket/export'], [
-                            'class' => 'btn btn-outline-primary'
-                        ]) ?>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="input-group">
-                        <input type="text" class="form-control" id="ticketSearch" 
-                               placeholder="Search tickets...">
-                        <div class="input-group-append">
-                            <span class="input-group-text"><i class="fas fa-search"></i></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Priority Queue -->
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Priority Queue</h6>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover" id="priorityTable">
-                            <thead>
-                                <tr>
-                                    <th>Ticket ID</th>
-                                    <th>Client</th>
-                                    <th>Issue</th>
-                                    <th>Priority</th>
-                                    <th>Status</th>
-                                    <th>Assigned To</th>
-                                    <th>Age</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($priorityTickets ?? [] as $ticket): ?>
-                                    <tr class="<?= $ticket->getPriorityClass() ?>">
-                                        <td>#<?= Html::encode($ticket->id) ?></td>
-                                        <td><?= Html::encode($ticket->client->company_name) ?></td>
-                                        <td>
-                                            <div class="d-flex align-items-center">
-                                                <?php if ($ticket->hasAttachments()): ?>
-                                                    <i class="fas fa-paperclip text-muted mr-2"></i>
-                                                <?php endif; ?>
-                                                <?= Html::encode($ticket->title) ?>
-                                            </div>
-                                            <small class="text-muted"><?= Html::encode($ticket->getShortDescription()) ?></small>
-                                        </td>
-                                        <td>
-                                            <span class="badge <?= $ticket->getPriorityBadgeClass() ?>">
-                                                <?= Html::encode($ticket->priority) ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span class="badge <?= $ticket->getStatusBadgeClass() ?>">
-                                                <?= Html::encode($ticket->status) ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <?php if ($ticket->assigned_to): ?>
-                                                <div class="d-flex align-items-center">
-                                                    <div class="avatar-circle mr-2">
-                                                        <?= strtoupper(substr($ticket->assignedTo->username, 0, 1)) ?>
-                                                    </div>
-                                                    <?= Html::encode($ticket->assignedTo->username) ?>
-                                                </div>
-                                            <?php else: ?>
-                                                <span class="text-muted">Unassigned</span>
-                                            <?php endif; ?>
-                                        </td>
-                                        <td>
-                                            <span class="<?= $ticket->getAgeClass() ?>">
-                                                <?= $ticket->getAge() ?>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <div class="btn-group">
-                                                <?= Html::a('<i class="fas fa-eye"></i>', ['ticket/view', 'id' => $ticket->id], [
-                                                    'class' => 'btn btn-sm btn-info',
-                                                    'title' => 'View'
-                                                ]) ?>
-                                                <?= Html::a('<i class="fas fa-edit"></i>', ['ticket/update', 'id' => $ticket->id], [
-                                                    'class' => 'btn btn-sm btn-primary',
-                                                    'title' => 'Edit'
-                                                ]) ?>
-                                                <?= Html::a('<i class="fas fa-reply"></i>', ['ticket/respond', 'id' => $ticket->id], [
-                                                    'class' => 'btn btn-sm btn-success',
-                                                    'title' => 'Respond'
-                                                ]) ?>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Response Time Chart -->
-            <div class="row mb-4">
-                <div class="col-xl-8">
-                    <div class="card shadow">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 font-weight-bold text-primary">Response Time Analysis</h6>
-                        </div>
-                        <div class="card-body">
-                            <canvas id="responseTimeChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-4">
-                    <div class="card shadow">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 font-weight-bold text-primary">Issue Categories</h6>
-                        </div>
-                        <div class="card-body">
-                            <canvas id="severityChart"></canvas>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Recent Activity Timeline -->
-            <div class="card shadow mb-4">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Recent Activity</h6>
-                </div>
-                <div class="card-body">
-                    <div class="timeline">
-                        <?php foreach ($recentActivities ?? [] as $activity): ?>
-                            <div class="timeline-item">
-                                <div class="timeline-marker"></div>
-                                <div class="timeline-content">
-                                    <h3 class="timeline-title">
-                                        <?= Html::encode($activity->getTitle()) ?>
-                                        <small class="text-muted"><?= Yii::$app->formatter->asRelativeTime($activity->created_at) ?></small>
-                                    </h3>
-                                    <p><?= Html::encode($activity->description) ?></p>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
+// Add search functionality
+$this->registerJs("
+    $('#clientSearch').on('keyup', function() {
+        var value = $(this).val().toLowerCase();
+        $('#clientTable tbody tr').filter(function() {
+            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+        });
+    });
+");
+?> 
 
         <!-- Reports Section -->
         <div id="reports" class="content-section">
@@ -772,30 +945,37 @@ $this->registerJs("
 
 <?php
 $this->registerJs("
-    // Handle navigation clicks
+    // User filter functionality
+    $('.btn-group [data-filter]').click(function() {
+        $(this).addClass('active').siblings().removeClass('active');
+        const filter = $(this).data('filter');
+        
+        if (filter === 'all') {
+            $('#usersTable tbody tr').show();
+        } else {
+            $('#usersTable tbody tr').hide();
+            $('#usersTable tbody tr[data-status=\"' + filter + '\"]').show();
+        }
+    });
+
+    // User search functionality
+    $('#userSearch').on('keyup', function() {
+        const value = $(this).val().toLowerCase();
+        $('#usersTable tbody tr').filter(function() {
+            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1);
+        });
+    });
+
+    // Navigation functionality
     $('.dash-nav-item').click(function(e) {
         e.preventDefault();
-        
-        // Update active nav item
         $('.dash-nav-item').removeClass('active');
         $(this).addClass('active');
         
-        // Show corresponding content
         const section = $(this).data('section');
         $('.content-section').removeClass('active');
         $('#' + section).addClass('active');
     });
-
-    // Search functionality
-    $('#contractSearch').on('keyup', function() {
-        var value = $(this).val().toLowerCase();
-        $('#contractsTable tbody tr').filter(function() {
-            $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
-        });
-    });
-
-    // Initialize tooltips
-    $('[data-toggle=\"tooltip\"]').tooltip();
 ");
 ?>
 
@@ -967,111 +1147,180 @@ $this->registerJs("
 ");
 ?>
 
-<!-- Commenting out the chart canvases and JavaScript initialization -->
-<!-- 
-<canvas id="severityChart"></canvas>
-<canvas id="statusChart"></canvas>
-<canvas id="responseTimeChart"></canvas>
+<!-- Add this modal at the end of your file -->
+<div class="modal fade" id="contractExtensionModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Extend Contract</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="extensionUserId">
+                <input type="hidden" id="extensionCompanyName">
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    Current contract expires: <span id="currentExpiryDate"></span>
+                </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Severity Chart
-    const severityCtx = document.getElementById('severityChart').getContext('2d');
-    new Chart(severityCtx, {
-        type: 'doughnut',
-        data: {
-            labels: <?= json_encode(array_keys($severityStats)) ?>,
-            datasets: [{
-                data: <?= json_encode(array_values($severityStats)) ?>,
-                backgroundColor: [
-                    '#e74a3b', // Critical
-                    '#f6c23e', // High
-                    '#4e73df', // Medium
-                    '#1cc88a'  // Low
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
+                <div class="mb-3">
+                    <label for="extensionPeriod" class="form-label">Extension Period</label>
+                    <select class="form-control" id="extensionPeriod">
+                        <option value="3">3 Months</option>
+                        <option value="6">6 Months</option>
+                        <option value="12" selected>1 Year</option>
+                        <option value="24">2 Years</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="extendContract()">
+                    <i class="fas fa-check"></i> Confirm Extension
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Update the JavaScript code -->
+<?php
+$csrfToken = Yii::$app->request->getCsrfToken();
+$js = <<<JS
+function showContractExtension(userId, companyName) {
+    document.getElementById('extensionUserId').value = userId;
+    document.getElementById('extensionCompanyName').value = companyName;
+    
+    // Fetch and display current expiry date
+    $.get('/site/get-company-expiry', { companyName: companyName }, function(response) {
+        if (response.success) {
+            document.getElementById('currentExpiryDate').textContent = response.expiryDate;
+        }
+    });
+    
+    const modal = new bootstrap.Modal(document.getElementById('contractExtensionModal'));
+    modal.show();
+}
+
+function extendContract() {
+    const userId = document.getElementById('extensionUserId').value;
+    const companyName = document.getElementById('extensionCompanyName').value;
+    const extensionPeriod = document.getElementById('extensionPeriod').value;
+    
+    Swal.fire({
+        title: 'Confirm Contract Extension',
+        text: 'Are you sure you want to extend this contract?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, extend it',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            $.ajax({
+                url: '/site/extend-contract',
+                type: 'POST',
+                data: {
+                    userId: userId,
+                    companyName: companyName,
+                    extensionPeriod: extensionPeriod,
+                    _csrf: '$csrfToken'
                 },
-                title: {
-                    display: true,
-                    text: 'Tickets by Severity'
-                }
-            }
-        }
-    });
-
-    // Status Chart
-    const statusCtx = document.getElementById('statusChart').getContext('2d');
-    new Chart(statusCtx, {
-        type: 'doughnut',
-        data: {
-            labels: <?= json_encode(array_keys($ticketStatusData)) ?>,
-            datasets: [{
-                data: <?= json_encode(array_values($ticketStatusData)) ?>,
-                backgroundColor: [
-                    '#4e73df', // New
-                    '#1cc88a', // In Progress
-                    '#36b9cc', // Pending
-                    '#f6c23e', // Resolved
-                    '#e74a3b'  // Closed
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
+                success: function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success',
+                            text: response.message
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: response.message || 'Failed to extend contract'
+                        });
+                    }
                 },
-                title: {
-                    display: true,
-                    text: 'Tickets by Status'
+                error: function() {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'An error occurred while processing your request'
+                    });
                 }
-            }
+            });
         }
     });
+}
+JS;
+$this->registerJs($js);
+?>
 
-    // Response Time Chart
-    const responseTimeCtx = document.getElementById('responseTimeChart').getContext('2d');
-    new Chart(responseTimeCtx, {
-        type: 'line',
-        data: {
-            labels: <?= json_encode($responseTimeLabels) ?>,
-            datasets: [{
-                label: 'Average Response Time (hours)',
-                data: <?= json_encode($responseTimeData) ?>,
-                borderColor: '#4e73df',
-                backgroundColor: 'rgba(78, 115, 223, 0.05)',
-                borderWidth: 2,
-                pointRadius: 3,
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom'
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true
-                }
+<?php
+$this->registerJs("
+    // Mobile menu toggle
+    document.querySelector('.nav-trigger').addEventListener('click', function(e) {
+        e.stopPropagation();
+        document.querySelector('.nav-links').classList.toggle('show');
+    });
+
+    // Handle navigation clicks
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Close mobile menu if open
+            if (window.innerWidth <= 768) {
+                document.querySelector('.nav-links').classList.remove('show');
             }
+            
+            const targetId = this.getAttribute('href');
+            const targetSection = document.querySelector(targetId);
+            
+            if (targetSection) {
+                const navHeight = document.querySelector('.dashboard-nav').offsetHeight;
+                const headerOffset = 100;
+                const elementPosition = targetSection.getBoundingClientRect().top;
+                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+                
+                window.scrollTo({
+                    top: offsetPosition,
+                    behavior: 'smooth'
+                });
+            }
+            
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            this.classList.add('active');
+        });
+    });
+
+    // Update active section on scroll
+    window.addEventListener('scroll', function() {
+        const scrollPosition = window.pageYOffset;
+        
+        document.querySelectorAll('.section').forEach(section => {
+            const sectionTop = section.offsetTop - 150;
+            const sectionBottom = sectionTop + section.offsetHeight;
+            
+            if (scrollPosition >= sectionTop && scrollPosition < sectionBottom) {
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === '#' + section.id) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+        });
+    });
+
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', function(e) {
+        if (window.innerWidth <= 768 && !e.target.closest('.dashboard-nav')) {
+            document.querySelector('.nav-links').classList.remove('show');
         }
     });
-});
-</script>
--->
-
-<!-- You can add other content here if needed --> 
+");
+?>
+ 

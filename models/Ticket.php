@@ -123,6 +123,10 @@ class Ticket extends ActiveRecord
             }"],
             [['screenshot_url'], 'string', 'max' => 255],
             [['screenshot_url'], 'safe'],
+            [['assigned_at', 'closed_at'], 'safe'],
+            [['time_taken'], 'number'],
+            [['closed_by', 'comments'], 'string'],
+            [['status'], 'string'],
         ];
     }
 
@@ -284,6 +288,8 @@ class Ticket extends ActiveRecord
     {
         return $this->hasOne(User::class, ['id' => 'user_id']);
     }
+
+
 
 
     public function getAssignedDeveloper()

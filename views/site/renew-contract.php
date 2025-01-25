@@ -22,19 +22,17 @@ $this->title = 'Request Contract Renewal for ' . $company->company_name;
 
                     <div class="mb-3">
                         <label class="form-label">Requested Extension Period</label>
-                        <select name="extension_period" class="form-control" required>
-                            <option value="">Select Period</option>
-                            <option value="3">3 Months</option>
-                            <option value="6">6 Months</option>
-                            <option value="12">1 Year</option>
-                            <option value="24">2 Years</option>
-                        </select>
+                        <?= $form->field($renewal, 'extension_period')->dropDownList([
+                            3 => '3 Months',
+                            6 => '6 Months',
+                            12 => '1 Year',
+                            24 => '2 Years',
+                        ], ['prompt' => 'Select Period'])->label(false); ?>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Additional Notes</label>
-                        <textarea name="notes" class="form-control" rows="3" 
-                                placeholder="Any specific requirements or comments"></textarea>
+                        <?= $form->field($renewal, 'notes')->textarea(['rows' => 3, 'placeholder' => 'Any specific requirements or comments'])->label(false); ?>
                     </div>
 
                     <div class="form-group text-center">

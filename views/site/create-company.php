@@ -14,6 +14,7 @@ $companiesForJs = [];
 foreach ($clientCompanies as $company) {
     $companiesForJs[$company['company_name']] = [
         'email' => $company['company_email'],
+        'name' => $company['name'] ?? str_replace(' Sacco', '', $company['company_name']),
         'modules' => array_filter(array_map('trim', explode(',', $company['module'])))
     ];
 }
@@ -27,8 +28,13 @@ $companiesJson = Json::encode($companiesForJs);
         </div>
         <div class="card-body">
             <?php $form = ActiveForm::begin(['id' => 'create-user-form']); ?>
-
-            <?= $form->field($model, 'name')->textInput(['maxlength' => true]) ?>
+            
+            <?= $form->field($model, 'name')->textInput([
+                'id' => 'name',
+                'class' => 'form-control',
+                'maxlength' => true,
+                'readonly' => true  // Make it readonly since it will be autofilled
+            ]) ?>
 
             <?= $form->field($model, 'company_name')->dropDownList(
                 $companyList,
@@ -88,15 +94,18 @@ $(document).ready(function() {
         const selectedCompany = $(this).val();
         const modulesContainer = $('#modules-container');
         const emailField = $('#company-email');
+        const nameField = $('#name');
         
         // Clear previous data
         emailField.val('');
+        nameField.val('');
         modulesContainer.empty();
         $('.modules-section').hide();
         
         if (selectedCompany && companies[selectedCompany]) {
-            // Set email
+            // Set email and name
             emailField.val(companies[selectedCompany].email);
+            nameField.val(companies[selectedCompany].name);
             
             // Display modules
             const modules = companies[selectedCompany].modules;

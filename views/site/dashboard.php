@@ -8,6 +8,7 @@ use app\models\User;
 use yii\grid\GridView;
 use yii\data\arrayDataProvider;
 // use app\models\ContractRenewal;
+use app\assets\SweetAlert2Asset;
 
 $this->title = 'Help Desk Analytics Dashboard';
 
@@ -622,27 +623,30 @@ document.getElementById('contractSearch').addEventListener('keyup', function() {
             ]),
             'columns' => [
                 ['class' => 'yii\grid\SerialColumn'],
-                'company_id',
-                'requested_by',
+                [
+                    'attribute' => 'company_id',
+                    'value' => function ($model) {
+                        return $model->company ? $model->company->company_name : $model->company_id;
+                    }
+                ],
+                [
+                    'attribute' => 'requested_by',
+                    'value' => function ($model) {
+                        return $model->requestedBy ? $model->requestedBy->name : $model->requested_by;
+                    }
+                ],
                 'extension_period',
-                'current_end_date',
-                'new_end_date',
+                'current_end_date:date',
+                'new_end_date:date',
                 'notes',
                 [
                     'attribute' => 'renewal_status',
                     'format' => 'raw',
                     'value' => function ($model) {
-                        $statusClass = [
-                            'approved' => 'text-success',
-                            'rejected' => 'text-danger',
-                            'pending' => 'text-warning',
-                        ];
-                        $class = isset($statusClass[$model->renewal_status]) ? $statusClass[$model->renewal_status] : '';
-                        return '<span class="' . $class . '">' . ucfirst($model->renewal_status) . '</span>';
+                        return $model->getStatusLabel();
                     }
                 ],
-                'created_at',
-                'updated_at',
+                'created_at:datetime',
                 [
                     'class' => 'yii\grid\ActionColumn',
                     'template' => '{approve} {reject}',
@@ -652,8 +656,9 @@ document.getElementById('contractSearch').addEventListener('keyup', function() {
                                 return '<button class="btn btn-success btn-sm" disabled>Approved</button>';
                             }
                             return Html::a('Approve', '#', [
-                                'class' => 'btn btn-success btn-sm',
-                                'onclick' => 'updateStatus(' . $model->id . ', "approved"); return false;',
+                                'class' => 'btn btn-success btn-sm update-status-btn',
+                                'data-id' => $model->id,
+                                'data-status' => 'approved',
                             ]);
                         },
                         'reject' => function ($url, $model) {
@@ -661,8 +666,9 @@ document.getElementById('contractSearch').addEventListener('keyup', function() {
                                 return '';  // Hide reject button if approved
                             }
                             return Html::a('Reject', '#', [
-                                'class' => 'btn btn-danger btn-sm',
-                                'onclick' => 'updateStatus(' . $model->id . ', "rejected"); return false;',
+                                'class' => 'btn btn-danger btn-sm update-status-btn',
+                                'data-id' => $model->id,
+                                'data-status' => 'rejected',
                             ]);
                         },
                     ],
@@ -675,35 +681,47 @@ document.getElementById('contractSearch').addEventListener('keyup', function() {
 </div>
 
 <?php
-$this->registerJs("
-    function updateStatus(id, status) {
-        if (confirm('Are you sure you want to ' + status + ' this contract?')) {
-            $.ajax({
-                url: '" . Yii::$app->urlManager->createUrl(['site/update-contract-status']) . "',
-                type: 'POST',
-                data: {
-                    id: id,
-                    status: status,
-                    _csrf: '" . Yii::$app->request->csrfToken . "'
-                },
-                success: function(response) {
-                    if (response.success) {
-                        // Refresh the grid to show updated status
-                        $.pjax.reload({container:'#contract-grid'});
-                        // Show success message
-                        alert('Contract status updated successfully');
-                        location.reload();
-                    } else {
-                        alert('Failed to update status: ' + response.message);
-                    }
-                },
-                error: function() {
-                    alert('Error occurred while updating status');
-                }
-            });
+$updateStatusUrl = Url::to(['site/update-renewal-status']);
+$csrfToken = Yii::$app->request->csrfToken;
+
+$js = <<<JS
+    $(document).on('click', '.update-status-btn', function(e) {
+        e.preventDefault();
+        
+        var btn = $(this);
+        var id = btn.data('id');
+        var status = btn.data('status');
+        
+        if (!confirm('Are you sure you want to ' + status + ' this renewal request?')) {
+            return false;
         }
-    }
-");
+        
+        $.ajax({
+            url: '$updateStatusUrl',
+            type: 'POST',
+            data: {
+                id: id,
+                status: status,
+                _csrf: '$csrfToken'
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Show success message
+                    alert(response.message);
+                    // Reload the page to show updated data
+                    location.reload();
+                } else {
+                    alert(response.message || 'Failed to update status');
+                }
+            },
+            error: function() {
+                alert('An error occurred while processing your request');
+            }
+        });
+    });
+JS;
+
+$this->registerJs($js);
 ?>
 
          

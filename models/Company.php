@@ -18,26 +18,25 @@ class Company extends ActiveRecord
 
     public static function tableName()
     {
-        return 'company'; // Your actual table name
+        return 'company';
     }
 
     public function rules()
     {
         return [
-            [['name', 'company_name', 'company_email', 'company_type', 'subscription_level'], 'required'],
+            [['name', 'company_name', 'company_email'], 'required'],
             [['name', 'company_name', 'company_email'], 'string', 'max' => 255],
             [['company_email'], 'email'],
             [['start_date', 'end_date'], 'safe'],
             [['modules'], 'safe'],
             [['status'], 'integer'],
+            [['role'], 'in', 'range' => ['user', 'admin', 'developer', 'super_admin']],
             [['company_type', 'subscription_level'], 'string'],
-            ['company_name', 'unique', 'targetClass' => self::class, 'message' => 'This Company Name has already been taken.'],
             ['company_email', 'unique', 'targetClass' => self::class, 'message' => 'This Company Email has already been taken.'],
-            ['role', 'string'],
             [['name'], 'string', 'max' => 255],
             [['start_date', 'end_date'], 'required'],
             [['start_date', 'end_date'], 'date', 'format' => 'php:Y-m-d'],
-            ['end_date', 'safe'],  // Make sure end_date is in your rules
+            [['end_date'], 'safe'],  // Make sure end_date is allowed to be set
         ];
     }
 
@@ -56,7 +55,7 @@ class Company extends ActiveRecord
     public function attributeLabels()
     {
         return [
-            'company_name' => 'Name',
+            'company_name' => 'Company Name',
             'company_email' => 'Email',
             'company_type' => 'Company Type',
             'subscription_level' => 'Subscription Level',
@@ -71,13 +70,10 @@ class Company extends ActiveRecord
 
     public function beforeSave($insert)
     {
+        Yii::debug('beforeSave - company_name before: ' . $this->company_name);
+        
         if (!parent::beforeSave($insert)) {
             return false;
-        }
-
-        // Copy name to company_name if name is set
-        if (isset($this->name)) {
-            $this->company_name = $this->name;
         }
 
         // Ensure dates are in the correct format
@@ -85,7 +81,8 @@ class Company extends ActiveRecord
             $this->start_date = date('Y-m-d', strtotime($this->start_date));
         }
         if ($this->end_date) {
-            $this->end_date = date('Y-m-d', strtotime($this->end_date));
+            $date = new \DateTime($this->end_date);
+            $this->end_date = $date->format('Y-m-d');
         }
 
         // Convert modules array to string before saving
@@ -93,14 +90,36 @@ class Company extends ActiveRecord
             $this->modules = implode(',', $this->modules);
         }
 
+        Yii::debug('beforeSave - company_name after: ' . $this->company_name);
         return true;
     }
 
+    public function afterSave($insert, $changedAttributes)
+    {
+        Yii::debug('afterSave - company_name: ' . $this->company_name);
+        parent::afterSave($insert, $changedAttributes);
+    }
+
+    // Add getter and setter for end_date to ensure proper formatting
+    public function getEndDate()
+    {
+        return $this->end_date;
+    }
+
+    public function setEndDate($value)
+    {
+        if ($value) {
+            $date = new \DateTime($value);
+            $this->end_date = $date->format('Y-m-d');
+        } else {
+            $this->end_date = null;
+        }
+    }
 
     public function getCompanyName()
-{
-    return $this->requestedBy->company->name; // Assuming 'company' is a relation in User model
-}
+    {
+        return $this->requestedBy->company->name; // Assuming 'company' is a relation in User model
+    }
 
     public function afterFind()
     {

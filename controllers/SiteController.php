@@ -53,25 +53,29 @@ class SiteController extends Controller
     {
         return [
             'access' => [
-                'class' => \yii\filters\AccessControl::className(),
-                'only' => ['admin', 'approve', 'cancel', 'assign', 'dashboard'], // Include actions for ticket management and dashboard
+                'class' => AccessControl::class,
+                'only' => ['logout', 'signup', 'admin', 'dashboard', 'approve', 'cancel', 'assign', 'change-password'], // Specify which actions to check
                 'rules' => [
                     [
-                        'actions' => ['index', 'login', 'signup', 'change-password'],
+                        'actions' => ['logout'],
                         'allow' => true,
-                        'roles' => ['@'], // Allow authenticated users
+                        'roles' => ['@'],
                     ],
                     [
-                        'actions' => ['admin', 'approve', 'cancel', 'assign', 'dashboard'], // Include admin, ticket actions, and dashboard
+                        'actions' => ['signup', 'change-password'],
+                        'allow' => true,
+                        'roles' => ['@'],
+                    ],
+                    [
+                        'actions' => ['admin', 'approve', 'cancel', 'assign', 'dashboard'],
                         'allow' => true,
                         'matchCallback' => function ($rule, $action) {
-                            // Check if the user role is 'admin', 'superadmin', 1, or 4
+                            if (Yii::$app->user->isGuest) {
+                                return false;
+                            }
                             $role = Yii::$app->user->identity->role;
                             return in_array($role, ['admin', 'superadmin', 1, 4]);
                         },
-                    ],
-                    [
-                        'allow' => false, // Deny all other actions
                     ],
                 ],
             ],
@@ -121,68 +125,69 @@ public function actionCreateUser()
 
 
 
-    public function actionCreateCompany()
-    {
-        $model = new Company();
-        $model->role = 'user';
+public function actionCreateCompany()
+{
+    $model = new Company();
+    $model->role = 'user';
 
-        // Get all companies with their modules and associated client names
-        $clientCompanies = (new \yii\db\Query())
-            ->select([
-                'c.company_name', 
-                'c.company_email', 
-                'c.module',
-                'cl.name'  // Add client name to the selection
-            ])
-            ->from(['c' => 'client'])
-            ->leftJoin(['cl' => 'client'], 'c.company_name = cl.company_name')
-            ->all();
+    // Get all companies with their modules and associated client names
+    $clientCompanies = (new \yii\db\Query())
+        ->select([
+            'c.company_name', 
+            'c.company_email', 
+            'c.module',
+            'cl.name'  // Add client name to the selection
+        ])
+        ->from(['c' => 'client'])
+        ->leftJoin(['cl' => 'client'], 'c.company_name = cl.company_name')
+        ->all();
 
-        // Handle form submission
-        if ($model->load(Yii::$app->request->post())) {
+    // Handle form submission
+    if ($model->load(Yii::$app->request->post())) {
+        try {
+            $post = Yii::$app->request->post('Company');
+            
+            // Start transaction
+            $transaction = Yii::$app->db->beginTransaction();
+
             try {
-                $post = Yii::$app->request->post('Company');
+                // Convert modules array to comma-separated string
+                $modules = isset($post['modules']) ? implode(',', $post['modules']) : '';
+
+                // Insert into company table
+                $result = Yii::$app->db->createCommand()->insert('company', [
+                    'name' => $post['name'],
+                    'company_name' => $post['company_name'], // Use company name directly
+                    'company_email' => $post['company_email'],
+                    'start_date' => $post['start_date'],
+                    'end_date' => $post['end_date'],
+                    'role' => 'user',
+                    'status' => 1,
+                    'modules' => $modules,
+                    'created_at' => new \yii\db\Expression('NOW()'),
+                    'updated_at' => new \yii\db\Expression('NOW()')
+                ])->execute();
+
+                $transaction->commit();
                 
-                // Start transaction
-                $transaction = Yii::$app->db->beginTransaction();
+                Yii::$app->session->setFlash('success', 'Company user created successfully.');
+                return $this->redirect(['admin']);
 
-                try {
-                    // Convert modules array to comma-separated string
-                    $modules = isset($post['modules']) ? implode(',', $post['modules']) : '';
-
-                    // Insert into company table
-                    $result = Yii::$app->db->createCommand()->insert('company', [
-                        'name' => $post['name'],
-                        'company_name' => $post['company_name'], // Use company name directly
-                        'company_email' => $post['company_email'],
-                        'start_date' => $post['start_date'],
-                        'end_date' => $post['end_date'],
-                        'role' => 'user',
-                        'status' => 1,
-                        'modules' => $modules,
-                        'created_at' => new \yii\db\Expression('NOW()'),
-                        'updated_at' => new \yii\db\Expression('NOW()')
-                    ])->execute();
-
-                    $transaction->commit();
-                    
-                    Yii::$app->session->setFlash('success', 'Company user created successfully.');
-                    return $this->redirect(['admin']);
-
-                } catch (\Exception $e) {
-                    $transaction->rollBack();
-                    Yii::$app->session->setFlash('error', 'Database Error: ' . $e->getMessage());
-                }
             } catch (\Exception $e) {
-                Yii::$app->session->setFlash('error', 'Error creating user: ' . $e->getMessage());
+                $transaction->rollBack();
+                Yii::$app->session->setFlash('error', 'Database Error: ' . $e->getMessage());
             }
+        } catch (\Exception $e) {
+            Yii::$app->session->setFlash('error', 'Error creating user: ' . $e->getMessage());
         }
-
-        return $this->render('create-company', [
-            'model' => $model,
-            'clientCompanies' => $clientCompanies,
-        ]);
     }
+
+    return $this->render('create-company', [
+        'model' => $model,
+        'clientCompanies' => $clientCompanies,
+    ]);
+}
+
     /**
      * Displays homepage.
      *
@@ -259,11 +264,7 @@ public function actionCreateUser()
 
     public function actionIndex()
     {
-        // If user is not logged in, redirect to login
-        if (Yii::$app->user->isGuest) {
-            return $this->redirect(['site/login']);
-        }
-
+        // Your index action code here
         return $this->render('index');
     }
 
@@ -2060,25 +2061,50 @@ public function actionCreateDeveloper()
 
 public function actionProfile($id)
 {
+    // Find the user
     $user = User::findOne($id);
-    
-    if ($user === null) {
-        throw new \yii\web\NotFoundHttpException('User not found.');
+    if (!$user) {
+        throw new NotFoundHttpException('User not found.');
     }
 
-    // Log the company name being used
-    Yii::info("Fetching company for user: " . $user->company_name, __METHOD__);
+    // Check if user is admin
+    if ($user->role === 'admin' || $user->role === '1' || $user->role === '4') {
+        // Get contracts that are due within the next 30 days
+        $nearingContracts = ContractRenewal::find()
+            ->joinWith('company')
+            ->where(['>=', 'end_date', date('Y-m-d')])
+            ->andWhere(['<=', 'end_date', date('Y-m-d', strtotime('+30 days'))])
+            ->orderBy(['end_date' => SORT_ASC])
+            ->all();
 
+        return $this->render('admin-profile', [
+            'user' => $user,
+            'nearingContracts' => $nearingContracts,
+        ]);
+    }
+
+    // For regular users, continue with existing logic
     $company = Company::findOne(['company_name' => $user->company_name]);
-
-    if ($company === null) {
-        Yii::error("Company not found for user: " . $user->company_name, __METHOD__);
-        throw new \yii\web\NotFoundHttpException('Company not found.');
+    if (!$company) {
+        Yii::warning("Company not found for user {$id} with company_name: {$user->company_name}");
+        $company = null;
     }
+
+    $tickets = Ticket::find()
+        ->where(['user_id' => $id])
+        ->orderBy(['created_at' => SORT_DESC])
+        ->all();
+
+    $renewals = ContractRenewal::find()
+        ->where(['company_id' => $company ? $company->id : null])
+        ->orderBy(['created_at' => SORT_DESC])
+        ->all();
 
     return $this->render('profile', [
         'user' => $user,
         'company' => $company,
+        'tickets' => $tickets,
+        'renewals' => $renewals,
     ]);
 }
 
@@ -2595,5 +2621,82 @@ public function actionGetCompanyExpiry()
 //         return $this->asJson(['success' => false, 'message' => 'Failed to approve contract renewal.']);
 //     }
 // }
+
+public function actionUpdateRenewalStatus()
+{
+    Yii::$app->response->format = Response::FORMAT_JSON;
+    
+    if (!Yii::$app->request->isAjax) {
+        return ['success' => false, 'message' => 'Invalid request'];
+    }
+
+    $id = Yii::$app->request->post('id');
+    $status = Yii::$app->request->post('status');
+
+    if (!$id || !$status) {
+        return ['success' => false, 'message' => 'Missing required parameters'];
+    }
+
+    $renewal = ContractRenewal::findOne($id);
+    if (!$renewal) {
+        return ['success' => false, 'message' => 'Renewal request not found'];
+    }
+
+    $transaction = Yii::$app->db->beginTransaction();
+    try {
+        // Update renewal status
+        $renewal->renewal_status = $status;
+        
+        // If approved, update company end date
+        if ($status === 'approved') {
+            $company = Company::findOne($renewal->company_id);
+            if ($company) {
+                // Update company end date using updateAttributes to skip validation
+                $result = $company->updateAttributes([
+                    'end_date' => $renewal->new_end_date
+                ]);
+                
+                if (!$result) {
+                    throw new \Exception('Failed to update company end date');
+                }
+            }
+        }
+
+        // Update renewal status using updateAttributes
+        $result = $renewal->updateAttributes([
+            'renewal_status' => $status,
+            'updated_at' => date('Y-m-d H:i:s')
+        ]);
+
+        if (!$result) {
+            throw new \Exception('Failed to update renewal status');
+        }
+
+        $transaction->commit();
+
+        // Send notification email
+        try {
+            $renewal->sendRenewalNotification($company);
+        } catch (\Exception $e) {
+            Yii::error('Failed to send notification email: ' . $e->getMessage());
+            // Don't throw the exception as the main operation succeeded
+        }
+        
+        return [
+            'success' => true,
+            'message' => $status === 'approved' ? 
+                'Renewal approved and company contract extended' : 
+                'Renewal request rejected'
+        ];
+
+    } catch (\Exception $e) {
+        $transaction->rollBack();
+        Yii::error('Contract renewal error: ' . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => $e->getMessage()
+        ];
+    }
+}
 
 }

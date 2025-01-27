@@ -92,6 +92,7 @@ $config = [
                 'site/create-user-for-company' => 'site/create-user-for-company',
                 'developer/view/<id:\d+>' => 'developer/view',
                 'ticket/search' => 'ticket/search',
+                'site/update-renewal-status' => 'site/update-renewal-status',
             ],
         ],
         'session' => [

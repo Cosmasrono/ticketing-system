@@ -4,12 +4,16 @@ namespace app\models;
 
 use Yii;
 use yii\db\ActiveRecord;
+use app\models\Company;
+use app\models\User;
+use yii\behaviors\TimestampBehavior;
+use yii\db\Expression;
 
 class ContractRenewal extends ActiveRecord
 {
     public static function tableName()
     {
-        return 'contract_renewal';
+        return 'contract_renewal'; // Changed to contract_renewal table
     }
 
     public function rules()
@@ -20,6 +24,17 @@ class ContractRenewal extends ActiveRecord
             ['notes', 'string'],
             ['renewal_status', 'in', 'range' => ['pending', 'approved', 'rejected']],
             [['current_end_date', 'new_end_date', 'created_at', 'updated_at'], 'safe'],
+            ['renewal_status', 'default', 'value' => 'pending'],
+        ];
+    }
+
+    public function behaviors()
+    {
+        return [
+            [
+                'class' => TimestampBehavior::class,
+                'value' => new Expression('NOW()'),
+            ],
         ];
     }
 
@@ -27,6 +42,17 @@ class ContractRenewal extends ActiveRecord
     {
         if (!parent::beforeSave($insert)) {
             return false;
+        }
+
+        // Ensure dates are in the correct format
+        if ($this->current_end_date) {
+            $date = new \DateTime($this->current_end_date);
+            $this->current_end_date = $date->format('Y-m-d');
+        }
+
+        if ($this->new_end_date) {
+            $date = new \DateTime($this->new_end_date);
+            $this->new_end_date = $date->format('Y-m-d');
         }
 
         // Set current_end_date from company if not set
@@ -44,7 +70,77 @@ class ContractRenewal extends ActiveRecord
             $this->new_end_date = date('Y-m-d', $newEndDate);
         }
 
+        // If renewal_status is being changed to 'approved'
+        if (!$insert && $this->isAttributeChanged('renewal_status') && $this->renewal_status === 'approved') {
+            // Update company end_date
+            $company = Company::findOne($this->company_id);
+            if ($company) {
+                $company->end_date = $this->new_end_date;
+                if (!$company->save()) {
+                    Yii::$app->session->setFlash('error', 'Failed to update company end date.');
+                    return false;
+                }
+                
+                // Log the contract renewal
+                Yii::info("Contract renewed for company {$company->company_name}. New end date: {$this->new_end_date}", 'contract');
+                
+                // Send notification email
+                $this->sendRenewalNotification($company);
+            }
+        }
+
         return true;
+    }
+
+    /**
+     * Send notification email about contract renewal
+     */
+    public function sendRenewalNotification($company)
+    {
+        try {
+            // Find company admin
+            $companyAdmin = User::find()
+                ->where(['company_name' => $company->company_name])
+                ->andWhere(['role' => '2']) // Assuming 2 is company admin role
+                ->one();
+
+            if ($companyAdmin && $companyAdmin->company_email) {
+                return Yii::$app->mailer->compose('contractRenewal', [
+                    'company' => $company,
+                    'renewal' => $this,
+                    'admin' => $companyAdmin
+                ])
+                ->setFrom([Yii::$app->params['adminEmail'] => Yii::$app->name])
+                ->setTo($companyAdmin->company_email)
+                ->setSubject('Contract Renewal ' . ucfirst($this->renewal_status))
+                ->send();
+            }
+            return false;
+        } catch (\Exception $e) {
+            Yii::error("Failed to send renewal notification: {$e->getMessage()}", 'contract');
+            return false;
+        }
+    }
+
+    /**
+     * Update renewal status and company end date
+     */
+    public function updateStatus($status)
+    {
+        $transaction = Yii::$app->db->beginTransaction();
+        try {
+            $this->renewal_status = $status;
+            if ($this->save()) {
+                $transaction->commit();
+                return true;
+            }
+            $transaction->rollBack();
+            return false;
+        } catch (\Exception $e) {
+            $transaction->rollBack();
+            Yii::error("Failed to update renewal status: {$e->getMessage()}", 'contract');
+            return false;
+        }
     }
 
     public function attributeLabels()

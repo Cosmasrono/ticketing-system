@@ -25,18 +25,13 @@ class Company extends ActiveRecord
     {
         return [
             [['name', 'company_name', 'company_email'], 'required'],
-            [['name', 'company_name', 'company_email'], 'string', 'max' => 255],
-            [['company_email'], 'email'],
             [['start_date', 'end_date'], 'safe'],
-            [['modules'], 'safe'],
             [['status'], 'integer'],
-            [['role'], 'in', 'range' => ['user', 'admin', 'developer', 'super_admin']],
+            [['modules'], 'safe'],
+            [['name', 'company_name', 'company_email'], 'string', 'max' => 255],
+            [['role'], 'string', 'max' => 50],
             [['company_type', 'subscription_level'], 'string'],
-            ['company_email', 'unique', 'targetClass' => self::class, 'message' => 'This Company Email has already been taken.'],
-            [['name'], 'string', 'max' => 255],
-            [['start_date', 'end_date'], 'required'],
-            [['start_date', 'end_date'], 'date', 'format' => 'php:Y-m-d'],
-            [['end_date'], 'safe'],  // Make sure end_date is allowed to be set
+            ['company_email', 'email'],
         ];
     }
 
@@ -55,43 +50,36 @@ class Company extends ActiveRecord
     public function attributeLabels()
     {
         return [
+            'id' => 'ID',
+            'name' => 'Name',
             'company_name' => 'Company Name',
-            'company_email' => 'Email',
-            'company_type' => 'Company Type',
-            'subscription_level' => 'Subscription Level',
+            'company_email' => 'Company Email',
             'start_date' => 'Start Date',
             'end_date' => 'End Date',
-            'modules' => 'Modules',
+            'role' => 'Role',
             'status' => 'Status',
-            'role' => 'User Type',
-            'name' => 'Name',
+            'modules' => 'Modules',
+            'company_type' => 'Company Type',
+            'subscription_level' => 'Subscription Level',
+            'created_at' => 'Created At',
+            'updated_at' => 'Updated At',
         ];
     }
 
     public function beforeSave($insert)
     {
-        Yii::debug('beforeSave - company_name before: ' . $this->company_name);
-        
-        if (!parent::beforeSave($insert)) {
-            return false;
+        if (parent::beforeSave($insert)) {
+            if ($this->isNewRecord) {
+                $this->created_at = date('Y-m-d H:i:s');
+                $this->updated_at = date('Y-m-d H:i:s');
+                $this->start_date = date('Y-m-d');
+                $this->end_date = date('Y-m-d', strtotime('+1 year'));
+            } else {
+                $this->updated_at = date('Y-m-d H:i:s');
+            }
+            return true;
         }
-
-        // Ensure dates are in the correct format
-        if ($this->start_date) {
-            $this->start_date = date('Y-m-d', strtotime($this->start_date));
-        }
-        if ($this->end_date) {
-            $date = new \DateTime($this->end_date);
-            $this->end_date = $date->format('Y-m-d');
-        }
-
-        // Convert modules array to string before saving
-        if (is_array($this->modules)) {
-            $this->modules = implode(',', $this->modules);
-        }
-
-        Yii::debug('beforeSave - company_name after: ' . $this->company_name);
-        return true;
+        return false;
     }
 
     public function afterSave($insert, $changedAttributes)
@@ -158,20 +146,11 @@ class Company extends ActiveRecord
     // Get the role value and map it to a label
     public function getRoleLabel()
     {
-        $role = strtolower($this->role); // Convert to lowercase for consistent comparison
-        
-        switch($role) {
-            case self::ROLE_ADMIN:
-                return 'Admin';
-            case self::ROLE_USER:
-                return 'User';
-            case self::ROLE_DEVELOPER:
-                return 'Developer';
-            case self::ROLE_SUPER_ADMIN:
-                return 'Super Admin';
-            default:
-                return 'Unknown Role (' . $this->role . ')';
-        }
+        // Log the role value for debugging
+        Yii::info('Role value: ' . json_encode($this->role)); // Log the role value
+
+        // Return the role in lowercase, defaulting to an empty string if null
+        return strtolower($this->role ?? ''); 
     }
 
     // Get roles array (for backward compatibility)
@@ -183,7 +162,7 @@ class Company extends ActiveRecord
     // Add relation to User model
     public function getUsers()
     {
-        return $this->hasMany(User::class, ['company_name' => 'company_name']);
+        return $this->hasMany(User::class, ['company_id' => 'id']);
     }
 
     // Helper method to check if company has active users

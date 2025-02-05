@@ -13,7 +13,7 @@ use app\models\User;
 $this->title = 'Developer Dashboard';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
-<div class="developer-dashboard">
+<div class="developer-dashboard container-fluid">
 
     <h1><?= Html::encode($this->title) ?></h1>
 
@@ -395,6 +395,18 @@ $this->params['breadcrumbs'][] = $this->title;
 
 #escalationModal .modal-title {
     color: #856404;
+}
+
+/* Additional styles for responsiveness */
+@media (max-width: 768px) {
+    .developer-dashboard {
+        padding: 10px;
+    }
+
+    .modal-dialog {
+        width: 100%;
+        margin: 0;
+    }
 }
 </style>
 

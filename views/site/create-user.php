@@ -55,10 +55,16 @@ const ROLE_SUPER_ADMIN = 4;
                                     <?php elseif ($existingUser): ?>
                                         <span class="badge badge-success">User Account Active</span>
                                     <?php else: ?>
-                                        <?php $form = ActiveForm::begin(['action' => ['create-user-for-company', 'company_id' => $company->id]]); ?>
+                                        <?php $form = ActiveForm::begin([
+                                            'action' => ['site/create-user-for-company', 'company_id' => $company->id],
+                                            'options' => ['class' => 'form-inline']
+                                        ]); ?>
+                                            
+                                            <?= Html::hiddenInput('company_id', $company->id) ?>
                                             <?= Html::hiddenInput('company_email', $company->company_email) ?>
                                             <?= Html::hiddenInput('company_name', $company->company_name) ?>
                                             <?= Html::hiddenInput('modules', is_array($company->modules) ? implode(',', $company->modules) : $company->modules) ?>
+                                            
                                             <?= Html::submitButton('Create User Account', [
                                                 'class' => 'btn btn-primary btn-sm',
                                                 'data' => [

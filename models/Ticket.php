@@ -48,10 +48,14 @@ class Ticket extends ActiveRecord
     public $voice_note_url;
     private $_voice_note;
  
+       
+    
     /**
      * @var int severity level of the ticket
      */
     public $severity;
+
+    // This will hold the company name instead of ID
 
     public static function tableName()
     {
@@ -127,6 +131,8 @@ class Ticket extends ActiveRecord
             [['time_taken'], 'number'],
             [['closed_by', 'comments'], 'string'],
             [['status'], 'string'],
+            [['screenshot_url', 'voice_note_url'], 'string', 'max' => 255],
+            [['screenshot_url', 'voice_note_url'], 'safe'],
         ];
     }
 
@@ -267,6 +273,14 @@ class Ticket extends ActiveRecord
         $this->updateSlaStatus();
         $this->last_update_at = new Expression('NOW()');
 
+        // Set the company name directly in the existing property
+        if ($insert) {
+            $user = User::findOne(Yii::$app->user->id); // Get the current user
+            if ($user && !empty($user->company_name)) {
+                $this->company_name = $user->company_name; // Use the existing property
+            }
+        }
+
         return true;
     }
 
@@ -286,7 +300,7 @@ class Ticket extends ActiveRecord
 
     public function getUser()
     {
-        return $this->hasOne(User::class, ['id' => 'user_id']);
+        return $this->hasOne(User::className(), ['id' => 'user_id']);
     }
 
 
@@ -294,7 +308,7 @@ class Ticket extends ActiveRecord
 
     public function getAssignedDeveloper()
     {
-        return $this->hasOne(User::class, ['id' => 'assigned_to']);
+        return $this->hasOne(User::className(), ['id' => 'developer_id']);
     }
 
 
@@ -860,15 +874,41 @@ class Ticket extends ActiveRecord
     public function afterFind()
     {
         parent::afterFind();
-        Yii::debug('Ticket Model afterFind: ' . print_r($this->attributes, true));
+        Yii::error("Ticket afterFind - created_by: " . $this->created_by);
+        if ($this->creator) {
+            Yii::error("Creator found with company: " . $this->creator->company_name);
+        } else {
+            Yii::error("No creator found");
+        }
         // Map severity_level to severity for form display
         $this->severity = $this->severity_level;
+
+        // If no company name is set, try to get it from related user
+        if (empty($this->company_name)) {
+            if ($this->creator && !empty($this->creator->company_name)) {
+                $this->company_name = $this->creator->company_name;
+            } elseif ($this->user_id) {
+                $user = User::findOne($this->user_id);
+                if ($user && !empty($user->company_name)) {
+                    $this->company_name = $user->company_name;
+                }
+            }
+        }
     }
 
     // Helper method to get developer name
     public function getDeveloperName()
     {
         return $this->developer ? $this->developer->name : 'Not Assigned';
+    }
+
+    /**
+     * Gets the user who created the ticket
+     * @return \yii\db\ActiveQuery
+     */
+    public function getCreator()
+    {
+        return $this->hasOne(User::class, ['id' => 'created_by']);
     }
 }
 

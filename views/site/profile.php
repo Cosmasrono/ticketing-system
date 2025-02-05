@@ -7,7 +7,6 @@ use app\models\Ticket;
 use app\models\User;
 use app\models\Company;
 
-
 $this->title = 'User Profile: ' . $user->name;
 
 // Get the associated company data with email
@@ -78,14 +77,26 @@ $roleName = Yii::$app->db->createCommand('
 ->bindValue(':user_id', $user->id)
 ->queryScalar();
 
-// Convert role to display name
-$roleDisplay = match($roleName) {
-    'admin' => 'Admin',
-    'user' => 'User',
-    'developer' => 'Developer',
-    'super_admin' => 'Super Admin',
-    default => 'Unknown Role'
-};
+// Debugging line to log the fetched role
+Yii::info("Fetched role for user ID {$user->id}: {$roleName}");
+
+// Check if role is empty or null and map the role
+switch ($roleName) {
+    case 1:
+        $roleDisplay = 'Admin';
+        break;
+    case 2:
+        $roleDisplay = 'User';
+        break;
+    case 3:
+        $roleDisplay = 'Developer';
+        break;
+    case 4:
+        $roleDisplay = 'Super Admin';
+        break;
+    default:
+        $roleDisplay = 'Unknown Role';
+}
 
 // Fetch ticket statistics for the user
 $totalTickets = Ticket::find()->where(['created_by' => $user->id])->count();
@@ -132,8 +143,6 @@ $userStatus = Yii::$app->db->createCommand('
                 <div class="card-body">
                     <?php if ($isExpired): ?>
                         <?= $remaining // Show expired message ?>
-                    <?php elseif (!empty($warningMessage)): ?>
-                        <?= $warningMessage // Show warning message ?>
                     <?php endif; ?>
 
                     <!-- User Details -->
@@ -234,7 +243,6 @@ $userStatus = Yii::$app->db->createCommand('
                         <h4 style="color: #FF9800;">Support Information</h4>
                         <p>If you need assistance, please contact our support team:</p>
                         <p>Email: <?= Yii::$app->params['adminEmail'] ?></p>
-                        <p></p>
                     </div>
 
                     <!-- Modules Section -->
@@ -252,4 +260,4 @@ $userStatus = Yii::$app->db->createCommand('
             </div>
         </div>
     </div>
-</div> 
+</div>

@@ -37,6 +37,7 @@ use Cloudinary\Uploader;
 use app\models\Company;
 use yii\helpers\Json;
 use yii\web\JsonResponse;
+use GuzzleHttp\Client;
  
  
  
@@ -1664,36 +1665,36 @@ public function actionClose()
         ]);
     }
 
-    private function uploadToCloudinary($tempFile)
-    {
-        try {
-            // Initialize Cloudinary
-            $cloudinary = new \Cloudinary\Cloudinary([
-                'cloud' => [
-                    'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
-                    'api_key' => Yii::$app->params['cloudinary']['api_key'],
-                    'api_secret' => Yii::$app->params['cloudinary']['api_secret']
-                ]
-            ]);
 
-            // Upload file and get result
-            $result = $cloudinary->uploadApi()->upload($tempFile, [
-                'folder' => 'tickets/screenshots',
-                'resource_type' => 'image'
-            ]);
 
-            // Log the full result
-            Yii::info('Cloudinary upload result: ' . json_encode($result));
-
-            // Return the secure URL
-            return $result['secure_url'] ?? null;
-
-        } catch (\Exception $e) {
-            Yii::error('Cloudinary upload error: ' . $e->getMessage());
-            throw $e;
+   private function uploadToCloudinary($tempFile)
+{
+    try {
+        // Set SSL certificate
+        $certPath = Yii::getAlias('@app/certs/cacert.pem');
+        if (file_exists($certPath)) {
+            putenv('CURL_CA_BUNDLE=' . $certPath);
         }
-    }
 
+        $cloudinary = new \Cloudinary\Cloudinary([
+            'cloud' => [
+                'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
+                'api_key' => Yii::$app->params['cloudinary']['api_key'],
+                'api_secret' => Yii::$app->params['cloudinary']['api_secret']
+            ],
+            'url' => [
+                'secure' => true
+            ]
+        ]);
+
+        // Rest of your upload code...
+    } catch (\Exception $e) {
+        Yii::error('Cloudinary upload error: ' . $e->getMessage());
+        throw $e;
+    }
+}
+    
+    
     public function actionAssigned()
     {
         $tickets = Ticket::find()
@@ -1932,8 +1933,3 @@ public function actionClose()
     }
 
 }
-
-
-
-
-

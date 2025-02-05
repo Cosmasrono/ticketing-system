@@ -477,6 +477,14 @@ $this->registerJs("
                                 <?php else: ?>
                                     <span class="text-muted">Not applicable</span>
                                 <?php endif; ?>
+                                
+                                <!-- Delete Button -->
+                                <button 
+                                    class="btn btn-sm btn-danger"
+                                    onclick="confirmDelete(<?= $user->id ?>)"
+                                    title="Delete user">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
                             </div>
                         </td>
                     </tr>
@@ -1341,4 +1349,28 @@ $this->registerJs("
     });
 ");
 ?>
+
+<script>
+function confirmDelete(userId) {
+    if (confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
+        // Make an AJAX request to delete the user
+        $.ajax({
+            url: '<?= \yii\helpers\Url::to(['user/delete']) ?>', // Adjust the URL to your delete action
+            type: 'POST',
+            data: { id: userId },
+            success: function(response) {
+                if (response.success) {
+                    alert("User deleted successfully.");
+                    location.reload(); // Reload the page to see the changes
+                } else {
+                    alert("Error deleting user: " + response.message);
+                }
+            },
+            error: function() {
+                alert("An error occurred while trying to delete the user.");
+            }
+        });
+    }
+}
+</script>
  

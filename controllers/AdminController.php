@@ -47,7 +47,7 @@ class AdminController extends Controller
             ->column();
 
         $dataProvider = new ActiveDataProvider([
-            'query' => $query,
+            'query' => $query->with('creator'),
             'pagination' => [
                 'pageSize' => 30,
             ],

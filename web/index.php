@@ -1,13 +1,28 @@
 <?php
 
-// Set default timezone
-date_default_timezone_set('Africa/Nairobi');
-
-// Define the environment
+// comment out the following two lines when deployed to production
 defined('YII_DEBUG') or define('YII_DEBUG', true);
 defined('YII_ENV') or define('YII_ENV', 'dev');
 
+// Disable SSL verification globally
+stream_context_set_default([
+    'ssl' => [
+        'verify_peer' => false,
+        'verify_peer_name' => false,
+    ]
+]);
+
+// Load the Composer autoloader
 require __DIR__ . '/../vendor/autoload.php';
+
+// Load environment variables
+try {
+    $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
+    $dotenv->load();
+} catch (\Exception $e) {
+    die('Error loading .env file. Please ensure it exists and is readable.');
+}
+
 require __DIR__ . '/../vendor/yiisoft/yii2/Yii.php';
 
 $config = require __DIR__ . '/../config/web.php';

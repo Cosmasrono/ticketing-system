@@ -4,6 +4,7 @@ namespace app\models;
 use Yii;
 use yii\base\Model;
 use app\models\User;
+use app\models\Company;
 
 class SignupForm extends Model
 {
@@ -11,119 +12,95 @@ class SignupForm extends Model
     public $company_name;
     public $company_email;
     public $password;
-    public $role;
-    public $selectedModules;
+    public $company_type;
+    public $subscription_level;
+    public $modules;
 
     public function rules()
     {
         return [
-            [['name', 'company_email', 'company_name', 'role'], 'required'],
-            ['company_email', 'email'],
-            ['company_email', 'unique', 'targetClass' => '\app\models\User', 'message' => 'This email address has already been taken.'],
+         
+                    [['name', 'company_name', 'company_email', 'password'], 'required'],
+                    ['company_email', 'email'],
+                    // Other validation rules...
+                
+            
+
+            ['company_email', 'string', 'max' => 255],
+            ['company_email', 'unique', 'targetClass' => '\app\models\User', 'targetAttribute' => 'company_email'],
+            ['company_email', 'validateSuperAdminEmail'],
             ['password', 'string', 'min' => 6],
-            ['name', 'string', 'min' => 2, 'max' => 255],
-            ['company_name', 'string'],
-            ['company_name', 'trim'],
-            ['role', 'in', 'range' => ['admin', 'developer', 'user']],
-            ['selectedModules', 'safe'],
+            [['name', 'company_name'], 'string', 'max' => 255],
+            [['company_type', 'subscription_level'], 'string'],
+            ['modules', 'safe'],
         ];
     }
+
+    public function validateSuperAdminEmail($attribute, $params)
+    {
+        $allowedEmails = ['ccosmas001@gmail.com'];
+        if (!in_array($this->$attribute, $allowedEmails)) {
+            $this->addError($attribute, 'Registration is restricted to authorized personnel only.');
+        }
+    }
+
     public function signup()
     {
         if (!$this->validate()) {
             return null;
         }
-        
-        $user = new User();
-        echo "Debug values:<br>";
-        echo "Form company_name: " . $this->company_name . "<br>";
-        
-        $user->name = $this->name;
-        $user->company_email = $this->company_email;
-        $user->company_name = $this->company_name;
-        
-        echo "User model company_name before save: " . $user->company_name . "<br>";
-        $user->role = $this->role;
 
-        // Handle modules based on role
-        if ($this->role === 'admin' || $this->role === 'developer') {
-            $user->selectedModules = 'All';
-        } else {
-            if (empty($this->selectedModules)) {
-                throw new \Exception("Please select at least one module for user role");
-            }
-            if (is_array($this->selectedModules)) {
-                $user->selectedModules = implode(',', $this->selectedModules);
-            } else {
-                $user->selectedModules = $this->selectedModules;
-            }
-        }
-
-        // Generate temporary password
-        $temporaryPassword = Yii::$app->security->generateRandomString(8);
-        $user->password_hash = Yii::$app->security->generatePasswordHash($temporaryPassword);
-        
-        // Set other required fields
-        $user->status = 10; // or whatever status code you use for active users
-        $user->created_at = time();
-        $user->updated_at = time();
-        $user->first_login = 1;
-        $user->auth_key = Yii::$app->security->generateRandomString();
-
-        // Save user and send welcome email
-        if ($user->save()) {
-            return $this->sendWelcomeEmail($user, $temporaryPassword) ? $user : null;
-        }
-
-        return null;
-    }
-
-    private function sendWelcomeEmail($user, $temporaryPassword)
-    {
         try {
-            $changePasswordUrl = Yii::$app->urlManager->createAbsoluteUrl([
-                'site/change-password',
-                'email' => $user->company_email
-            ]);
+            $transaction = Yii::$app->db->beginTransaction();
 
-            $emailContent = "
-                <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;'>
-                    <h2 style='color: #333;'>Welcome to " . Yii::$app->name . "</h2>
-                    <p>Dear {$user->name},</p>
-                    <p>Your account has been created successfully.</p>
-                    
-                    <div style='background: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;'>
-                        <p><strong>Email:</strong> {$user->company_email}</p>
-                        <p><strong>Temporary Password:</strong> {$temporaryPassword}</p>
-                    </div>
+            $now = time();
+            
+            // Create SQL query with required fields
+            $sql = "INSERT INTO users (
+                name, company_name, company_email, role, status, 
+                company_id, password_hash, auth_key,
+                created_at, updated_at, is_verified, first_login
+            ) VALUES (
+                :name, :company_name, :company_email, :role, :status,
+                :company_id, :password_hash, :auth_key,
+                :created_at, :updated_at, :is_verified, :first_login
+            )";
 
-                    <p><strong>Important:</strong> Click the button below to set your new password:</p>
-                    
-                    <div style='text-align: center; margin: 25px 0;'>
-                        <a href='{$changePasswordUrl}' 
-                           style='background-color: #007bff; 
-                                  color: white; 
-                                  padding: 12px 25px; 
-                                  text-decoration: none; 
-                                  border-radius: 5px; 
-                                  display: inline-block;
-                                  font-weight: bold;'>
-                            Set Your New Password
-                        </a>
-                    </div>
-                </div>
-            ";
+            // Execute the query with parameters
+            $result = Yii::$app->db->createCommand($sql)
+                ->bindValues([
+                    ':name' => $this->name,
+                    ':company_name' => $this->company_name,
+                    ':company_email' => $this->company_email,
+                    ':role' => 4,
+                    ':status' => 1,
+                    ':company_id' => 0,
+                    ':password_hash' => Yii::$app->security->generatePasswordHash($this->password),
+                    ':auth_key' => Yii::$app->security->generateRandomString(),
+                    ':created_at' => $now,
+                    ':updated_at' => $now,
+                    ':is_verified' => 1, // Set as verified by default
+                    ':first_login' => 1
+                ])
+                ->execute();
 
-            return Yii::$app->mailer->compose()
-                ->setFrom([Yii::$app->params['senderEmail'] => Yii::$app->name])
-                ->setTo($user->company_email)
-                ->setSubject('Welcome to ' . Yii::$app->name . ' - Set Your Password')
-                ->setHtmlBody($emailContent)
-                ->send();
+            if ($result) {
+                $user = User::findOne(['company_email' => $this->company_email]);
+                if ($user) {
+                    $transaction->commit();
+                    return $user;
+                }
+            }
+
+            $transaction->rollBack();
+            throw new \Exception('Failed to create user account');
 
         } catch (\Exception $e) {
-            Yii::error('Failed to send welcome email: ' . $e->getMessage());
-            return false;
+            if (isset($transaction)) {
+                $transaction->rollBack();
+            }
+            throw $e;
         }
     }
+ 
 }

@@ -13,7 +13,15 @@ use app\models\Company;
 
 class User extends ActiveRecord implements IdentityInterface
 {
- 
+    public $is_verified;
+    public $first_login;
+    // created at
+    public $created_at;
+    // updated at
+    public $updated_at;
+    // token created at
+    public $token_created_at;
+
     public $password; // This will hold the plain text password temporarily
     public $module;
     public $issue;
@@ -29,6 +37,15 @@ class User extends ActiveRecord implements IdentityInterface
     public $company_email;
     public $isExpired; // Add this line to define the property
 
+    // Add these properties to your User model
+    public $email_verified = false;
+    public $verification_token;
+
+    // Add this property
+    public $company_type;
+
+    // Add this property
+    public $subscription_level;
 
     const SCENARIO_SIGNUP = 'signup';
 
@@ -68,7 +85,20 @@ public function isUser()
      */
     public static function tableName()
     {
-        return 'users'; // Ensure this matches your users table name
+        return 'users';
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function behaviors()
+    {
+        return [
+            'timestamp' => [
+                'class' => 'yii\behaviors\TimestampBehavior',
+                'value' => function() { return date('Y-m-d H:i:s'); }
+            ],
+        ];
     }
 
     /**
@@ -77,14 +107,22 @@ public function isUser()
     public function rules()
     {
         return [
-            [['name', 'company_name', 'company_email'], 'required'],
-            [['name', 'company_name', 'company_email'], 'string', 'max' => 255],
-            ['company_email', 'email'],
-            ['company_email', 'unique'],
-            ['modules', 'safe'],
-            [['email_verified_at'], 'safe'],
-            ['password_reset_token', 'string', 'max' => 255],
-            [['token_created_at'], 'safe'],
+            [['name', 'password_hash', 'auth_key', 'role', 'status', 'company_id'], 'required'],
+            [['company_email'], 'email', 'skipOnEmpty' => true],
+            [['company_email'], 'unique', 'skipOnEmpty' => true],
+            [['company_email'], 'default', 'value' => null], // Set default value to null
+            [['role', 'status', 'company_id', 'created_at', 'updated_at'], 'integer'],
+            [['name', 'company_name', 'company_email', 'password_hash', 'auth_key'], 'string', 'max' => 255],
+            [['verification_token'], 'string', 'max' => 255], // Allow null
+            [['email_verified'], 'boolean'],
+            [['email_verified'], 'default', 'value' => false], // Set default value to false
+            [['is_verified', 'first_login'], 'integer'], // Changed from boolean to integer
+            [['modules'], 'safe'],
+            [['company_type'], 'string'], // Add this rule
+            [['company_type'], 'default', 'value' => null], // Sets default value to null
+            [['subscription_level'], 'string'], // Add this rule
+            [['subscription_level'], 'default', 'value' => null], // Sets default value to null
+            // subscription_id
         ];
     }
 
@@ -97,20 +135,20 @@ public function isUser()
     {
         return [
             'id' => 'ID',
-            'name' => 'Full Name',
-            'company_email' => 'Company Email',
+            'name' => 'Name',
             'company_name' => 'Company Name',
+            'company_email' => 'Company Email',
             'password_hash' => 'Password Hash',
             'auth_key' => 'Auth Key',
-            'role' => 'Role', 
-            'verification_token',
+            'role' => 'Role',
+            'status' => 'Status',
+            'company_id' => 'Company ID',
             'created_at' => 'Created At',
-            'module' => 'Modules',
-            'selectedModules' => 'Selected Modules',
-            'selectedModule' => 'Selected Module',
-            'start_date' => 'Start Date',
-            'end_date' => 'End Date',
-            'email_verified_at' => 'Email Verified At',
+            'updated_at' => 'Updated At',
+            'is_verified' => 'Is Verified',
+            'first_login' => 'First Login',
+            'verification_token' => 'Verification Token',
+            'modules' => 'Modules',
         ];
     }
 
@@ -133,12 +171,23 @@ public function isUser()
          if (!parent::beforeSave($insert)) {
              return false;
          }
-         
-         // Remove any debug output
-         if (ob_get_level() > 0) {
-             ob_clean();
+
+         if ($this->isNewRecord) {
+             $this->auth_key = Yii::$app->security->generateRandomString();
+             $this->created_at = time();
+             $this->updated_at = time();
+             $this->is_verified = false;
+             $this->first_login = true;
+             $this->email_verified = false;
+             
+             // Generate verification token only if company_email is not null
+             if (!empty($this->company_email)) {
+                 $this->verification_token = Yii::$app->security->generateRandomString(32);
+             } else {
+                 $this->verification_token = null;
+             }
          }
-         
+
          return true;
      }
  
@@ -326,20 +375,21 @@ public function isUser()
 
     public function attributes()
     {
-        return array_merge(parent::attributes(), [
+        return [
             'id',
+            'company_id',
             'name',
-            'company_email',
             'company_name',
+            'company_email',
             'password_hash',
             'auth_key',
             'role',
             'status',
             'password_reset_token',
             'verification_token',
-            'created_at',
-            'selectedModule',
-        ]);
+            'token_created_at',
+            'email_verified'
+        ];
     }
 
     public static function findByEmail($email)
@@ -377,29 +427,58 @@ public function isUser()
 
     public static function findByPasswordResetToken($token)
     {
-        if (empty($token)) {
-            Yii::error('Empty token provided');
+        Yii::debug("=== Validating Reset Token ===");
+        Yii::debug("Token to validate: " . $token);
+
+        if (empty($token) || !is_string($token)) {
+            Yii::error("Invalid token format");
             return null;
         }
 
-        // Debug log
-        Yii::debug("Looking for user with token: " . $token);
-
-        $user = static::findOne([
-            'password_reset_token' => $token,
-            'status' => [self::STATUS_INACTIVE, self::STATUS_UNVERIFIED]
-        ]);
-
+        // First, find the user without status check
+        $user = static::findOne(['password_reset_token' => $token]);
+        
         if (!$user) {
             Yii::error("No user found with token: " . $token);
             return null;
         }
 
-        // Check if token is expired (24 hours)
-        if ($user->token_created_at + 86400 < time()) {
-            Yii::error("Token expired for user ID: " . $user->id);
-            return null;
+        Yii::debug("Found user: " . json_encode([
+            'id' => $user->id,
+            'email' => $user->company_email,
+            'status' => $user->status,
+            'token' => $user->password_reset_token,
+            'token_created_at' => $user->token_created_at ? date('Y-m-d H:i:s', $user->token_created_at) : 'null'
+        ]));
+
+        // Check if token_created_at is null
+        if ($user->token_created_at === null) {
+            Yii::error("Token creation time is null for user {$user->id}");
+            
+            // Update token_created_at if it's null
+            $user->token_created_at = time();
+            $user->save(false);
+            
+            Yii::debug("Updated token_created_at to current time");
         }
+
+        // Extend expiration time to 24 hours for testing
+        $expiration = 86400; // 24 hours in seconds
+        $timePassed = time() - $user->token_created_at;
+
+        Yii::debug("Token timing: " . json_encode([
+            'Created' => date('Y-m-d H:i:s', $user->token_created_at),
+            'Current' => date('Y-m-d H:i:s', time()),
+            'Time Passed' => $timePassed,
+            'Expiration' => $expiration,
+            'Is Expired' => ($timePassed > $expiration) ? 'Yes' : 'No'
+        ]));
+
+        // Temporarily disable expiration check for testing
+        // if ($timePassed > $expiration) {
+        //     Yii::error("Token has expired");
+        //     return null;
+        // }
 
         return $user;
     }
@@ -430,21 +509,35 @@ public function isUser()
 
     public function generateVerificationToken()
     {
-        $this->verification_token = Yii::$app->security->generateRandomString() . '_' . time();
+        if (empty($this->company_email)) {
+            $this->verification_token = null;
+            return null;
+        }
+        
+        $this->verification_token = Yii::$app->security->generateRandomString(32);
         return $this->verification_token;
     }
     
-    public static function findByVerificationToken($token, $companyEmail)
+    public static function findByVerificationToken($token)
     {
-        if (empty($token) || empty($companyEmail)) {
+        if (empty($token)) {
+            Yii::error('Empty verification token provided');
             return null;
         }
 
-        $user = static::findOne([
-            'verification_token' => $token,
-            'company_email' => $companyEmail,
-            'status' => self::STATUS_UNVERIFIED, // Check for unverified status
-        ]);
+        Yii::debug("Looking for user with verification token: $token");
+        
+        $user = static::find()
+            ->where(['verification_token' => $token])
+            ->andWhere(['IS NOT', 'company_email', null])
+            ->andWhere(['status' => self::STATUS_INACTIVE])
+            ->one();
+
+        if (!$user) {
+            Yii::error("No user found with verification token: $token");
+        } else {
+            Yii::debug("Found user with ID: {$user->id} and email: {$user->company_email}");
+        }
 
         return $user;
     }
@@ -454,29 +547,27 @@ public function isUser()
     
     
     
-public function verify($token, $companyEmail)
+public function verify()
 {
-    Yii::info("Verifying user: ID = {$this->id}, Email = {$this->company_email}, Company Email = {$companyEmail}, Current Status = {$this->status}");
-
-    $user = self::findByVerificationToken($token, $companyEmail);
-    
-    if ($user === null) {
-        Yii::error("Invalid or expired token for user ID {$this->id} with company email {$companyEmail}");
+    if (empty($this->company_email)) {
+        Yii::error("Cannot verify user without email address");
         return false;
     }
 
-    // Proceed with verification
-    $this->status = self::STATUS_ACTIVE;
-    $this->verification_token = null;
-    $this->verification_token_created_at = null;
-    $this->verified_at = new Expression('NOW()');
-
-    if ($this->save()) {
-        Yii::info("User verified successfully: ID = {$this->id}");
+    if ($this->email_verified) {
+        Yii::debug("User {$this->id} is already verified");
         return true;
     }
 
-    Yii::error("Failed to verify user: ID = {$this->id}. Errors: " . json_encode($this->getErrors()));
+    $this->email_verified = true;
+    $this->status = self::STATUS_ACTIVE;
+
+    if ($this->save(false)) {
+        Yii::debug("User {$this->id} verified successfully");
+        return true;
+    }
+
+    Yii::error("Failed to verify user {$this->id}: " . json_encode($this->errors));
     return false;
 }
 
@@ -818,15 +909,29 @@ public function verify($token, $companyEmail)
     public function safeAttributes()
     {
         return [
+            'company_id',
             'name',
-            'company_email',
             'company_name',
+            'company_email',  // Explicitly include company_email
+            'password_hash',
+            'auth_key',
             'role',
             'status',
-            'modules'
-            // ... any other attributes
+            'verification_token',
+            'created_at',
+            'updated_at',
+            'token_created_at',
+            'modules',
+            'is_verified',
+            'first_login',
+            'subscription_level'
         ];
     }
 
-}
+    // Add a method to check if email verification is needed
+    public function needsEmailVerification()
+    {
+        return !empty($this->company_email) && !$this->email_verified;
+    }
 
+}

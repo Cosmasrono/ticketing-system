@@ -1,6 +1,6 @@
 <?php
 use yii\helpers\Html;
-use yii\bootstrap5\ActiveForm;
+use yii\widgets\ActiveForm;
 
 $this->title = 'Add Client';
 ?>
@@ -13,6 +13,7 @@ $this->title = 'Add Client';
         <div class="card-body">
             <?php $form = ActiveForm::begin(['id' => 'add-client-form']); ?>
 
+            <?= $form->field($model, 'name')->textInput(['maxlength' => true]) ?>
             <?= $form->field($model, 'company_name')->textInput([
                 'maxlength' => true,
                 'class' => 'form-control',

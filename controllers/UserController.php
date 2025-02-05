@@ -5,6 +5,7 @@ namespace app\controllers;
 use yii\web\Controller;
 use yii\helpers\ArrayHelper;
 use app\models\User;
+use Yii;
 
 class UserController extends Controller
 {
@@ -68,5 +69,25 @@ class UserController extends Controller
                 'message' => \YII_DEBUG ? $e->getMessage() : 'An error occurred while updating user status'
             ];
         }
+    }
+
+    public function actionDelete()
+    {
+        Yii::$app->response->format = \yii\web\Response::FORMAT_JSON; // Set response format to JSON
+        $id = Yii::$app->request->post('id');
+
+        if ($id) {
+            $user = User::findOne($id);
+            if ($user) {
+                if ($user->delete()) {
+                    return ['success' => true];
+                } else {
+                    return ['success' => false, 'message' => 'Failed to delete user.'];
+                }
+            } else {
+                return ['success' => false, 'message' => 'User not found.'];
+            }
+        }
+        return ['success' => false, 'message' => 'Invalid request.'];
     }
 }

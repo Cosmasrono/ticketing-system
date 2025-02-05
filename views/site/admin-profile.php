@@ -105,36 +105,32 @@ use app\models\User;
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>User Name</th>
+                                    <th>User ID</th>
                                     <th>Company</th>
                                     <th>Email</th>
                                     <th>Tickets Raised</th>
+                                    <th>Most Used Module</th>
+                                    <th>Last Activity</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($activeUsers as $activeUser): ?>
-                                    <?php if (isset($activeUser['user']) && $activeUser['user'] !== null): ?>
-                                        <tr>
-                                            <td><?= Html::encode($activeUser['user']['name']) ?></td>
-                                            <td><?= Html::encode($activeUser['user']['company_name']) ?></td>
-                                            <td>
-                                                <a href="mailto:<?= Html::encode($activeUser['user']['company_email']) ?>">
-                                                    <?= Html::encode($activeUser['user']['company_email']) ?>
-                                                </a>
-                                            </td>
-                                            <td>
-                                                <span class="badge bg-primary">
-                                                    <?= $activeUser['ticket_count'] ?> tickets
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    <?php else: ?>
-                                        <tr>
-                                            <td colspan="4" class="text-muted">
-                                                User ID: <?= Html::encode($activeUser['user_id']) ?> (Deleted User)
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
+                                    <tr>
+                                        <td><?= Html::encode($activeUser['user_id']) ?></td>
+                                        <td><?= Html::encode($activeUser['company_name']) ?></td>
+                                        <td>
+                                            <a href="mailto:<?= Html::encode($activeUser['company_email']) ?>">
+                                                <?= Html::encode($activeUser['company_email']) ?>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-primary">
+                                                <?= $activeUser['ticket_count'] ?> tickets
+                                            </span>
+                                        </td>
+                                        <td><?= Html::encode($activeUser['most_used_module']) ?></td>
+                                        <td><?= Yii::$app->formatter->asDatetime($activeUser['last_ticket_date']) ?></td>
+                                    </tr>
                                 <?php endforeach; ?>
                             </tbody>
                         </table>
@@ -145,40 +141,110 @@ use app\models\User;
             </div>
         </div>
 
-        <!-- Most Assigned Developers Section -->
+        <!-- Most Assigned Staff Section -->
         <div class="card mt-4">
             <div class="card-body">
-                <h5 class="card-title">Most Assigned Developers</h5>
+                <h5 class="card-title">Most Assigned Staff</h5>
                 <?php if (!empty($busyDevelopers)): ?>
                     <div class="table-responsive">
                         <table class="table">
                             <thead>
                                 <tr>
-                                    <th>Developer Name</th>
-                                    <th>Email</th>
-                                    <th>Assigned Tickets</th>
-                                    <th>Workload Status</th>
+                                    <th>Staff ID</th>
+                                    <th>Name</th>
+                                    <th>Total Assigned</th>
+                                    <th>Active Tickets</th>
+                                    <th>Breached SLA</th>
+                                    <th>Last Assignment</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php foreach ($busyDevelopers as $developer): ?>
-                                    <?php 
-                                        $workloadClass = $developer['assigned_count'] > 15 ? 'bg-danger' : 
-                                                       ($developer['assigned_count'] > 10 ? 'bg-warning' : 'bg-success');
-                                        $workloadStatus = $developer['assigned_count'] > 15 ? 'High' : 
-                                                       ($developer['assigned_count'] > 10 ? 'Medium' : 'Normal');
-                                    ?>
                                     <tr>
-                                        <td><?= Html::encode($developer['assignedDeveloper']['name']) ?></td>
+                                        <td><?= Html::encode($developer['assigned_to']) ?></td>
+                                        <td><?= Html::encode($developer['developer_name']) ?></td>
                                         <td>
-                                            <a href="mailto:<?= Html::encode($developer['assignedDeveloper']['company_email']) ?>">
-                                                <?= Html::encode($developer['assignedDeveloper']['company_email']) ?>
-                                            </a>
+                                            <span class="badge bg-info">
+                                                <?= $developer['assigned_count'] ?> total
+                                            </span>
                                         </td>
-                                        <td><?= $developer['assigned_count'] ?> tickets</td>
                                         <td>
-                                            <span class="badge <?= $workloadClass ?>">
-                                                <?= $workloadStatus ?>
+                                            <span class="badge bg-warning">
+                                                <?= $developer['active_tickets'] ?> active
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger">
+                                                <?= $developer['breached_tickets'] ?> breached
+                                            </span>
+                                        </td>
+                                        <td><?= Yii::$app->formatter->asDatetime($developer['last_assigned']) ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <p class="text-muted">No assignment data available.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Ticket Statistics Overview -->
+        <?php if (isset($ticketStats)): ?>
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Ticket Statistics Overview</h5>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="alert alert-warning">
+                                <h6>Pending Tickets</h6>
+                                <h3><?= $ticketStats['total_pending'] ?? 0 ?></h3>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="alert alert-danger">
+                                <h6>Breached SLA</h6>
+                                <h3><?= $ticketStats['total_breached'] ?? 0 ?></h3>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="alert alert-info">
+                                <h6>At Risk</h6>
+                                <h3><?= $ticketStats['total_at_risk'] ?? 0 ?></h3>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="alert alert-secondary">
+                                <h6>High Severity</h6>
+                                <h3><?= $ticketStats['severity_high'] ?? 0 ?></h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <!-- Module Statistics Section -->
+        <?php if (isset($moduleStats)): ?>
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Module Statistics</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Module</th>
+                                    <th>Total Tickets</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($moduleStats as $module): ?>
+                                    <tr>
+                                        <td><?= Html::encode($module['module']) ?></td>
+                                        <td>
+                                            <span class="badge bg-info">
+                                                <?= $module['count'] ?>
                                             </span>
                                         </td>
                                     </tr>
@@ -186,104 +252,48 @@ use app\models\User;
                             </tbody>
                         </table>
                     </div>
-                <?php else: ?>
-                    <p class="text-muted">No developer assignment data available.</p>
-                <?php endif; ?>
-            </div>
-        </div>
-
-        <!-- Ticket Statistics Overview -->
-        <div class="card mt-4">
-            <div class="card-body">
-                <h5 class="card-title">Ticket Statistics Overview</h5>
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="alert alert-warning">
-                            <h6>Pending Tickets</h6>
-                            <h3><?= $ticketStats['total_pending'] ?></h3>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="alert alert-danger">
-                            <h6>Breached SLA</h6>
-                            <h3><?= $ticketStats['total_breached'] ?></h3>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="alert alert-info">
-                            <h6>At Risk</h6>
-                            <h3><?= $ticketStats['total_at_risk'] ?></h3>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="alert alert-secondary">
-                            <h6>High Severity</h6>
-                            <h3><?= $ticketStats['severity_high'] ?></h3>
-                        </div>
-                    </div>
                 </div>
             </div>
-        </div>
+        <?php endif; ?>
 
-        <!-- Module Distribution -->
-        <div class="card mt-4">
-            <div class="card-body">
-                <h5 class="card-title">Tickets by Module</h5>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Module</th>
-                                <th>Total Tickets</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($moduleStats as $module): ?>
+        <!-- Breached Tickets Section -->
+        <?php if (isset($breachedTickets)): ?>
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">Breached SLA Tickets</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
                                 <tr>
-                                    <td><?= Html::encode($module['module']) ?></td>
-                                    <td>
-                                        <span class="badge bg-info">
-                                            <?= $module['count'] ?>
-                                        </span>
-                                    </td>
+                                    <th>Ticket ID</th>
+                                    <th>Module</th>
+                                    <th>Issue</th>
+                                    <th>Created At</th>
+                                    <th>Response Time</th>
                                 </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                <?php if (!empty($breachedTickets)): ?>
+                                    <?php foreach ($breachedTickets as $ticket): ?>
+                                        <tr>
+                                            <td><?= Html::encode($ticket->id) ?></td>
+                                            <td><?= Html::encode($ticket->module) ?></td>
+                                            <td><?= Html::encode($ticket->issue) ?></td>
+                                            <td><?= Yii::$app->formatter->asDatetime($ticket->created_at) ?></td>
+                                            <td><?= Html::encode($ticket->response_time) ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="5" class="text-center">No breached tickets found</td>
+                                    </tr>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Recent Breached Tickets -->
-        <div class="card mt-4">
-            <div class="card-body">
-                <h5 class="card-title">Recently Breached SLA Tickets</h5>
-                <div class="table-responsive">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Ticket ID</th>
-                                <th>Module</th>
-                                <th>Issue</th>
-                                <th>Created At</th>
-                                <th>Response Time</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach ($breachedTickets as $ticket): ?>
-                                <tr>
-                                    <td><?= Html::encode($ticket->id) ?></td>
-                                    <td><?= Html::encode($ticket->module) ?></td>
-                                    <td><?= Html::encode($ticket->issue) ?></td>
-                                    <td><?= Yii::$app->formatter->asDatetime($ticket->created_at) ?></td>
-                                    <td><?= Html::encode($ticket->response_time) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+        <?php endif; ?>
     </div>
 </div>
 

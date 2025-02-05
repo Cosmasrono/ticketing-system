@@ -4,9 +4,6 @@ namespace app\models;
 use Yii;
 use yii\base\Model;
 use app\models\User;
-use SendinBlue\Client\Configuration;
-use SendinBlue\Client\Api\TransactionalEmailsApi;
-use SendinBlue\Client\Model\SendSmtpEmail;
 
 class SignupForm extends Model
 {
@@ -26,39 +23,37 @@ class SignupForm extends Model
     public function signup()
     {
         if (!$this->validate()) {
+            Yii::error('Signup validation errors: ' . json_encode($this->errors));
             return null;
         }
         
         $user = new User();
         $user->company_name = $this->company_name;
-        $user->company_email = $this->company_email;
+        $user->company_email = $this->company_email; // Set company_email from input
         $user->setPassword($this->password);
         $user->generateAuthKey();
         $user->generateEmailVerificationToken();
         $user->status = User::STATUS_INACTIVE; // Set status to inactive initially
-        
-        return $user->save() ? $user : null;
-    }
-
-    public function sendVerificationEmail($email, $token)
-    {
-        // Configure API key authorization
-        $config = Configuration::getDefaultConfiguration()->setApiKey('api-key', 'YOUR_API_KEY');
-
-        $apiInstance = new TransactionalEmailsApi(new \GuzzleHttp\Client(), $config);
-        $sendSmtpEmail = new SendSmtpEmail([
-            'subject' => 'Email Verification',
-            'sender' => ['name' => 'Your Company', 'email' => 'francismwaniki630@gmail.com'],
-            'replyTo' => ['name' => 'Your Company', 'email' => 'ccosmas001@gmail.com'],
-            'to' => [['name' => $this->company_name, 'email' => $email]],
-            'htmlContent' => '<html><body><p>Click the link below to verify your email:</p><p><a href="http://yourdomain.com/site/verify?token=' . $token . '">Verify Email</a></p></body></html>',
-        ]);
-
-        try {
-            $result = $apiInstance->sendTransacEmail($sendSmtpEmail);
-            Yii::info('Verification email sent: ' . json_encode($result));
-        } catch (\Exception $e) {
-            Yii::error('Exception when sending verification email: ' . $e->getMessage());
+        $user->role = User::ROLE_USER; // Set default role (adjust as necessary)
+        $user->company_id = time(); // Set a unique company ID or retrieve it from the database
+    
+        // Log user attributes before validation
+        Yii::debug('User attributes before validation: ' . json_encode($user->attributes));
+    
+        // Validate the user model before saving
+        if (!$user->validate()) {
+            Yii::error('User validation errors: ' . json_encode($user->errors));
+            return null; // Return null if validation fails
+        }
+    
+        // Attempt to save the user
+        if ($user->save()) {
+            Yii::info('User saved successfully: ' . json_encode($user->attributes));
+            return $user; // Return the saved user
+        } else {
+            Yii::error('User save failed: ' . json_encode($user->errors));
+            return null; // Return null if save fails
         }
     }
+    
 }

@@ -24,8 +24,8 @@ class m241227_113551_create_company_table extends Migration
             'company_type' => $this->string(50)->notNull(),
             'subscription_level' => $this->string(50)->notNull(),
             'modules' => $this->text(),
-            'created_at' => $this->timestamp()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
-            'updated_at' => $this->timestamp()->notNull()->defaultExpression('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'),
+            'created_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
+            'updated_at' => $this->dateTime()->notNull()->defaultExpression('CURRENT_TIMESTAMP'),
             'status' => $this->tinyInteger(1)->notNull()->defaultValue(1),
         ], $tableOptions);
 

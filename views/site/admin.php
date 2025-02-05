@@ -238,28 +238,16 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                     return ucfirst($model->status ?: 'Not Set');
                 }
             ],
+            // Replace 'created_by' with a custom column to fetch the company name
             [
-                'attribute' => 'company_name',
+                'attribute' => 'created_by',
+                'label' => 'Created By',
                 'value' => function ($model) {
-                    // Try to get company name from the user who created the ticket
-                    if ($model->created_by) {
-                        $user = User::findOne($model->created_by);
-                        if ($user && !empty($user->company_name)) {
-                            return $user->company_name;
-                        }
-                    }
-                    
-                    // If no company name found in user, try ticket's company_name
-                    if (!empty($model->company_name)) {
-                        return $model->company_name;
-                    }
-
-                    // If no company name is found, return "Not Set"
-                    return 'Not Set';
-                }
-                
+                    // Fetch the user based on created_by ID
+                    $user = User::findOne($model->created_by);
+                    return $user ? Html::encode($user->company_name) : 'Not Set';
+                },
             ],
-            
             [
                 'attribute' => 'created_at',
                 'label' => 'Created At (EAT)',

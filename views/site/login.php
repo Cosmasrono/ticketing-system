@@ -74,6 +74,10 @@ $this->params['breadcrumbs'][] = $this->title;
                         ]) ?>
                     </div>
 
+                    <div class="text-center" style="margin-top: 20px;">
+                        <?= Html::a('Super Admin Registration', ['site/super-admin-signup'], ['class' => 'btn btn-info']) ?>
+                    </div>
+
                     <?php ActiveForm::end(); ?>
                 </div>
             </div>

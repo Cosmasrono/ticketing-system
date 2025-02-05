@@ -6,8 +6,14 @@ use yii\bootstrap5\ActiveForm;
 use app\models\Ticket;
 use app\models\User;
 use app\models\Company;
+use app\models\ContractRenewal;
 
-$this->title = 'User Profile: ' . $user->name;
+/* @var $this yii\web\View */
+/* @var $company app\models\Company */
+/* @var $tickets app\models\Ticket[] */
+/* @var $renewals app\models\ContractRenewal[] */
+
+$this->title = $company->company_name . ' Profile';
 
 // Get the associated company data with email
 $company = Company::findOne(['company_name' => $user->company_name]);
@@ -131,133 +137,82 @@ $userStatus = Yii::$app->db->createCommand('
 ')
 ->bindValue(':user_id', $user->id)
 ->queryScalar();
+
+// Fetch tickets and renewals
+$tickets = Ticket::find()->where(['company_id' => $company->id])->all();
+$renewals = ContractRenewal::find()->where(['company_id' => $company->id])->all();
 ?>
 
-<div class="user-profile">
-    <div class="row">
-        <div class="col-lg-8 offset-lg-2">
-            <div class="card shadow">
-                <div class="card-header" style="background-color: #FF9800; color: white;">
-                    <h1 class="card-title h3 mb-0"><?= Html::encode($this->title) ?></h1>
-                </div>
-                <div class="card-body">
-                    <?php if ($isExpired): ?>
-                        <?= $remaining // Show expired message ?>
-                    <?php endif; ?>
+<div class="company-profile">
+    <h1><?= Html::encode($this->title) ?></h1>
 
-                    <!-- User Details -->
-                    <div class="mb-4">
-                        <h4 style="color: #FF9800;">User Information</h4>
-                        <?= DetailView::widget([
-                            'model' => $user,
-                            'attributes' => [
-                                'company_name',
-                                [
-                                    'label' => 'Company Email',
-                                    'value' => $companyEmail ?? '(not set)',
-                                    'contentOptions' => ['class' => 'text-primary'],
-                                ],
-                                [
-                                    'label' => 'Role',
-                                    'value' => $roleDisplay,
-                                    'contentOptions' => ['class' => 'text-primary'],
-                                ],
-                                [
-                                    'label' => 'Account Status',
-                                    'value' => $userStatus ? 'Active' : 'Deactivated',
-                                    'contentOptions' => [
-                                        'class' => $userStatus ? 'text-success' : 'text-danger'
-                                    ],
-                                ],
-                                [
-                                    'label' => 'Contract Status',
-                                    'value' => $isExpired ? 'Expired' : 'Active',
-                                    'contentOptions' => [
-                                        'class' => $isExpired ? 'text-danger' : 'text-success'
-                                    ],
-                                ],
-                            ],
-                        ]) ?>
-                    </div>
+    <?= DetailView::widget([
+        'model' => $company,
+        'attributes' => [
+            'name',
+            'company_name',
+            'company_email:email',
+            'start_date:date',
+            'end_date:date',
+            'role',
+            [
+                'attribute' => 'status',
+                'value' => $company->status ? 'Active' : 'Inactive',
+            ],
+            'company_type',
+            'subscription_level',
+            'created_at:datetime',
+            'updated_at:datetime',
+        ],
+    ]) ?>
 
-                    <!-- Company Duration -->
-                    <div class="mb-4">
-                        <h4 style="color: #FF9800;">Company Duration</h4>
-                        <?= DetailView::widget([
-                            'model' => $company,
-                            'attributes' => [
-                                'start_date',
-                                'end_date',
-                                [
-                                    'label' => 'Total Duration',
-                                    'value' => $duration,
-                                    'format' => 'raw',
-                                ],
-                                [
-                                    'label' => 'Time Remaining',
-                                    'value' => $remaining,
-                                    'format' => 'raw',
-                                ],
-                            ],
-                        ]) ?>
-                    </div>
-
-                    <!-- Ticket Statistics Section -->
-                    <div class="mb-4">
-                        <h4 style="color: #FF9800;">Ticket Statistics</h4>
-                        <ul class="list-group">
-                            <li class="list-group-item">Total Tickets Created: <?= Html::encode($totalTickets) ?></li>
-                            <li class="list-group-item">Total Tickets Assigned: <?= Html::encode($totalAssignedTickets) ?></li>
-                            <li class="list-group-item">Total Tickets Closed: <?= Html::encode($totalClosedTickets) ?></li>
-                            <li class="list-group-item">Total Active Tickets: <?= Html::encode($totalActiveTickets) ?></li>
-                        </ul>
-                    </div>
-
-                    <!-- Recent Tickets Section -->
-                    <div class="mb-4">
-                        <h4 style="color: #FF9800;">Recent Tickets</h4>
-                        <div class="list-group">
-                            <?php foreach ($recentTickets as $ticket): ?>
-                                <div class="list-group-item">
-                                    <strong><?= Html::encode($ticket->title) ?></strong><br>
-                                    Status: <?= Html::encode($ticket->status) ?><br>
-                                    Created At: <?= Html::encode($ticket->created_at) ?>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-
-                    <!-- User Activity Log Section -->
-                    <div class="mb-4">
-                        <h4 style="color: #FF9800;">User Activity Log</h4>
-                        <ul class="list-group">
-                            <!-- Example static log entries; replace with dynamic data as needed -->
-                            <li class="list-group-item">Created a ticket on <?= date('Y-m-d H:i:s') ?></li>
-                            <li class="list-group-item">Closed a ticket on <?= date('Y-m-d H:i:s') ?></li>
-                            <li class="list-group-item">Updated a ticket on <?= date('Y-m-d H:i:s') ?></li>
-                        </ul>
-                    </div>
-
-                    <!-- Support Information Section -->
-                    <div class="mb-4">
-                        <h4 style="color: #FF9800;">Support Information</h4>
-                        <p>If you need assistance, please contact our support team:</p>
-                        <p>Email: <?= Yii::$app->params['adminEmail'] ?></p>
-                    </div>
-
-                    <!-- Modules Section -->
-                    <?php if ($user->modules): ?>
-                    <div class="mb-4">
-                        <h4 style="color: #FF9800;">Assigned Modules</h4>
-                        <div class="list-group">
-                            <?php foreach (explode(',', $user->modules) as $module): ?>
-                                <div class="list-group-item"><?= Html::encode($module) ?></div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                    <?php endif; ?>
-                </div>
-            </div>
+    <h2>Tickets</h2>
+    <?php if (!empty($tickets)): ?>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Issue</th>
+                        <th>Status</th>
+                        <th>Created At</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($tickets as $ticket): ?>
+                        <tr>
+                            <td><?= Html::encode($ticket->issue) ?></td>
+                            <td><?= Html::encode($ticket->status) ?></td>
+                            <td><?= Yii::$app->formatter->asDatetime($ticket->created_at) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
         </div>
-    </div>
+    <?php else: ?>
+        <p>No tickets found.</p>
+    <?php endif; ?>
+
+    <h2>Contract Renewals</h2>
+    <?php if (!empty($renewals)): ?>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Renewal Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ($renewals as $renewal): ?>
+                        <tr>
+                            <td><?= Yii::$app->formatter->asDate($renewal->end_date) ?></td>
+                            <td><?= Html::encode($renewal->status) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php else: ?>
+        <p>No renewals found.</p>
+    <?php endif; ?>
 </div>

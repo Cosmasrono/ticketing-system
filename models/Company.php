@@ -4,6 +4,8 @@ namespace app\models;
 
 use Yii;
 use yii\db\ActiveRecord;
+use yii\behaviors\TimestampBehavior;
+use yii\db\Expression;
 
 class Company extends ActiveRecord
 {
@@ -32,6 +34,7 @@ class Company extends ActiveRecord
             [['role'], 'string', 'max' => 50],
             [['company_type', 'subscription_level'], 'string'],
             ['company_email', 'email'],
+            [['created_at', 'updated_at'], 'safe'],
         ];
     }
 
@@ -66,16 +69,26 @@ class Company extends ActiveRecord
         ];
     }
 
+    public function behaviors()
+    {
+        return [
+            [
+                'class' => \yii\behaviors\TimestampBehavior::class,
+                'createdAtAttribute' => 'created_at',
+                'updatedAtAttribute' => 'updated_at',
+                'value' => function() { 
+                    return date('Y-m-d H:i:s');
+                }
+            ],
+        ];
+    }
+
     public function beforeSave($insert)
     {
         if (parent::beforeSave($insert)) {
             if ($this->isNewRecord) {
-                $this->created_at = date('Y-m-d H:i:s');
-                $this->updated_at = date('Y-m-d H:i:s');
                 $this->start_date = date('Y-m-d');
                 $this->end_date = date('Y-m-d', strtotime('+1 year'));
-            } else {
-                $this->updated_at = date('Y-m-d H:i:s');
             }
             return true;
         }

@@ -545,15 +545,49 @@ public function actionSignup()
         }
 
         $model = new LoginForm();
-        
-        if ($model->load(Yii::$app->request->post())) {
-            Yii::info("Login attempt with email: " . $model->company_email);
+        if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+            // Find the user
+            $user = User::findOne(['company_email' => $model->email]);
             
-            if ($model->login()) {
-                Yii::info("Login successful for user: " . $model->company_email);
-                return $this->goBack();
-            } else {
-                Yii::info("Login failed. Errors: " . print_r($model->errors, true));
+            if ($user) {
+                // If user role is 2 or 3 (regular users), check for other active sessions
+                if (in_array($user->role, [2, 3])) {
+                    // Find all other active sessions for users with same company_email
+                    $otherSessions = User::find()
+                        ->where(['company_email' => $user->company_email])
+                        ->andWhere(['status' => User::STATUS_ACTIVE])
+                        ->andWhere(['!=', 'id', $user->id])
+                        ->all();
+
+                    // Logout other sessions
+                    foreach ($otherSessions as $session) {
+                        // Update their status to logged out
+                        $session->updateAttributes([
+                            'status' => User::STATUS_INACTIVE,
+                            'last_login' => new \yii\db\Expression('NOW()'),
+                            'auth_key' => null // Clear auth key to force logout
+                        ]);
+                        
+                        // Log the forced logout
+                        Yii::info("Forced logout for user ID {$session->id} due to new login from same company");
+                    }
+
+                    // Optional: Show message about other sessions being logged out
+                    if (!empty($otherSessions)) {
+                        Yii::$app->session->setFlash('warning', 'Other active sessions for this account have been logged out.');
+                    }
+                }
+
+                // Update current user's status and login time
+                $user->updateAttributes([
+                    'status' => User::STATUS_ACTIVE,
+                    'last_login' => new \yii\db\Expression('NOW()')
+                ]);
+
+                // Proceed with login
+                if ($model->login()) {
+                    return $this->goBack();
+                }
             }
         }
 
@@ -1523,14 +1557,17 @@ public function actionCreateUserForCompany($company_id)
         return $this->redirect(['index']);
     }
 
-    // Check if there's already an active user for this company
+    // Check if there's already an active user with this email
     $existingUser = User::find()
-        ->where(['company_name' => $company->company_name])
-        ->andWhere(['status' => User::STATUS_ACTIVE])
+        ->where(['company_email' => $company->company_email])
+        ->andWhere(['status' => [User::STATUS_ACTIVE, User::STATUS_UNVERIFIED]])
         ->one();
 
-    if ($existingUser && $existingUser->status === User::STATUS_ACTIVE) {
-        Yii::$app->session->setFlash('error', 'An active user already exists for this company.');
+    if ($existingUser) {
+        $status = $existingUser->status === User::STATUS_ACTIVE ? 'active' : 'pending verification';
+        Yii::$app->session->setFlash('error', 
+            "A user with this email ({$company->company_email}) already exists and is {$status}."
+        );
         return $this->redirect(['index']);
     }
 
@@ -1542,12 +1579,19 @@ public function actionCreateUserForCompany($company_id)
         $clearPassword = Yii::$app->security->generateRandomString(8);
         $token = Yii::$app->security->generateRandomString(32);
 
-        // Debug log the token
-        Yii::debug("Generated token: " . $token);
-
         // Get company name parts for the user's name
         $nameParts = explode('-', $company->company_name);
-        $userName = ucfirst(end($nameParts)); // Take the last part after hyphen and capitalize
+        $userName = ucfirst(end($nameParts));
+
+        // Map role properly
+        $role = $company->role;
+        if ($role === 'admin') {
+            $roleValue = 1;
+        } elseif ($role === 'developer') {
+            $roleValue = 4;
+        } else {
+            $roleValue = 2; // default role
+        }
 
         // Prepare user data
         $userData = [
@@ -1560,7 +1604,7 @@ public function actionCreateUserForCompany($company_id)
             'password_reset_token' => $token,
             'token_created_at' => time(),
             'status' => User::STATUS_UNVERIFIED,
-            'role' => $company->role ?? 2, // Assign the role from the company, default to 2 if not set
+            'role' => $roleValue,
             'created_at' => time(),
             'updated_at' => time(),
             'modules' => is_array($company->modules) ? implode(', ', $company->modules) : $company->modules,
@@ -1576,9 +1620,9 @@ public function actionCreateUserForCompany($company_id)
             throw new \Exception('Failed to insert user data');
         }
 
-        // Get the newly created user ID
+        // Rest of your email sending code...
         $userId = $connection->getLastInsertID();
-
+        
         // Verify the user was created
         $createdUser = User::findOne($userId);
         if (!$createdUser) {
@@ -1590,9 +1634,6 @@ public function actionCreateUserForCompany($company_id)
             '/site/set-initial-password',
             'token' => $token
         ]);
-
-        // Debug log the URL
-        Yii::debug("Reset URL: " . $resetUrl);
 
         $emailSent = Yii::$app->mailer->compose('@app/views/site/_email_credentials', [
             'company' => $company,
@@ -2377,52 +2418,43 @@ public function actionCreateDeveloper()
 
 public function actionProfile($id)
 {
-    Yii::info("Accessing profile for user ID: {$id}");
-
-    // Find the user
-    $user = User::findOne($id);
-    if (!$user) {
-        throw new NotFoundHttpException('User not found.');
+    // Find the company directly from company table
+    $company = Company::findOne($id);
+    
+    if (!$company) {
+        Yii::warning("Company not found with ID: {$id}");
+        throw new NotFoundHttpException('Company profile not found.');
     }
 
-    // Check if user is admin
-    if ($user->role === 'admin' || $user->role === '1' || $user->role === '4') {
+    Yii::info("Accessing profile for company: {$company->company_name}");
+
+    // Check if company is admin/developer
+    if ($company->role === 'admin' || $company->role === 'developer') {
         // Get contracts that are due within the next 30 days
         $nearingContracts = ContractRenewal::find()
-            ->joinWith('company')
             ->where(['>=', 'end_date', date('Y-m-d')])
             ->andWhere(['<=', 'end_date', date('Y-m-d', strtotime('+30 days'))])
             ->orderBy(['end_date' => SORT_ASC])
             ->all();
 
         return $this->render('admin-profile', [
-            'user' => $user,
+            'company' => $company,
             'nearingContracts' => $nearingContracts,
         ]);
     }
 
-    // For regular users, continue with existing logic
-    $companyName = trim($user->company_name); // Trim the company name
-    $company = Company::findOne(['company_name' => $companyName]);
-    
-    if (!$company) {
-        Yii::warning("Company not found for user {$id} with company_name: {$companyName}");
-        // Handle accordingly (e.g., set $company to null or provide a default message)
-        $company = null; // or handle as needed
-    }
-
+    // For regular companies
     $tickets = Ticket::find()
-        ->where(['user_id' => $id])
+        ->where(['company_name' => $company->company_name]) // Using company_name to match tickets
         ->orderBy(['created_at' => SORT_DESC])
         ->all();
 
     $renewals = ContractRenewal::find()
-        ->where(['company_id' => $company ? $company->id : null])
+        ->where(['company_id' => $id])
         ->orderBy(['created_at' => SORT_DESC])
         ->all();
 
     return $this->render('profile', [
-        'user' => $user,
         'company' => $company,
         'tickets' => $tickets,
         'renewals' => $renewals,

@@ -1670,27 +1670,55 @@ public function actionClose()
    private function uploadToCloudinary($tempFile)
 {
     try {
-        // Set SSL certificate
-        $certPath = Yii::getAlias('@app/certs/cacert.pem');
-        if (file_exists($certPath)) {
-            putenv('CURL_CA_BUNDLE=' . $certPath);
-        }
+        // Create HTTP client with SSL verification disabled
+        $httpClient = new \GuzzleHttp\Client([
+            'verify' => false,
+            'http_errors' => false,
+            'defaults' => [
+                'verify' => false,
+                'exceptions' => false
+            ]
+        ]);
 
+        // Initialize Cloudinary with the custom client
         $cloudinary = new \Cloudinary\Cloudinary([
             'cloud' => [
                 'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
                 'api_key' => Yii::$app->params['cloudinary']['api_key'],
                 'api_secret' => Yii::$app->params['cloudinary']['api_secret']
             ],
-            'url' => [
-                'secure' => true
+            'api' => [
+                'http_client' => $httpClient
             ]
         ]);
 
-        // Rest of your upload code...
+        // Verify the file exists and is readable
+        if (!is_readable($tempFile)) {
+            throw new \Exception("Cannot read upload file: $tempFile");
+        }
+
+        // Log attempt
+        Yii::info('Attempting to upload file to Cloudinary: ' . $tempFile);
+
+        // Upload file and get result
+        $result = $cloudinary->uploadApi()->upload($tempFile, [
+            'folder' => 'tickets/screenshots',
+            'resource_type' => 'image',
+            'unique_filename' => true
+        ]);
+
+        // Log success
+        Yii::info('Successfully uploaded to Cloudinary. Result: ' . json_encode($result));
+
+        return $result['secure_url'] ?? null;
+
     } catch (\Exception $e) {
+        // Log detailed error
         Yii::error('Cloudinary upload error: ' . $e->getMessage());
-        throw $e;
+        Yii::error('Error trace: ' . $e->getTraceAsString());
+        
+        // You might want to handle this error differently
+        throw new \Exception('Failed to upload image to Cloudinary: ' . $e->getMessage());
     }
 }
     

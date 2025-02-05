@@ -307,36 +307,62 @@ public function actionCreateCompany()
 //     ]);
 // }
 
-
 public function actionSignup()
 {
-    if (!Yii::$app->user->isGuest) {
-        return $this->goHome();
-    }
-
     $model = new SignupForm();
-
-    if ($model->load(Yii::$app->request->post())) {
-        $allowedEmails = ['ccosmas001@gmail.com'];
-        if (!in_array($model->company_email, $allowedEmails)) {
-            Yii::$app->session->setFlash('error', 'Registration is restricted to authorized personnel only.');
-            return $this->render('signup', [
-                'model' => $model,
-            ]);
-        }
-
+    
+    if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+        $transaction = Yii::$app->db->beginTransaction();
+        
         try {
-            if ($user = $model->signup()) {
-                Yii::$app->session->setFlash('success', 'Registration successful! Please login.');
-                return $this->redirect(['site/login']);
+            // Create the company
+            $company = new Company();
+            $company->name = $model->company_name;
+            $company->company_email = $model->company_email;
+            $company->created_at = time();
+            $company->updated_at = time();
+            
+            if ($company->save()) {
+                Yii::info("Company created with ID: " . $company->id);
+                
+                // Create the user
+                $user = new User();
+                $user->name = $model->name;
+                $user->company_name = $model->company_name;
+                $user->company_email = $model->company_email;
+                $user->password_hash = Yii::$app->security->generatePasswordHash($model->password);
+                $user->auth_key = Yii::$app->security->generateRandomString();
+                $user->verification_token = Yii::$app->security->generateRandomString();
+                $user->email_verified = false;
+                $user->role = User::ROLE_SUPERADMIN; // Use a constant for role
+                $user->status = User::STATUS_PENDING; // Use a constant for status
+                $user->company_id = (int)$company->id;  // Explicitly cast to integer
+                $user->created_at = time();
+                $user->updated_at = time();
+                
+                Yii::info("Attempting to save user with company_id: " . $user->company_id);
+                
+                if ($user->save()) {
+                    $transaction->commit();
+                    Yii::$app->session->setFlash('success', 'Registration successful.');
+                    return $this->redirect(['site/login']); // Redirect to login
+                } else {
+                    Yii::error('User validation errors: ' . print_r($user->errors, true));
+                    Yii::$app->session->setFlash('error', 'Error creating user account: ' . json_encode($user->errors));
+                }
+            } else {
+                Yii::error('Company validation errors: ' . print_r($company->errors, true));
+                Yii::$app->session->setFlash('error', 'Error creating company: ' . json_encode($company->errors));
             }
         } catch (\Exception $e) {
-            Yii::$app->session->setFlash('error', 'Registration failed: ' . $e->getMessage());
+            $transaction->rollBack();
+            Yii::error('Exception during signup: ' . $e->getMessage());
+            Yii::$app->session->setFlash('error', 'An error occurred during registration: ' . $e->getMessage());
         }
     }
-
+    
     return $this->render('signup', [
-        'model' => $model,
+        'model' => $model
     ]);
 }
 
@@ -800,6 +826,7 @@ public function actionRequestPasswordReset()
 
             // Send email with reset link
             Yii::$app->mailer->compose()
+                ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->params['senderName']])
                 ->setTo($model->company_email)
                 ->setSubject('Password reset for ' . Yii::$app->name)
                 ->setTextBody('Please click the link below to reset your password: ' . 

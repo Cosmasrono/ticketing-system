@@ -136,14 +136,6 @@ $config = [
             'class' => 'yii\web\AssetManager',
             'basePath' => '@webroot/assets',
             'baseUrl' => '@web/assets',
-            'bundles' => [
-                'yii\web\JqueryAsset' => [
-                    'sourcePath' => null,
-                    'js' => [
-                        'https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
-                    ]
-                ],
-            ],
         ],
         'response' => [
             'class' => 'yii\web\Response',

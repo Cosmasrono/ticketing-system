@@ -93,6 +93,9 @@ $config = [
                 'developer/view/<id:\d+>' => 'developer/view',
                 'ticket/search' => 'ticket/search',
                 'site/update-renewal-status' => 'site/update-renewal-status',
+                'profile/<id:\d+>' => 'site/profile',
+                'user-profile/<id:\d+>' => 'user-profile/view',
+                'admin-profile/<id:\d+>' => 'admin-profile/view',
             ],
         ],
         'session' => [

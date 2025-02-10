@@ -16,7 +16,19 @@ class Company extends ActiveRecord
     const ROLE_SUPER_ADMIN = 'super_admin';
 
     public $role;
-    public $name;
+    public $id; // Assuming you have an id column
+    public $name; // Assuming you have a name column
+    public $company_name; // Assuming you have a company_name column
+    public $company_email; // Assuming you have a company_email column
+    public $company_type; // Assuming you have a company_type column
+    public $subscription_level; // Assuming you have a subscription_level column
+    public $modules; // Assuming you have a modules column
+    public $created_at; // Assuming you have a created_at column
+    public $updated_at; // Assuming you have an updated_at column
+    public $status; // Assuming you have a status column
+    public $start_date; // New property
+    public $end_date; // New property
+    public $renewed_at; // New property
 
     public static function tableName()
     {

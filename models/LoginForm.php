@@ -19,7 +19,17 @@ class LoginForm extends Model
         return [
             [['company_email', 'password'], 'required'],
             ['company_email', 'email'],
+            ['rememberMe', 'boolean'],
             ['password', 'validatePassword'],
+        ];
+    }
+
+    public function attributeLabels()
+    {
+        return [
+            'company_email' => 'Email',
+            'password' => 'Password',
+            'rememberMe' => 'Remember Me',
         ];
     }
 
@@ -28,11 +38,25 @@ class LoginForm extends Model
         if (!$this->hasErrors()) {
             $user = $this->getUser();
             
-            // Add debug logging
-            Yii::debug('Attempting login for email: ' . $this->company_email);
-            Yii::debug('User found: ' . ($user ? 'Yes' : 'No'));
+            // Add debugging
+            Yii::debug('Found user: ' . ($user ? 'Yes' : 'No'));
+            if ($user) {
+                Yii::debug('User status: ' . $user->status);
+            }
             
-            if (!$user || !$user->validatePassword($this->password)) {
+            if (!$user) {
+                $this->addError($attribute, 'Incorrect email or password.');
+                return;
+            }
+            
+            // Check status with debugging
+            if ($user->status != User::STATUS_ACTIVE) {
+                Yii::debug('User not active. Status: ' . $user->status);
+                $this->addError($attribute, 'Your account is not active.');
+                return;
+            }
+
+            if (!$user->validatePassword($this->password)) {
                 $this->addError($attribute, 'Incorrect email or password.');
             }
         }

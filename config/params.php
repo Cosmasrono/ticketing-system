@@ -6,7 +6,9 @@ return [
     // ... other params ...
     'supportEmail' => 'francismwaniki630@gmail.com',
     'senderName' => 'Your Company Name',
-    'user.passwordResetTokenExpire' => 3600, // 1 hour
+  
+        'user.passwordResetTokenExpire' => 86400, // 24 hours in seconds, adjust as needed
+     // Token expires in 1 hour
     'cloudinary' => [
         'cloud_name' => 'dscbboswt',
         'api_key' => '165833264188614',

@@ -7,19 +7,22 @@ use yii\db\Migration;
  */
 class m250202_172635_add_module_column_to_client_table extends Migration
 {
-    
-    public function safeUp()
+    public function up()
     {
-        // Add the 'module' column to the 'client' table
-        $this->addColumn('client', 'module', $this->string()->after('company_email')); // Adjust position as needed
+        // Check if the column already exists
+        if (!$this->db->schema->getTableSchema('client')->getColumn('module')) {
+            $this->addColumn('client', 'module', $this->string()->after('company_email'));
+        }
     }
 
     /**
      * {@inheritdoc}
      */
-    public function safeDown()
+    public function down()
     {
-        // Drop the 'module' column if the migration is reverted
-        $this->dropColumn('client', 'module');
+        // Remove the column if it exists
+        if ($this->db->schema->getTableSchema('client')->getColumn('module')) {
+            $this->dropColumn('client', 'module');
+        }
     }
 }

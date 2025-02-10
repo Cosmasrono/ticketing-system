@@ -4,6 +4,7 @@ use yii\helpers\Url;
 use yii\web\JqueryAsset;
 use app\models\ContractRenewal;
 use app\models\User;
+use app\models\Company;
 // grid
 use yii\grid\GridView;
 use yii\data\arrayDataProvider;
@@ -409,196 +410,169 @@ $this->registerJs("
 
 <div class="dashboard-container">
     <!-- Users Section -->
-    <div id="users" class="content-section">
+    <div id="users" class="content-section bg-white rounded-lg shadow-sm p-4">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="text-gray-800">User Management</h2>
+            <h2 class="text-primary fw-bold mb-0">
+                <i class="fas fa-users me-2"></i>User Management
+            </h2>
             <div class="d-flex align-items-center">
-                <div class="input-group mr-3" style="width: 300px;">
-                    <input type="text" class="form-control" id="userSearch" placeholder="Search users...">
-                    <div class="input-group-append">
-                        <span class="input-group-text"><i class="fas fa-search"></i></span>
-                    </div>
-                </div>
-             </div>
-        </div>
-
-        <div class="card-body">
-    <div class="table-responsive">
-        <table class="table table-hover" id="usersTable">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Company</th>
-                    
-                    <th>Role</th>
-                    <th>User Status</th>
-                    <th>Created</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($allUsers as $user): ?>
-                    <tr>
-                        <td><?= Html::encode($user->name) ?></td>
-                        <td><?= Html::encode($user->company_name) ?></td>
-                         <td>
-                            <span class="badge bg-info">
-                                <?= Html::encode(ucfirst($user->role)) ?>
-                            </span>
-                        </td>
-                        <td>
-                            <span class="badge <?= $user->status == User::STATUS_ACTIVE ? 'bg-success' : 'bg-danger' ?>">
-                                <?= $user->status == User::STATUS_ACTIVE ? 'Active' : 'Inactive' ?>
-                            </span>
-                        </td>
-                        <td>
-                            <?php if (isset($user->created_at) && $user->created_at): ?>
-                                <?= Yii::$app->formatter->asDate($user->created_at) ?>
-                            <?php else: ?>
-                                <span class="text-muted">N/A</span>
-                            <?php endif; ?>
-                        </td>
-                        <td>
-                            <div class="btn-group">
-                                <?php if ($user->status == 10): // Check if status is active ?>
-                                    <button 
-                                        class="btn btn-sm btn-danger"
-                                        onclick="toggleUserStatus(<?= $user->id ?>, 0)"
-                                        title="Deactivate user">
-                                        <i class="fas fa-ban"></i> Deactivate
-                                    </button>
-                                <?php elseif ($user->status == 0): // Check if status is inactive ?>
-                                    <button 
-                                        class="btn btn-sm btn-success"
-                                        onclick="toggleUserStatus(<?= $user->id ?>, 1)"
-                                        title="Activate user">
-                                        Activate
-                                    </button>
-                                <?php else: ?>
-                                    <span class="text-muted">Not applicable</span>
-                                <?php endif; ?>
-                                
-                                <!-- Delete Button -->
-                                <button 
-                                    class="btn btn-sm btn-danger"
-                                    onclick="confirmDelete(<?= $user->id ?>)"
-                                    title="Delete user">
-                                    <i class="fas fa-trash"></i> Delete
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<script>
-function toggleUserStatus(userId, newStatus) {
-    $.ajax({
-        url: '/user/toggle-status',
-        method: 'POST',
-        data: {
-            id: userId,
-            status: newStatus
-        },
-        success: function(response) {
-            if (response.success) {
-                location.reload();
-            } else {
-                alert('Failed to update user status');
-            }
-        },
-        error: function() {
-            alert('Error updating user status');
-        }
-    });
-}
-</script>
-</div>
-
-<script>
-function toggleUserStatus(userId, newStatus) {
-    // AJAX call to update user status
-    $.ajax({
-        url: '/user/toggle-status',
-        method: 'POST',
-        data: {
-            id: userId,
-            status: newStatus
-        },
-        success: function(response) {
-            if (response.success) {
-                // Reload or update the table row
-                location.reload(); // Simple approach
-            } else {
-                alert('Failed to update user status');
-            }
-        },
-        error: function() {
-            alert('Error updating user status');
-        }
-    });
-}
-</script>
-        </div>
-
-        <!-- Overview Section -->
-        <div id="overview" class="content-section active">
-            <h2>Dashboard Overview</h2>
-            <!-- Add this section to your admin dashboard -->
-           
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h3>Clients with Comments</h3>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Status</th>
-                                    <th>Created At</th>
-                                    <th>Comments</th>
-                                    <th>Company Name</th>
-                                    <th>Closed By</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($tickets as $ticket): ?>
-                                    <?php if (!empty($ticket->comments)): ?>
-                                        <tr>
-                                            <td><?= Html::encode($ticket->id) ?></td>
-                                            <td>
-                                                <span class="badge <?= getStatusColor($ticket->status) ?>">
-                                                    <?= Html::encode($ticket->status) ?>
-                                                </span>
-                                            </td>
-                                            <td><?= Yii::$app->formatter->asDatetime($ticket->created_at) ?></td>
-                                            <td><?= Html::encode($ticket->comments) ?></td>
-                                            <td><?= Html::encode($ticket->company_name) ?></td>
-                                            <td><?= Html::encode($ticket->closed_by) ?></td>
-                                        </tr>
-                                    <?php endif; ?>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                        
-                        <?php if (!array_filter($tickets, function($ticket) { return !empty($ticket->comments); })): ?>
-                            <div class="alert alert-info">
-                                No tickets with comments found.
-                            </div>
-                        <?php endif; ?>
-                    </div>
+                <div class="input-group" style="width: 300px;">
+                    <input type="text" class="form-control border-end-0" id="userSearch" placeholder="Search users...">
+                    <span class="input-group-text bg-white border-start-0">
+                        <i class="fas fa-search text-muted"></i>
+                    </span>
                 </div>
             </div>
         </div>
 
-        <!-- Clients Section -->
-        
-        
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0" id="usersTable">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="px-4 py-3">Name</th>
+                                <th class="py-3">Company</th>
+                                <th class="py-3">Company Email</th>
+                                <th class="py-3">Role</th>
+                                <th class="py-3">Status</th>
+                                <th class="py-3">Created</th>
+                                <th class="py-3 text-end pe-4">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($allUsers as $user): ?>
+                                <tr id="user-<?= $user->id ?>">
+                                    <td class="px-4">
+                                        <div class="d-flex align-items-center">
+                                            <div class="avatar-sm bg-primary-subtle rounded-circle me-2 d-flex align-items-center justify-content-center">
+                                                <span class="text-primary fw-bold"><?= strtoupper(substr($user->name, 0, 1)) ?></span>
+                                            </div>
+                                            <div class="fw-medium"><?= Html::encode($user->name) ?></div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <?= Html::a(
+                                            Html::encode($user->company_name),
+                                            ['site/profile', 'id' => $user->company_id],
+                                            ['class' => 'text-decoration-none text-primary fw-medium']
+                                        ) ?>
+                                    </td>
+                                    <td>
+                                        <div class="text-muted">
+                                            <?= Html::encode($user->getAttribute('company_email')) ?: '<span class="fst-italic">Not set</span>' ?>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info-subtle text-info px-3 py-2">
+                                            <?= Html::encode(ucfirst($user->role)) ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="badge <?= $user->status == 10 
+                                            ? 'bg-success-subtle text-success' 
+                                            : 'bg-danger-subtle text-danger' ?> px-3 py-2 status-badge">
+                                            <?= $user->status == 10 ? 'Active' : 'Inactive' ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="text-muted">
+                                            <?php if (isset($user->created_at) && $user->created_at): ?>
+                                                <i class="far fa-calendar-alt me-1"></i>
+                                                <?= Yii::$app->formatter->asDate($user->created_at, 'php:M d, Y') ?>
+                                            <?php else: ?>
+                                                <span class="fst-italic">N/A</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        <div class="btn-group">
+                                            <?php if ($user->role != 4): ?>
+                                                <?php if ($user->status == 10): ?>
+                                                    <button class="btn btn-outline-danger btn-sm status-toggle"
+                                                        onclick="toggleUserStatus(<?= $user->id ?>, 0)">
+                                                        <i class="fas fa-ban me-1"></i>Deactivate
+                                                    </button>
+                                                <?php else: ?>
+                                                    <button class="btn btn-outline-success btn-sm status-toggle"
+                                                        onclick="toggleUserStatus(<?= $user->id ?>, 10)">
+                                                        <i class="fas fa-check me-1"></i>Activate
+                                                    </button>
+                                                <?php endif; ?>
+                                                
+                                                <button class="btn btn-outline-danger btn-sm ms-2"
+                                                    onclick="confirmDelete(<?= $user->id ?>)">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            <?php else: ?>
+                                                <span class="badge bg-secondary">Protected Account</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Overview Section -->
+    <div id="overview" class="content-section active">
+        <h2>Dashboard Overview</h2>
+        <!-- Add this section to your admin dashboard -->
+       
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3>Clients with Comments</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Status</th>
+                                <th>Created At</th>
+                                <th>Comments</th>
+                                <th>Company Name</th>
+                                <th>Closed By</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($tickets as $ticket): ?>
+                                <?php if (!empty($ticket->comments)): ?>
+                                    <tr>
+                                        <td><?= Html::encode($ticket->id) ?></td>
+                                        <td>
+                                            <span class="badge <?= getStatusColor($ticket->status) ?>">
+                                                <?= Html::encode($ticket->status) ?>
+                                            </span>
+                                        </td>
+                                        <td><?= Yii::$app->formatter->asDatetime($ticket->created_at) ?></td>
+                                        <td><?= Html::encode($ticket->comments) ?></td>
+                                        <td><?= Html::encode($ticket->company_name) ?></td>
+                                        <td><?= Html::encode($ticket->closed_by) ?></td>
+                                    </tr>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    
+                    <?php if (!array_filter($tickets, function($ticket) { return !empty($ticket->comments); })): ?>
+                        <div class="alert alert-info">
+                            No tickets with comments found.
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clients Section -->
+    
+    
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.getElementById('contractSearch').addEventListener('keyup', function() {
@@ -1373,4 +1347,61 @@ function confirmDelete(userId) {
     }
 }
 </script>
+
+<?php
+$this->registerJs("
+    function toggleUserStatus(userId, newStatus) {
+        $.ajax({
+            url: '" . Yii::$app->urlManager->createUrl(['site/toggle-status']) . "',
+            type: 'POST',
+            data: {
+                id: userId,
+                status: newStatus,
+                '" . Yii::$app->request->csrfParam . "': '" . Yii::$app->request->csrfToken . "'
+            },
+            success: function(response) {
+                if (response.success) {
+                    const statusBadge = $('#user-' + userId + ' .status-badge');
+                    const statusToggle = $('#user-' + userId + ' .status-toggle');
+                    
+                    if (newStatus == 10) {
+                        statusBadge.removeClass('bg-danger-subtle text-danger').addClass('bg-success-subtle text-success');
+                        statusBadge.text('Active');
+                        statusToggle.removeClass('btn-outline-success').addClass('btn-outline-danger');
+                        statusToggle.html('<i class=\"fas fa-ban me-1\"></i>Deactivate');
+                        statusToggle.attr('onclick', 'toggleUserStatus(' + userId + ', 0)');
+                    } else {
+                        statusBadge.removeClass('bg-success-subtle text-success').addClass('bg-danger-subtle text-danger');
+                        statusBadge.text('Inactive');
+                        statusToggle.removeClass('btn-outline-danger').addClass('btn-outline-success');
+                        statusToggle.html('<i class=\"fas fa-check me-1\"></i>Activate');
+                        statusToggle.attr('onclick', 'toggleUserStatus(' + userId + ', 10)');
+                    }
+                    
+                    if (typeof toastr !== 'undefined') {
+                        toastr.success(response.message);
+                    } else {
+                        alert(response.message);
+                    }
+                } else {
+                    console.error(response.message);
+                    if (typeof toastr !== 'undefined') {
+                        toastr.error(response.message);
+                    } else {
+                        alert(response.message);
+                    }
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Error:', error);
+                if (typeof toastr !== 'undefined') {
+                    toastr.error('Failed to update status');
+                } else {
+                    alert('Failed to update status');
+                }
+            }
+        });
+    }
+");
+?>
  

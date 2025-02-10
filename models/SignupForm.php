@@ -19,20 +19,22 @@ class SignupForm extends Model
     public function rules()
     {
         return [
-         
-                    [['name', 'company_name', 'company_email', 'password'], 'required'],
-                    ['company_email', 'email'],
-                    // Other validation rules...
-                
-            
-
-            ['company_email', 'string', 'max' => 255],
-            ['company_email', 'unique', 'targetClass' => '\app\models\User', 'targetAttribute' => 'company_email'],
-            ['company_email', 'validateSuperAdminEmail'],
+            [['company_name', 'company_email', 'password'], 'required'],
+            ['company_email', 'email'],
+            ['company_email', 'unique', 'targetClass' => '\app\models\User', 'message' => 'This email address has already been taken.'],
             ['password', 'string', 'min' => 6],
             [['name', 'company_name'], 'string', 'max' => 255],
             [['company_type', 'subscription_level'], 'string'],
             ['modules', 'safe'],
+        ];
+    }
+
+    public function attributeLabels()
+    {
+        return [
+            'company_name' => 'Company Name',
+            'company_email' => 'Company Email',
+            'password' => 'Password',
         ];
     }
 

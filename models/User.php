@@ -328,14 +328,7 @@ public function isUser()
      */
     public function setPassword($password)
     {
-        try {
-            $this->password_hash = Yii::$app->security->generatePasswordHash($password);
-            Yii::debug("New password hash generated successfully");
-            return true;
-        } catch (\Exception $e) {
-            Yii::error("Error generating password hash: " . $e->getMessage());
-            return false;
-        }
+        $this->password_hash = Yii::$app->security->generatePasswordHash($password);
     }
 
     /**
@@ -424,72 +417,43 @@ public function isUser()
     // {
     //     return $this->role === 'admin';
     // }
-
     public static function findByPasswordResetToken($token)
     {
-        Yii::debug("=== Validating Reset Token ===");
-        Yii::debug("Token to validate: " . $token);
-
-        if (empty($token) || !is_string($token)) {
-            Yii::error("Invalid token format");
+        if (!static::isPasswordResetTokenValid($token)) {
+            Yii::error('Token validation failed: ' . $token);
             return null;
         }
 
-        // First, find the user without status check
-        $user = static::findOne(['password_reset_token' => $token]);
-        
-        if (!$user) {
-            Yii::error("No user found with token: " . $token);
-            return null;
-        }
-
-        Yii::debug("Found user: " . json_encode([
-            'id' => $user->id,
-            'email' => $user->company_email,
-            'status' => $user->status,
-            'token' => $user->password_reset_token,
-            'token_created_at' => $user->token_created_at ? date('Y-m-d H:i:s', $user->token_created_at) : 'null'
-        ]));
-
-        // Check if token_created_at is null
-        if ($user->token_created_at === null) {
-            Yii::error("Token creation time is null for user {$user->id}");
-            
-            // Update token_created_at if it's null
-            $user->token_created_at = time();
-            $user->save(false);
-            
-            Yii::debug("Updated token_created_at to current time");
-        }
-
-        // Extend expiration time to 24 hours for testing
-        $expiration = 86400; // 24 hours in seconds
-        $timePassed = time() - $user->token_created_at;
-
-        Yii::debug("Token timing: " . json_encode([
-            'Created' => date('Y-m-d H:i:s', $user->token_created_at),
-            'Current' => date('Y-m-d H:i:s', time()),
-            'Time Passed' => $timePassed,
-            'Expiration' => $expiration,
-            'Is Expired' => ($timePassed > $expiration) ? 'Yes' : 'No'
-        ]));
-
-        // Temporarily disable expiration check for testing
-        // if ($timePassed > $expiration) {
-        //     Yii::error("Token has expired");
-        //     return null;
-        // }
-
-        return $user;
+        return static::findOne([
+            'password_reset_token' => $token,
+            'status' => [self::STATUS_ACTIVE, self::STATUS_UNVERIFIED],
+        ]);
     }
-
+    
     public function removePasswordResetToken()
     {
         $this->password_reset_token = null;
-        $this->token_created_at = null;
+        return $this->save(false);
     }
 
+
+    
+    public function generatePasswordResetToken()
+    {
+        $randomStr = Yii::$app->security->generateRandomString(32);
+        $timestamp = time();
+        $this->password_reset_token = $randomStr . '_' . $timestamp;
+        Yii::debug("Generated new reset token: " . $this->password_reset_token);
+        return $this->password_reset_token;
+    }
+
+    // public function removePasswordResetToken()
+    // {
+    //     $this->password_reset_token = null;
+    // }
+
     public function sendEmail()
+    
     {
         if (!User::isPasswordResetTokenValid($this->password_reset_token)) {
             $this->generatePasswordResetToken();
@@ -932,6 +896,55 @@ public function verify()
     public function needsEmailVerification()
     {
         return !empty($this->company_email) && !$this->email_verified;
+    }
+
+    // public function generatePasswordResetToken()
+    // {
+    //     try {
+    //         $this->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
+    //         return true;
+    //     } catch (\Exception $e) {
+    //         Yii::error("Error generating reset token: " . $e->getMessage());
+    //         return false;
+    //     }
+    // }
+
+    public static function isPasswordResetTokenValid($token)
+    {
+        if (empty($token)) {
+            return false;
+        }
+
+        $timestamp = (int) substr($token, strrpos($token, '_') + 1);
+        $expire = Yii::$app->params['user.passwordResetTokenExpire'] ?? 3600;
+        return $timestamp + $expire >= time();
+    }
+
+    public static function isPasswordResetTokenExpired($token)
+    {
+        if (empty($token)) {
+            Yii::error('Empty token provided for expiration check');
+            return true;
+        }
+
+        $parts = explode('_', $token);
+        if (count($parts) !== 2) {
+            Yii::error('Token format invalid: ' . $token);
+            return true;
+        }
+
+        $timestamp = (int) $parts[1];
+        if (!$timestamp) {
+            Yii::error('Invalid timestamp in token: ' . $token);
+            return true;
+        }
+
+        $expire = Yii::$app->params['user.passwordResetTokenExpire'] ?? 86400;
+        $isExpired = $timestamp + $expire < time();
+        
+        Yii::debug("Token check - Timestamp: $timestamp, Expire: $expire, Current: " . time() . ", IsExpired: " . ($isExpired ? 'yes' : 'no'));
+        
+        return $isExpired;
     }
 
 }

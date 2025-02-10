@@ -178,7 +178,7 @@ if (!Yii::$app->user->isGuest) {
         $menuItems = [
             ['label' => 'Home', 'url' => ['/site/index']],
             ['label' => '<i class="fas fa-user"></i> Profile',
-             'url' => ['/site/profile', 'id' => Yii::$app->user->id],
+             'url' => ['/user/profile', 'id' => Yii::$app->user->id],
              'encode' => false],
             ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
              'url' => ['/developer/view'],
@@ -202,7 +202,7 @@ if (!Yii::$app->user->isGuest) {
              'encode' => false],
 
              ['label' => '<i class="fas fa-user"></i> Profile',
-             'url' => ['/site/profile', 'id' => Yii::$app->user->id],
+             'url' => ['/user/profile', 'id' => Yii::$app->user->id],
              'encode' => false],
         ];
     }

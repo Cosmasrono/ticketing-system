@@ -43,6 +43,7 @@ use DateTime;
 use app\models\Renewal;
 use app\models\TicketActivity;
 use app\models\Contract;
+// use app\models\Users;
  
 
 class SiteController extends Controller
@@ -307,6 +308,8 @@ public function actionCreateCompany()
 //     ]);
 // }
 
+
+
 public function actionSignup()
 {
     $model = new SignupForm();
@@ -325,33 +328,41 @@ public function actionSignup()
             if ($company->save()) {
                 Yii::info("Company created with ID: " . $company->id);
                 
-                // Create the user
+                // Create the user with proper password hashing
                 $user = new User();
-                $user->name = $model->name;
+                $user->name = $model->company_name; // Using company name as user name
                 $user->company_name = $model->company_name;
                 $user->company_email = $model->company_email;
-                $user->password_hash = Yii::$app->security->generatePasswordHash($model->password);
+                
+                // Properly hash the password
+                $user->setPassword($model->password); // Use the setPassword method from User model
+                
                 $user->auth_key = Yii::$app->security->generateRandomString();
                 $user->verification_token = Yii::$app->security->generateRandomString();
                 $user->email_verified = false;
-                $user->role = User::ROLE_SUPERADMIN; // Use a constant for role
-                $user->status = User::STATUS_PENDING; // Use a constant for status
-                $user->company_id = (int)$company->id;  // Explicitly cast to integer
+                $user->role = User::ROLE_SUPERADMIN;
+                $user->status = User::STATUS_INACTIVE; // Set to inactive until email verification
+                $user->company_id = (int)$company->id;
                 $user->created_at = time();
                 $user->updated_at = time();
                 
                 Yii::info("Attempting to save user with company_id: " . $user->company_id);
                 
                 if ($user->save()) {
+                    // Send verification email
+                    $this->sendVerificationEmail($user);
+                    
                     $transaction->commit();
-                    Yii::$app->session->setFlash('success', 'Registration successful.');
-                    return $this->redirect(['site/login']); // Redirect to login
+                    Yii::$app->session->setFlash('success', 'Registration successful. Please check your email to verify your account.');
+                    return $this->redirect(['site/login']);
                 } else {
                     Yii::error('User validation errors: ' . print_r($user->errors, true));
+                    $transaction->rollBack();
                     Yii::$app->session->setFlash('error', 'Error creating user account: ' . json_encode($user->errors));
                 }
             } else {
                 Yii::error('Company validation errors: ' . print_r($company->errors, true));
+                $transaction->rollBack();
                 Yii::$app->session->setFlash('error', 'Error creating company: ' . json_encode($company->errors));
             }
         } catch (\Exception $e) {
@@ -364,6 +375,27 @@ public function actionSignup()
     return $this->render('signup', [
         'model' => $model
     ]);
+}
+
+private function sendVerificationEmail($user)
+{
+    try {
+        Yii::$app->mailer->compose()
+            ->setTo($user->company_email)
+            ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name])
+            ->setSubject('Account verification for ' . Yii::$app->name)
+            ->setTextBody("Click this link to verify your email: " . 
+                Yii::$app->urlManager->createAbsoluteUrl([
+                    'site/verify-email',
+                    'token' => $user->verification_token
+                ]))
+            ->send();
+            
+        return true;
+    } catch (\Exception $e) {
+        Yii::error('Failed to send verification email: ' . $e->getMessage());
+        return false;
+    }
 }
 
 // public function sendConfirmationEmail($user)
@@ -547,42 +579,14 @@ public function actionSignup()
         $model = new LoginForm();
         if ($model->load(Yii::$app->request->post()) && $model->validate()) {
             // Find the user
-            $user = User::findOne(['company_email' => $model->email]);
+            $user = User::findOne(['company_email' => $model->company_email]);
             
             if ($user) {
-                // If user role is 2 or 3 (regular users), check for other active sessions
-                if (in_array($user->role, [2, 3])) {
-                    // Find all other active sessions for users with same company_email
-                    $otherSessions = User::find()
-                        ->where(['company_email' => $user->company_email])
-                        ->andWhere(['status' => User::STATUS_ACTIVE])
-                        ->andWhere(['!=', 'id', $user->id])
-                        ->all();
-
-                    // Logout other sessions
-                    foreach ($otherSessions as $session) {
-                        // Update their status to logged out
-                        $session->updateAttributes([
-                            'status' => User::STATUS_INACTIVE,
-                            'last_login' => new \yii\db\Expression('NOW()'),
-                            'auth_key' => null // Clear auth key to force logout
-                        ]);
-                        
-                        // Log the forced logout
-                        Yii::info("Forced logout for user ID {$session->id} due to new login from same company");
-                    }
-
-                    // Optional: Show message about other sessions being logged out
-                    if (!empty($otherSessions)) {
-                        Yii::$app->session->setFlash('warning', 'Other active sessions for this account have been logged out.');
-                    }
+                // Check if the user is active
+                if ($user->status != User::STATUS_ACTIVE) {
+                    Yii::$app->session->setFlash('error', 'Your account is not active.');
+                    return $this->render('login', ['model' => $model]);
                 }
-
-                // Update current user's status and login time
-                $user->updateAttributes([
-                    'status' => User::STATUS_ACTIVE,
-                    'last_login' => new \yii\db\Expression('NOW()')
-                ]);
 
                 // Proceed with login
                 if ($model->login()) {
@@ -843,42 +847,23 @@ public function actionAdmin()
 //         'model' => $model,
 //     ]);
 // }
-
-
 public function actionRequestPasswordReset()
 {
     $model = new PasswordResetRequestForm();
-
+    
     if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-        $user = User::findOne(['company_email' => $model->company_email, 'status' => 1]);
-
-        if ($user) {
-            // Generate a token
-            $token = Yii::$app->security->generateRandomString();
-            $user->password_reset_token = $token;
-            $user->save();
-
-            // Send email with reset link
-            Yii::$app->mailer->compose()
-                ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->params['senderName']])
-                ->setTo($model->company_email)
-                ->setSubject('Password reset for ' . Yii::$app->name)
-                ->setTextBody('Please click the link below to reset your password: ' . 
-                    Yii::$app->urlManager->createAbsoluteUrl(['site/reset-password', 'token' => $token]))
-                ->send();
-
+        if ($model->sendEmail()) {
             Yii::$app->session->setFlash('success', 'Check your email for further instructions.');
             return $this->goHome();
-        } else {
-            Yii::$app->session->setFlash('error', 'No user found with this email address or account is inactive.');
         }
+
+        Yii::$app->session->setFlash('error', 'Sorry, we are unable to reset password for the provided email address.');
     }
 
-    return $this->render('requestPasswordReset', [
+    return $this->render('requestPasswordResetToken', [
         'model' => $model,
     ]);
 }
-
 
 public function actionResetPassword($token)
 {
@@ -900,18 +885,18 @@ public function actionResetPassword($token)
 
 public function actionForgotPassword()
 {
-    $model = new ForgotPasswordForm();
-   
+    $model = new PasswordResetRequestForm(); // Assuming you have a model for this
+
     if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-        if ($model->sendResetLink()) {
-            Yii::$app->session->setFlash('success', 'If an account exists for this email, a password reset link has been sent. Please check your email for further instructions.');
+        if ($model->sendEmail()) {
+            Yii::$app->session->setFlash('success', 'Check your email for further instructions.');
             return $this->goHome();
         } else {
-            Yii::$app->session->setFlash('error', 'Sorry, we are unable to process your request at this time. Please try again later.');
+            Yii::$app->session->setFlash('error', 'Sorry, we are unable to reset password for the provided email address.');
         }
     }
 
-    return $this->render('forgotPassword', [
+    return $this->render('forgot_password', [
         'model' => $model,
     ]);
 }
@@ -1557,7 +1542,7 @@ public function actionCreateUserForCompany($company_id)
         return $this->redirect(['index']);
     }
 
-    // Check if there's already an active user with this email
+    // Check if there's already an user with this email
     $existingUser = User::find()
         ->where(['company_email' => $company->company_email])
         ->andWhere(['status' => [User::STATUS_ACTIVE, User::STATUS_UNVERIFIED]])
@@ -1571,13 +1556,13 @@ public function actionCreateUserForCompany($company_id)
         return $this->redirect(['index']);
     }
 
-    try {
-        $connection = Yii::$app->db;
-        $transaction = $connection->beginTransaction();
+            try {
+                $connection = Yii::$app->db;
+                $transaction = $connection->beginTransaction();
 
         // Generate a simple token without timestamp
-        $clearPassword = Yii::$app->security->generateRandomString(8);
-        $token = Yii::$app->security->generateRandomString(32);
+                $clearPassword = Yii::$app->security->generateRandomString(8);
+                $token = Yii::$app->security->generateRandomString(32);
 
         // Get company name parts for the user's name
         $nameParts = explode('-', $company->company_name);
@@ -1585,12 +1570,14 @@ public function actionCreateUserForCompany($company_id)
 
         // Map role properly
         $role = $company->role;
-        if ($role === 'admin') {
+        if ($role === 'superadmin') {
+            $roleValue = 4;
+        } elseif ($role === 'admin') {
             $roleValue = 1;
         } elseif ($role === 'developer') {
-            $roleValue = 4;
+            $roleValue = 3;
         } else {
-            $roleValue = 2; // default role
+            $roleValue = 2; // default role for user
         }
 
         // Prepare user data
@@ -1667,55 +1654,52 @@ public function actionCreateUserForCompany($company_id)
     return $this->redirect(['index']);
 }
 
-
-
-public function actionSetInitialPassword($token)
+public function actionSetInitialPassword($token = null)
 {
     if (empty($token)) {
-        Yii::$app->session->setFlash('error', 'Empty reset token.');
+        Yii::error("No token provided in request");
+        Yii::$app->session->setFlash('error', 'Password reset token is required.');
         return $this->redirect(['site/login']);
     }
 
-    // Debug log received token
-    Yii::debug("Received token in reset action: " . $token);
+    try {
+        Yii::debug("Token received: " . $token);
+        Yii::debug("Current time: " . time());
 
-    $user = User::findByPasswordResetToken($token);
+        // Debug token parts
+        $parts = explode('_', $token);
+        if (count($parts) === 2) {
+            $timestamp = (int) $parts[1];
+            $expire = Yii::$app->params['user.passwordResetTokenExpire'];
+            Yii::debug("Token timestamp: " . $timestamp);
+            Yii::debug("Expiration period: " . $expire);
+            Yii::debug("Will expire at: " . ($timestamp + $expire));
+        }
 
-    if (!$user) {
-        Yii::error("No user found with token: " . $token);
-        Yii::$app->session->setFlash('error', 'Wrong password reset token.');
+        $model = new ResetPasswordForm($token);
+
+        if (Yii::$app->request->isPost) {
+            if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+                if ($model->resetPassword()) {
+                    Yii::$app->session->setFlash('success', 'Your new password has been saved.');
+                    return $this->redirect(['site/login']);
+                }
+            } else {
+                Yii::error("Validation errors: " . json_encode($model->getErrors()));
+            }
+        }
+
+        return $this->render('resetPassword', [
+            'model' => $model,
+        ]);
+
+    } catch (\Exception $e) {
+        Yii::error("Password reset failed: " . $e->getMessage());
+        Yii::$app->session->setFlash('error', 'Unable to reset password. Please request a new reset link.');
         return $this->redirect(['site/login']);
     }
-
-    $model = new ResetPasswordForm();
-
-    if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-        $user->status = User::STATUS_ACTIVE;
-        $user->password_hash = Yii::$app->security->generatePasswordHash($model->password);
-        $user->password_reset_token = null;
-        $user->token_created_at = null;
-        
-        if ($user->save(false)) {
-            Yii::$app->session->setFlash('success', 'Password has been set successfully.');
-            return $this->redirect(['site/login']);
-        }
-    }
-
-    return $this->render('resetPassword', [
-        'model' => $model,
-    ]);
 }
 
-// Update the model validation to use the token
-public function validateTemporaryPassword($attribute, $params)
-{
-    if (!$this->hasErrors()) {
-        $user = User::findOne(['password_reset_token' => Yii::$app->request->get('token')]);
-        if (!$user || !$user->validatePassword($this->temporary_password)) {
-            $this->addError($attribute, 'Incorrect temporary password.');
-        }
-    }
-}
 
 private function isTokenValid($user)
 {
@@ -2181,52 +2165,45 @@ private function getRoleName($roleId)
 // Keep the toggle status action for user activation
 public function actionToggleStatus()
 {
-    \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+    if (!Yii::$app->request->isAjax) {
+        return;
+    }
     
-    try {
-        if (!\Yii::$app->request->isAjax) {
-            throw new \Exception('Invalid request method');
-        }
-
-        $id = \Yii::$app->request->post('id');
-        
-        // Get current status using SQL Server syntax
-        $currentUser = (new \yii\db\Query())
-            ->select(['status'])
-            ->from('[users]')
-            ->where(['id' => $id])
-            ->one();
-
-        if (!$currentUser) {
-            throw new \Exception('User not found');
-        }
-
-        // Toggle status
-        $newStatus = $currentUser['status'] == 1 ? 0 : 1;
-
-        // Update using SQL Server syntax
-        $success = Yii::$app->db->createCommand()
-            ->update('[users]', 
-                ['status' => $newStatus],
-                ['id' => $id])
-            ->execute();
-
-        if ($success) {
-            return [
-                'success' => true,
-                'message' => $newStatus == 1 ? 'User activated successfully' : 'User deactivated successfully',
-                'newStatus' => $newStatus
-            ];
-        } else {
-            throw new \Exception('Failed to update user status');
-        }
-    } catch (\Exception $e) {
-        Yii::error('Toggle Status Error: ' . $e->getMessage());
+    Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+    
+    $id = Yii::$app->request->post('id');
+    $newStatus = (int)Yii::$app->request->post('status');
+    
+    $user = User::findOne($id);
+    
+    if (!$user) {
         return [
             'success' => false,
-            'message' => 'Failed to update user status'
+            'message' => 'User not found'
         ];
     }
+
+    // Prevent status change for role 4 users
+    if ($user->role == 4) {
+        return [
+            'success' => false,
+            'message' => 'Cannot modify status of protected users'
+        ];
+    }
+
+    $user->status = $newStatus;
+    if ($user->save()) {
+        return [
+            'success' => true,
+            'message' => $newStatus == 10 ? 'User activated' : 'User deactivated',
+            'newStatus' => $user->status
+        ];
+    }
+    
+    return [
+        'success' => false,
+        'message' => 'Failed to update status: ' . json_encode($user->errors)
+    ];
 }
 
 public function actionGetCompanyByEmail($email)
@@ -2416,112 +2393,184 @@ public function actionCreateDeveloper()
     ]);
 }
 
-public function actionProfile($id)
-{
-    // Find the company directly from company table
-    $company = Company::findOne($id);
+
+// public function actionProfile($id)
+// {
+//     $role = Yii::$app->user->identity->role;
     
-    if (!$company) {
-        Yii::warning("Company not found with ID: {$id}");
-        throw new NotFoundHttpException('Company profile not found.');
-    }
+//     if ($role == 4) {
+//         // For developers (role 4), fetch from users table
+//         $user = User::findOne($id);
+//         if ($user === null) {
+//             throw new NotFoundHttpException('The requested user does not exist.');
+//         }
+        
+//         // Temporarily set empty arrays until we confirm table structures
+//         $contracts = [];
+//         $tickets = [];
+//         $renewals = [];
 
-    Yii::info("Accessing profile for company: {$company->company_name}");
+//         return $this->render('profile', [
+//             'user' => $user,
+//             'companyEmail' => $user->company_email,
+//             'contracts' => $contracts,
+//             'tickets' => $tickets,
+//             'renewals' => $renewals
+//         ]);
+            
+//     } else {
+//         // For roles 1,2,3, use admin profile view
+//         $user = User::findOne($id);
+//         if ($user === null) {
+//             throw new NotFoundHttpException('User not found.');
+//         }
+        
+//         // Get associated data for admin
+//         $users = User::find()
+//             ->where(['company_name' => $user->company_name])
+//             ->all();
+            
+//         // Temporarily set empty arrays until we confirm table structures
+//         $contracts = [];
+//         $tickets = [];
+//         $renewals = [];
 
-    // Check if company is admin/developer
-    if ($company->role === 'admin' || $company->role === 'developer') {
-        // Get contracts that are due within the next 30 days
-        $nearingContracts = ContractRenewal::find()
-            ->where(['>=', 'end_date', date('Y-m-d')])
-            ->andWhere(['<=', 'end_date', date('Y-m-d', strtotime('+30 days'))])
-            ->orderBy(['end_date' => SORT_ASC])
-            ->all();
-
-        return $this->render('admin-profile', [
-            'company' => $company,
-            'nearingContracts' => $nearingContracts,
-        ]);
-    }
-
-    // For regular companies
-    $tickets = Ticket::find()
-        ->where(['company_name' => $company->company_name]) // Using company_name to match tickets
-        ->orderBy(['created_at' => SORT_DESC])
-        ->all();
-
-    $renewals = ContractRenewal::find()
-        ->where(['company_id' => $id])
-        ->orderBy(['created_at' => SORT_DESC])
-        ->all();
-
-    return $this->render('profile', [
-        'company' => $company,
-        'tickets' => $tickets,
-        'renewals' => $renewals,
-    ]);
-}
-
-
-
+//         return $this->render('admin-profile', [
+//             'user' => $user,
+//             'users' => $users,
+//             'companyEmail' => $user->company_email,
+//             'contracts' => $contracts,
+//             'tickets' => $tickets,
+//             'renewals' => $renewals
+//         ]);
+//     }
+// }
 
 
-public function actionRenewContract($id)
+
+
+// public function actionRenewContract($id)
+// {
+//     $company = Company::findOne($id);
+//     if (!$company) {
+//         throw new NotFoundHttpException('Company not found.');
+//     }
+
+//     $renewal = new ContractRenewal();
+//     if ($renewal->load(Yii::$app->request->post())) {
+//         // Set the company ID and requested by user ID
+//         $renewal->company_id = $company->id; // Set the company ID
+//         $renewal->requested_by = Yii::$app->user->id; // Assuming you have user ID
+//         $renewal->current_end_date = $company->end_date; // Set the current end date
+
+//         // Log the attributes being saved
+//         Yii::info('Saving ContractRenewal with data: ' . json_encode($renewal->attributes));
+
+//         if ($renewal->save()) {
+//             Yii::$app->session->setFlash('success', 'Contract renewal request submitted successfully.');
+//             return $this->redirect(['profile', 'id' => Yii::$app->user->id]);
+//         } else {
+//             Yii::error('Failed to save renewal: ' . json_encode($renewal->errors));
+//             Yii::$app->session->setFlash('error', 'Failed to submit contract renewal.');
+//         }
+//     }
+
+//     return $this->render('renew-contract', [
+//         'company' => $company,
+//         'renewal' => $renewal,
+//     ]);
+// }
+
+
+public function actionRenewContract($id = null)
 {
-    $company = Company::findOne($id);
+    // Get company based on logged-in user
+    $userId = Yii::$app->user->id;
+    $company = Company::find()
+        ->where(['id' => $id])
+        // ->orWhere(['id' => $userId])
+        ->one();
+
     if (!$company) {
-        throw new NotFoundHttpException('Company not found.');
+        Yii::$app->session->setFlash('error', 'Company not found.');
+        return $this->redirect(['user/profile', 'id' => $userId]);
     }
 
-    $renewal = new ContractRenewal();
-    if ($renewal->load(Yii::$app->request->post())) {
-        // Set the company ID and requested by user ID
-        $renewal->company_id = $company->id; // Set the company ID
-        $renewal->requested_by = Yii::$app->user->id; // Assuming you have user ID
-        $renewal->current_end_date = $company->end_date; // Set the current end date
+    // Log company data for debugging
+    Yii::debug("Company Data Found: " . print_r([
+        'id' => $company->id,
+        'name' => $company->company_name,
+        'email' => $company->company_email,
+        'start_date' => $company->start_date,
+        'end_date' => $company->end_date,
+    ], true));
 
-        // Log the attributes being saved
-        Yii::info('Saving ContractRenewal with data: ' . json_encode($renewal->attributes));
+    $model = new ContractRenewal();
+    $model->company_id = $company->id;
+    $model->requested_by = $userId;
+    $model->current_end_date = $company->end_date;
+    $model->renewal_status = 'pending';
 
-        if ($renewal->save()) {
-            Yii::$app->session->setFlash('success', 'Contract renewal request submitted successfully.');
-            return $this->redirect(['profile', 'id' => Yii::$app->user->id]);
-        } else {
-            Yii::error('Failed to save renewal: ' . json_encode($renewal->errors));
-            Yii::$app->session->setFlash('error', 'Failed to submit contract renewal.');
+    if ($model->load(Yii::$app->request->post())) {
+        try {
+            if (!empty($company->end_date)) {
+                $currentEndDate = new \DateTime($company->end_date);
+                $newEndDate = clone $currentEndDate;
+                $newEndDate->modify("+{$model->extension_period} months");
+                $model->new_end_date = $newEndDate->format('Y-m-d');
+                
+                if ($model->save()) {
+                    Yii::$app->session->setFlash('success', 'Contract renewal request has been submitted successfully and is pending approval.');
+                    return $this->redirect(['user/profile', 'id' => $userId]);
+                } else {
+                    Yii::$app->session->setFlash('error', 'Error saving renewal request: ' . implode(', ', $model->getFirstErrors()));
+                }
+            } else {
+                Yii::$app->session->setFlash('error', 'Contract end date is not set. Please contact administrator.');
+            }
+        } catch (\Exception $e) {
+            Yii::error("Error processing renewal dates: " . $e->getMessage());
+            Yii::$app->session->setFlash('error', 'Error processing renewal dates.');
         }
     }
 
     return $this->render('renew-contract', [
+        'model' => $model,
         'company' => $company,
-        'renewal' => $renewal,
     ]);
 }
 
-
-
+// Add this action for admin approval
 public function actionApproveRenewal($id)
 {
+    if (!Yii::$app->user->can('admin')) {
+        throw new ForbiddenHttpException('You are not authorized to perform this action.');
+    }
+
     $renewal = ContractRenewal::findOne($id);
     if (!$renewal) {
         throw new NotFoundHttpException('Renewal request not found.');
     }
 
-    // Find the associated company
-    $company = Company::findOne($renewal->company_id);
-    if ($company) {
-        // Update the company's end period
-        $company->end_period = date('Y-m-d', strtotime("+{$renewal->requested_extension} months", strtotime($company->end_period)));
-        if ($company->save()) {
-            // Optionally update the renewal status
-            $renewal->status = 'approved';
-            $renewal->save();
-            Yii::$app->session->setFlash('success', 'Contract renewal approved successfully.');
-        } else {
-            Yii::$app->session->setFlash('error', 'Failed to update company end period.');
+    $renewal->renewal_status = 'approved';
+    $renewal->renewed_at = date('Y-m-d H:i:s');
+
+    if ($renewal->save()) {
+        // Update company end date
+        $company = Company::findOne($renewal->company_id);
+        if ($company) {
+            $company->end_date = $renewal->new_end_date;
+            if ($company->save()) {
+                Yii::$app->session->setFlash('success', 'Renewal request approved and contract updated successfully.');
+            } else {
+                Yii::$app->session->setFlash('error', 'Renewal approved but failed to update company contract date.');
+            }
         }
+    } else {
+        Yii::$app->session->setFlash('error', 'Failed to approve renewal request.');
     }
 
-    return $this->redirect(['profile', 'id' => Yii::$app->user->id]);
+    return $this->redirect(['admin/renewals']); // Adjust this to your admin dashboard route
 }
 
 public function actionRejectRenewal($id)
@@ -2751,7 +2800,15 @@ public function beforeAction($action)
 
     // Only check if user is logged in
     if (!Yii::$app->user->isGuest) {
-        $this->checkContractStatus();
+        $user = Yii::$app->user->identity;
+        
+        // If user status is inactive (0), force logout
+        if ($user->status == 0) {
+            Yii::$app->user->logout();
+            Yii::$app->session->setFlash('error', 'Your account has been deactivated. Please contact administrator.');
+            Yii::$app->response->redirect(['/site/login'])->send();
+            return false;
+        }
     }
 
     return true;
@@ -2760,68 +2817,46 @@ public function beforeAction($action)
 protected function checkContractStatus()
 {
     $user = Yii::$app->user->identity;
-    
+ 
+    // Check if user status is inactive
+    if ($user->status == 0) {
+        Yii::$app->user->logout();
+        Yii::$app->session->setFlash('error', 'Your account has been deactivated. Please contact administrator.');
+        return Yii::$app->response->redirect(['/site/login']);
+    }
+
     // Get company end date
     $company = Company::findOne(['company_name' => $user->company_name]);
-    
-    if ($company) {
-        $today = new DateTime();
+ 
+    if (!$company || !$company->end_date) {
+        Yii::info("No company or end date found for user {$user->id}");
+        return;
+    }
+
+    try {
+        $today = new DateTime('now');
         $endDate = new DateTime($company->end_date);
         
-        if ($today > $endDate) {
+        // Log the comparison values
+        Yii::info("Contract check - Today: " . $today->format('Y-m-d') . ", End Date: " . $endDate->format('Y-m-d'));
+        
+        // Only deactivate if end date is in the past (today is after end date)
+        if ($today->format('Y-m-d') > $endDate->format('Y-m-d')) {
+            Yii::info("Contract expired for user {$user->id} - Company: {$company->company_name}");
             // Deactivate user
             Yii::$app->db->createCommand()
                 ->update('users', ['status' => 0], ['id' => $user->id])
                 ->execute();
-                
-            // Force logout if contract expired
+ 
             Yii::$app->user->logout();
-            
-            // Set flash message
-            Yii::$app->session->setFlash('error', 'Your contract has expired. Please contact support for renewal.');
-            
-            // Redirect to login page
-            Yii::$app->response->redirect(['site/login'])->send();
-            return false;
+            Yii::$app->session->setFlash('error', 'Your account has been deactivated due to contract expiration.');
+            return Yii::$app->response->redirect(['/site/login']);
         }
+    } catch (\Exception $e) {
+        Yii::error("Date comparison error: " . $e->getMessage());
     }
-    
-    return true;
 }
-
-// public function actionLogin()
-// {
-//     if (!Yii::$app->user->isGuest) {
-//         return $this->goHome();
-//     }
-
-//     $model = new LoginForm();
-//     if ($model->load(Yii::$app->request->post()) && $model->login()) {
-//         // Check user status after successful login
-//         $user = Yii::$app->user->identity;
-//         $userStatus = Yii::$app->db->createCommand('
-//             SELECT status 
-//             FROM users 
-//             WHERE id = :user_id
-//         ')
-//         ->bindValue(':user_id', $user->id)
-//         ->queryScalar();
-
-//         if (!$userStatus) {
-//             Yii::$app->user->logout();
-//             Yii::$app->session->setFlash('error', 'Your account has been deactivated. Please contact support.');
-//             return $this->redirect(['site/login']);
-//         }
-
-//         return $this->goBack();
-//     }
-
-//     $model->password = '';
-//     return $this->render('login', [
-//         'model' => $model,
-//     ]);
-// }
-
+ 
 public function actionExtendContract()
 {
     Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
@@ -3174,39 +3209,39 @@ public function actionSuperAdminSignup() {
     ]);
 }
 
-protected function sendVerificationEmail($user) {
-    try {
-        // Double check the token exists
-        if (empty($user->verification_token)) {
-            $user->verification_token = Yii::$app->security->generateRandomString(32);
-            $user->save(false);
-        }
+// protected function sendVerificationEmail($user) {
+//     try {
+//         // Double check the token exists
+//         if (empty($user->verification_token)) {
+//             $user->verification_token = Yii::$app->security->generateRandomString(32);
+//             $user->save(false);
+//         }
 
-        $verificationLink = Yii::$app->urlManager->createAbsoluteUrl([
-            'site/verify-email',
-            'token' => $user->verification_token
-        ]);
+//         $verificationLink = Yii::$app->urlManager->createAbsoluteUrl([
+//             'site/verify-email',
+//             'token' => $user->verification_token
+//         ]);
 
-        // Log the verification link for debugging
-        Yii::debug("Verification link generated: $verificationLink");
+//         // Log the verification link for debugging
+//         Yii::debug("Verification link generated: $verificationLink");
 
-        return Yii::$app->mailer->compose()
-            ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name])
-            ->setTo($user->company_email)
-            ->setSubject('Email Verification - ' . Yii::$app->name)
-            ->setHtmlBody("
-                <p>Hello {$user->name},</p>
-                <p>Please click the following link to verify your email address:</p>
-                <p><a href='{$verificationLink}'>{$verificationLink}</a></p>
-                <p>If you didn't create an account, you can ignore this email.</p>
-            ")
-            ->send();
+//         return Yii::$app->mailer->compose()
+//             ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name])
+//             ->setTo($user->company_email)
+//             ->setSubject('Email Verification - ' . Yii::$app->name)
+//             ->setHtmlBody("
+//                 <p>Hello {$user->name},</p>
+//                 <p>Please click the following link to verify your email address:</p>
+//                 <p><a href='{$verificationLink}'>{$verificationLink}</a></p>
+//                 <p>If you didn't create an account, you can ignore this email.</p>
+//             ")
+//             ->send();
 
-    } catch (\Exception $e) {
-        Yii::error('Error sending verification email: ' . $e->getMessage());
-        return false;
-    }
-}
+//     } catch (\Exception $e) {
+//         Yii::error('Error sending verification email: ' . $e->getMessage());
+//         return false;
+//     }
+// }
 
 public function actionVerifyEmail($token) {
     try {
@@ -3298,7 +3333,112 @@ public function actionRequestNewToken($email = null)
 
     return $this->redirect(['site/login']);
 }
+public function actionUpdateStatus() {
+    if (!Yii::$app->request->isAjax) {
+        return;
+    }
+    
+    Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+    
+    $id = Yii::$app->request->post('id');
+    $newStatus = (int)Yii::$app->request->post('status');
+    
+    $user = User::findOne($id);
+    
+    if (!$user) {
+        return [
+            'success' => false,
+            'message' => 'User not found'
+        ];
+    }
+    
+    if ($user->role == 4) {
+        return [
+            'success' => false,
+            'message' => 'Cannot modify protected users'
+        ];
+    }
 
- 
-
+    try {
+        $user->status = $newStatus;
+        if ($user->save()) {
+            return [
+                'success' => true,
+                'message' => $newStatus == 10 ? 'User activated' : 'User deactivated',
+                'newStatus' => $user->status
+            ];
+        }
+    } catch (\Exception $e) {
+        Yii::error("Error updating user status: " . $e->getMessage());
+        return [
+            'success' => false,
+            'message' => 'Failed to update status'
+        ];
+    }
+    
+    return [
+        'success' => false,
+        'message' => 'Failed to update user status'
+    ];
 }
+// In your controller (e.g., CompanyController.php or SiteController.php)
+// public function actionRenewContract($id)
+// {
+//     // Find the company
+//     $company = Company::findOne($id);
+//     if ($company === null) {
+//         throw new NotFoundHttpException('The requested company does not exist.');
+//     }
+
+//     // Handle the POST request for renewal
+//     if (Yii::$app->request->isPost) {
+//         // Start a transaction
+//         $transaction = Yii::$app->db->beginTransaction();
+        
+//         try {
+//             // Get current end date
+//             $currentEndDate = new DateTime($company->end_date);
+            
+//             // Store old end date before modification
+//             $oldEndDate = $company->end_date;
+            
+//             // Add 1 year to the current end date
+//             $newEndDate = $currentEndDate->modify('+1 year');
+            
+//             // Update company end date
+//             $company->end_date = $newEndDate->format('Y-m-d');
+            
+//             // Create renewal record
+//             $renewal = new ContractRenewal();
+//             $renewal->company_id = $company->id;
+//             $renewal->old_end_date = $oldEndDate;
+//             $renewal->new_end_date = $company->end_date;
+//             $renewal->renewed_at = date('Y-m-d H:i:s');
+//             $renewal->status = 'completed';
+            
+//             // Save both records
+//             if ($company->save() && $renewal->save()) {
+//                 $transaction->commit();
+//                 Yii::$app->session->setFlash('success', 'Contract has been successfully renewed until ' . 
+//                     Yii::$app->formatter->asDate($company->end_date));
+                
+//                 // Redirect to profile page
+//                 return $this->redirect(['/user/profile', 'id' => Yii::$app->user->id]);
+//             } else {
+//                 $transaction->rollBack();
+//                 Yii::$app->session->setFlash('error', 'Failed to renew contract. Please try again.');
+//             }
+//         } catch (\Exception $e) {
+//             $transaction->rollBack();
+//             Yii::error('Contract renewal failed: ' . $e->getMessage());
+//             Yii::$app->session->setFlash('error', 'An error occurred while renewing the contract.');
+//         }
+//     }
+    
+//     // Render the renewal confirmation form
+//     return $this->render('renew-contract', [
+//         'company' => $company,
+//     ]);
+// }
+}
+    

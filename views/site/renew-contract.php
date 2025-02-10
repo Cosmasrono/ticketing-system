@@ -1,107 +1,100 @@
 <?php
 use yii\helpers\Html;
-use yii\bootstrap5\ActiveForm;
-use app\models\ContractRenewal;
+use yii\widgets\ActiveForm;
 
-/* @var $this yii\web\View */
-/* @var $model app\models\ContractRenewal */
-/* @var $company app\models\Company */
-
-$this->title = 'Renew Contract - ' . $company->company_name;
-$this->params['breadcrumbs'][] = ['label' => 'Profile', 'url' => ['user/profile', 'id' => Yii::$app->user->id]];
-$this->params['breadcrumbs'][] = $this->title;
+$this->title = 'Request Contract Renewal for ' . $company->company_name;
 ?>
 
-<div class="contract-renewal">
-    <h1><?= Html::encode($this->title) ?></h1>
+<div class="renew-contract">
+    <div class="row">
+        <div class="col-lg-6 offset-lg-3">
+            <div class="card shadow">
+                <div class="card-header bg-warning">
+                    <h3 class="card-title mb-0">Request Contract Renewal for <?= Html::encode($company->company_name) ?></h3>
+                </div>
+                
+                <div class="card-body">
+                    <?php if (Yii::$app->session->hasFlash('error')): ?>
+                        <div class="alert alert-danger">
+                            <?= Yii::$app->session->getFlash('error') ?>
+                        </div>
+                    <?php endif; ?>
 
-    <div class="card">
-        <div class="card-header bg-warning">
-            <h3 class="card-title mb-0">Contract Renewal Request</h3>
-        </div>
-        <div class="card-body">
-            <div class="alert alert-info">
-                <h4>Current Contract Details:</h4>
-                <table class="table table-bordered">
-                    <tr>
-                        <th>Company Name:</th>
-                        <td><?= Html::encode($company->company_name) ?></td>
-                    </tr>
-                    <tr>
-                        <th>Contract Start Date:</th>
-                        <td><?= $company->start_date ? Yii::$app->formatter->asDate($company->start_date) : 'Not set' ?></td>
-                    </tr>
-                    <tr>
-                        <th>Contract End Date:</th>
-                        <td><?= $company->end_date ? Yii::$app->formatter->asDate($company->end_date) : 'Not set' ?></td>
-                    </tr>
-                </table>
-            </div>
+                    <?php if (Yii::$app->session->hasFlash('success')): ?>
+                        <div class="alert alert-success">
+                            <?= Yii::$app->session->getFlash('success') ?>
+                        </div>
+                    <?php endif; ?>
 
-            <?php if (!empty($company->end_date)): ?>
-                <?php $form = ActiveForm::begin(['id' => 'renewal-form']); ?>
+                    <?php $form = ActiveForm::begin([
+                        'id' => 'renew-contract-form',
+                        'method' => 'post',
+                        'options' => ['enctype' => 'multipart/form-data']
+                    ]); ?>
 
-                <div class="row">
-                    <div class="col-md-6">
-                        <?= $form->field($model, 'extension_period')->dropDownList([
+                    <!-- Hidden fields -->
+                    <input type="hidden" name="ContractRenewal[company_id]" value="<?= (int)$company->id ?>">
+                    <input type="hidden" name="ContractRenewal[current_end_date]" value="<?= Html::encode($currentEndDate) ?>">
+                    <input type="hidden" name="ContractRenewal[requested_by]" value="<?= (int)Yii::$app->user->id ?>">
+
+                    <div class="mb-3">
+                        <label class="form-label">Current Contract End Date</label>
+                        <input type="text" class="form-control" value="<?= Yii::$app->formatter->asDate($currentEndDate) ?>" disabled>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label required">Extension Start Date</label>
+                        <?= $form->field($renewal, 'extension_period', [
+                            'options' => ['class' => 'form-group'],
+                            'errorOptions' => ['class' => 'text-danger']
+                        ])->input('date', [
+                            'value' => date('Y-m-d', strtotime($currentEndDate . ' +1 day')),
+                            'class' => 'form-control',
+                            'required' => true
+                        ])->label(false) ?>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label required">Renewal Duration</label>
+                        <?= $form->field($renewal, 'renewal_duration', [
+                            'options' => ['class' => 'form-group'],
+                            'errorOptions' => ['class' => 'text-danger']
+                        ])->dropDownList([
                             3 => '3 Months',
                             6 => '6 Months',
                             12 => '1 Year',
-                            24 => '2 Years'
-                        ], ['prompt' => 'Select Extension Period']) ?>
+                            24 => '2 Years',
+                        ], [
+                            'prompt' => 'Select Duration',
+                            'required' => true,
+                            'class' => 'form-control'
+                        ])->label(false) ?>
                     </div>
-                </div>
 
-                <div class="row">
-                    <div class="col-md-12">
-                        <?= $form->field($model, 'notes')->textarea([
-                            'rows' => 4,
-                            'placeholder' => 'Enter any additional notes or comments for the renewal request'
+                    <div class="mb-3">
+                        <label class="form-label">Additional Notes</label>
+                        <?= $form->field($renewal, 'notes', [
+                            'options' => ['class' => 'form-group'],
+                            'errorOptions' => ['class' => 'text-danger']
+                        ])->textarea([
+                            'rows' => 3,
+                            'class' => 'form-control',
+                            'placeholder' => 'Any specific requirements or comments'
+                        ])->label(false) ?>
+                    </div>
+
+                    <div class="form-group text-center">
+                        <?= Html::submitButton('Submit Renewal Request', [
+                            'class' => 'btn btn-warning btn-lg'
+                        ]) ?>
+                        <?= Html::a('Cancel', ['profile', 'id' => Yii::$app->user->id], [
+                            'class' => 'btn btn-secondary btn-lg ms-2'
                         ]) ?>
                     </div>
-                </div>
 
-                <div class="alert alert-warning">
-                    <p><strong>Please Note:</strong></p>
-                    <ul>
-                        <li>Your renewal request will need to be approved by an administrator</li>
-                        <li>Current contract terms will remain active until the renewal is approved</li>
-                        <li>You will be notified once your request is processed</li>
-                    </ul>
+                    <?php ActiveForm::end(); ?>
                 </div>
-
-                <div class="form-group text-center mt-4">
-                    <?= Html::submitButton(
-                        '<i class="fas fa-paper-plane"></i> Submit Renewal Request',
-                        [
-                            'class' => 'btn btn-success btn-lg me-2',
-                            'data' => ['confirm' => 'Are you sure you want to submit this renewal request?']
-                        ]
-                    ) ?>
-                    <?= Html::a(
-                        '<i class="fas fa-times"></i> Cancel',
-                        ['/user/profile', 'id' => Yii::$app->user->id],
-                        ['class' => 'btn btn-danger btn-lg']
-                    ) ?>
-                </div>
-
-                <?php ActiveForm::end(); ?>
-            <?php else: ?>
-                <div class="alert alert-danger">
-                    <p><strong>Contract Information Missing</strong></p>
-                    <p>Your company's contract dates are not properly set up in the system. Please contact the administrator to update your contract information with the following details:</p>
-                    <ul>
-                        <li>Company ID: <?= $company->id ?></li>
-                        <li>Company Name: <?= Html::encode($company->company_name) ?></li>
-                        <li>Current Contract Status: <?= empty($company->start_date) ? 'No start date' : 'No end date' ?></li>
-                    </ul>
-                    <?= Html::a(
-                        '<i class="fas fa-arrow-left"></i> Back to Profile',
-                        ['/user/profile', 'id' => Yii::$app->user->id],
-                        ['class' => 'btn btn-primary mt-3']
-                    ) ?>
-                </div>
-            <?php endif; ?>
+            </div>
         </div>
     </div>
 </div>
@@ -112,5 +105,9 @@ $this->params['breadcrumbs'][] = $this->title;
 }
 .btn-warning {
     color: #000;
+}
+.required:after {
+    content: " *";
+    color: red;
 }
 </style> 

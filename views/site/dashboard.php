@@ -10,6 +10,7 @@ use yii\grid\GridView;
 use yii\data\arrayDataProvider;
 // use app\models\ContractRenewal;
 use app\assets\SweetAlert2Asset;
+use yii\web\View;
 
 $this->title = 'Help Desk Analytics Dashboard';
 
@@ -614,7 +615,7 @@ document.getElementById('contractSearch').addEventListener('keyup', function() {
                 [
                     'attribute' => 'requested_by',
                     'value' => function ($model) {
-                        return $model->requestedBy ? $model->requestedBy->name : $model->requested_by;
+                        return $model->getRequesterName();
                     }
                 ],
                 'extension_period',
@@ -1403,5 +1404,55 @@ $this->registerJs("
         });
     }
 ");
+?>
+
+<?php
+$this->registerJs("
+    function updateRenewalStatus(id, status) {
+        if (!id || !status) {
+            console.error('Missing parameters');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to ' + status + ' this renewal request?')) {
+            return;
+        }
+
+        const button = $('button[onclick*=\"' + id + '\"]');
+        const originalText = button.html();
+        button.prop('disabled', true).html('<i class=\"fas fa-spinner fa-spin\"></i> Processing...');
+
+        $.ajax({
+            url: '" . Yii::$app->urlManager->createUrl(['site/update-renewal-status']) . "',
+            type: 'POST',
+            data: {
+                id: id,
+                status: status,
+                _csrf: yii.getCsrfToken()
+            },
+            dataType: 'json'
+        })
+        .done(function(response) {
+            if (response.success) {
+                alert(response.message);
+                window.location.reload();
+            } else {
+                alert('Error: ' + (response.message || 'Unknown error occurred'));
+                button.prop('disabled', false).html(originalText);
+            }
+        })
+        .fail(function(jqXHR) {
+            let errorMessage = 'Failed to update status';
+            try {
+                const response = JSON.parse(jqXHR.responseText);
+                errorMessage = response.message || errorMessage;
+            } catch (e) {}
+            
+            alert(errorMessage);
+            button.prop('disabled', false).html(originalText);
+            console.error('Update failed:', jqXHR.responseText);
+        });
+    }
+", View::POS_END);
 ?>
  

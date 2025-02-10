@@ -7,15 +7,17 @@ use app\models\User;
 use app\models\Company;
 use app\models\ContractRenewal;
 
-/* @var $this yii\web\View */
-/* @var $user app\models\User */
-/* @var $company app\models\Company */
-/* @var $ticketStats array|null */
-/* @var $renewalStats array|null */
-/* @var $isSuperAdmin bool */
-/* @var $recentTickets array */
+use yii\web\Controller;
+use yii\web\NotFoundHttpException;
+use yii\web\Response;
 
-$this->title = 'User Profile: ' . Html::encode($user->username);
+/* @var $this yii\web\View */
+/* @var $company app\models\Company */
+/* @var $companyDetails array */
+/* @var $tickets app\models\Ticket[] */
+/* @var $renewals app\models\ContractRenewal[] */
+
+$this->title = $companyDetails['company_name'] . ' Profile';
 
 // Initialize variables
 $duration = 'Not available';
@@ -26,10 +28,10 @@ $totalDays = 0;
 $progressPercentage = 0;
 
 // Calculate duration and status if dates exist
-if ($company->start_date && $company->end_date) {
+if ($companyDetails['start_date'] && $companyDetails['end_date']) {
     try {
-        $startDate = new DateTime($company->start_date);
-        $endDate = new DateTime($company->end_date);
+        $startDate = new DateTime($companyDetails['start_date']);
+        $endDate = new DateTime($companyDetails['end_date']);
         
         // Calculate total duration
         $interval = $startDate->diff($endDate);
@@ -60,31 +62,25 @@ if ($company->start_date && $company->end_date) {
 }
 ?>
 
-<div class="user-profile">
+<div class="company-profile">
     <h1><?= Html::encode($this->title) ?></h1>
 
-    <h2>Company Information</h2>
-    <p><strong>Name:</strong> <?= Html::encode($company->company_name) ?></p>
-    <p><strong>Email:</strong> <?= Html::encode($company->company_email) ?></p>
-    <p><strong>Status:</strong> <?= Html::encode($company->status) ?></p>
-    <p><strong>Start Date:</strong> <?= Html::encode($company->start_date) ?></p>
-    <p><strong>End Date:</strong> <?= Html::encode($company->end_date) ?></p>
-
-    <?php if ($isSuperAdmin): ?>
-        <h2>Ticket Statistics</h2>
-        <p><strong>Total Tickets:</strong> <?= $ticketStats['total'] ?></p>
-        <p><strong>Pending Tickets:</strong> <?= $ticketStats['pending'] ?></p>
-        <p><strong>Approved Tickets:</strong> <?= $ticketStats['approved'] ?></p>
-        <p><strong>Closed Tickets:</strong> <?= $ticketStats['closed'] ?></p>
-        <p><strong>Breached SLA:</strong> <?= $ticketStats['breached_sla'] ?></p>
-
-        <h2>Renewal Statistics</h2>
-        <p><strong>Total Renewals:</strong> <?= $renewalStats['total'] ?></p>
-        <p><strong>Pending Renewals:</strong> <?= $renewalStats['pending'] ?></p>
-        <p><strong>Approved Renewals:</strong> <?= $renewalStats['approved'] ?></p>
-    <?php endif; ?>
-
-   
+    <?= DetailView::widget([
+        'model' => (object)$companyDetails,
+        'attributes' => [
+            'company_name',
+            'company_email:email',
+            'start_date:date',
+            'end_date:date',
+            [
+                'attribute' => 'status',
+                'value' => $companyDetails['status'] ? 'Active' : 'Inactive',
+            ],
+             
+            'created_at:datetime',
+            'updated_at:datetime',
+        ],
+    ]) ?>
 
     <div class="row mt-4">
         <div class="col-md-6">
@@ -96,11 +92,11 @@ if ($company->start_date && $company->end_date) {
                     <table class="table table-bordered">
                         <tr>
                             <th>Start Date:</th>
-                            <td><?= Yii::$app->formatter->asDate($company->start_date) ?></td>
+                            <td><?= Yii::$app->formatter->asDate($companyDetails['start_date']) ?></td>
                         </tr>
                         <tr>
                             <th>End Date:</th>
-                            <td><?= Yii::$app->formatter->asDate($company->end_date) ?></td>
+                            <td><?= Yii::$app->formatter->asDate($companyDetails['end_date']) ?></td>
                         </tr>
                         <tr>
                             <th>Total Duration:</th>
@@ -117,7 +113,7 @@ if ($company->start_date && $company->end_date) {
                     <h3 class="card-title mb-0">Contract Status</h3>
                 </div>
                 <div class="card-body">
-                    <?php if ($company->start_date && $company->end_date): ?>
+                    <?php if ($companyDetails['start_date'] && $companyDetails['end_date']): ?>
                         <?php if ($isExpired): ?>
                             <div class="alert alert-danger">
                                 <strong>Contract Expired!</strong><br>
@@ -134,25 +130,25 @@ if ($company->start_date && $company->end_date) {
                             <div class="mt-3">
                                 <?php
                                 // Debug information
-                                Yii::debug("Company Details: " . print_r($company, true));
+                                Yii::debug("Company Details: " . print_r($companyDetails, true));
                                 ?>
                                 
                                 <!-- Debug output visible on page -->
                                 <div class="alert alert-info">
                                     <small>
-                                        Company ID: <?= $company->id ?? 'Not set' ?><br>
+                                        Company ID: <?= $companyDetails['id'] ?? 'Not set' ?><br>
                                         Current URL: <?= Yii::$app->request->url ?><br>
                                     </small>
                                 </div>
 
                                 <?= Html::a(
                                     '<i class="fas fa-sync-alt"></i> Renew Contract',
-                                    ['/site/renew-contract', 'id' => $company->id], // Updated route with leading slash
+                                    ['/site/renew-contract', 'id' => $companyDetails['id']], // Updated route with leading slash
                                     [
                                         'class' => 'btn btn-warning btn-block',
                                         'data' => [
                                             'method' => 'get',
-                                            'params' => ['id' => $company->id]
+                                            'params' => ['id' => $companyDetails['id']]
                                         ]
                                     ]
                                 ) ?>
@@ -168,68 +164,5 @@ if ($company->start_date && $company->end_date) {
         </div>
     </div>
 
-    <!-- Add this after your existing cards -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-info text-white">
-                    <h3 class="card-title mb-0">Contract Renewal History</h3>
-                </div>
-                <div class="card-body">
-                    <?php if (!empty($renewals)): ?>
-                        <table class="table table-striped">
-                            <thead>
-                                <tr>
-                                    <th>Requested Date</th>
-                                    <th>Current End Date</th>
-                                    <th>New End Date</th>
-                                    <th>Extension Period</th>
-                                    <th>Status</th>
-                                    <th>Notes</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($renewals as $renewal): ?>
-                                    <tr>
-                                        <td><?= Yii::$app->formatter->asDate($renewal->created_at) ?></td>
-                                        <td><?= Yii::$app->formatter->asDate($renewal->current_end_date) ?></td>
-                                        <td><?= Yii::$app->formatter->asDate($renewal->new_end_date) ?></td>
-                                        <td><?= $renewal->extension_period ?> months</td>
-                                        <td><?= $renewal->getStatusLabel() ?></td>
-                                        <td><?= Html::encode($renewal->notes) ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    <?php else: ?>
-                        <div class="alert alert-info">No renewal history found.</div>
-                    <?php endif; ?>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<style>
-.user-profile {
-    margin: 20px;
-}
-.user-profile h1 {
-    font-size: 24px;
-    margin-bottom: 20px;
-}
-.user-profile h2 {
-    font-size: 20px;
-    margin-top: 20px;
-}
-.user-profile p {
-    margin: 5px 0;
-}
-.user-profile ul {
-    list-style-type: none;
-    padding: 0;
-}
-.user-profile li {
-    margin: 5px 0;
-}
-</style> 
+    <!-- Rest of your view code (tickets and renewals tables) -->
+</div> 

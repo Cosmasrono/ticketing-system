@@ -1,4 +1,5 @@
 <?php
+
 use yii\helpers\Html;
 use yii\widgets\ActiveForm;
 use app\models\User;
@@ -36,39 +37,76 @@ const ROLE_SUPER_ADMIN = 4;
                     <tbody>
                         <?php foreach ($companies as $company): ?>
                             <tr>
-                                <td><?= Html::encode($company->company_name) ?></td>
-                                <td><?= Html::encode($company->company_email) ?></td>
-                                <td><?= is_array($company->modules) ? Html::encode(implode(', ', $company->modules)) : Html::encode($company->modules) ?></td>
+                                <td><?= Html::encode($company['company_name'] ?? 'N/A') ?></td>
+                                <td><?= Html::encode($company['company_email'] ?? 'N/A') ?></td>
                                 <td>
                                     <?php 
-                                    echo Html::encode($company->getRoleLabel());
+                                    if (!empty($company['modules'])) {
+                                        $modules = json_decode($company['modules'], true);
+                                        echo is_array($modules) ? 
+                                            Html::encode(implode(', ', $modules)) : 
+                                            Html::encode($company['modules']);
+                                    } else {
+                                        echo 'N/A';
+                                    }
                                     ?>
                                 </td>
                                 <td>
+    <?php 
+    // More robust role handling
+    $roleLabels = [
+        ROLE_ADMIN => 'Admin',
+        ROLE_USER => 'User',
+        ROLE_DEVELOPER => 'Developer',
+        ROLE_SUPER_ADMIN => 'Super Admin'
+    ];
+    
+    // Debug the incoming role value
+    Yii::debug([
+        'company' => $company['company_name'],
+        'raw_role' => $company['role'],
+        'role_type' => gettype($company['role'])
+    ], 'view_role_debug');
+    
+    // Convert role to integer if it's a valid numeric value
+    $roleValue = null;
+    if (isset($company['role']) && !empty($company['role'])) {
+        $roleValue = is_numeric($company['role']) ? (int)$company['role'] : null;
+    }
+    
+    if (isset($roleLabels[$roleValue])) {
+        echo Html::encode($roleLabels[$roleValue]);
+    } else {
+        echo Html::encode($company['role'] ?? 'N/A');
+        Yii::error("Invalid role value for company {$company['company_name']}: " . 
+            var_export($company['role'], true));
+    }
+    ?>
+</td>
+                                <td>
                                     <?php
-                                    $existingUser = $company->getUsers()
+                                    $existingUser = User::find()
+                                        ->where(['company_id' => $company['id']])
                                         ->andWhere(['status' => User::STATUS_ACTIVE])
                                         ->one();
                                     
-                                    if ($existingUser && Yii::$app->user->isGuest): ?>
-                                        <span class="badge badge-warning">Please login to manage users</span>
-                                    <?php elseif ($existingUser): ?>
+                                    if ($existingUser): ?>
                                         <span class="badge badge-success">User Account Active</span>
                                     <?php else: ?>
                                         <?php $form = ActiveForm::begin([
-                                            'action' => ['site/create-user-for-company', 'company_id' => $company->id],
+                                            'action' => ['site/create-user-for-company', 'company_id' => $company['id']],
                                             'options' => ['class' => 'form-inline']
                                         ]); ?>
-                                            
-                                            <?= Html::hiddenInput('company_id', $company->id) ?>
-                                            <?= Html::hiddenInput('company_email', $company->company_email) ?>
-                                            <?= Html::hiddenInput('company_name', $company->company_name) ?>
-                                            <?= Html::hiddenInput('modules', is_array($company->modules) ? implode(',', $company->modules) : $company->modules) ?>
+                                            <?= Html::hiddenInput('company_id', $company['id']) ?>
+                                            <?= Html::hiddenInput('company_email', $company['company_email']) ?>
+                                            <?= Html::hiddenInput('company_name', $company['company_name']) ?>
+                                            <?= Html::hiddenInput('modules', $company['modules']) ?>
                                             
                                             <?= Html::submitButton('Create User Account', [
                                                 'class' => 'btn btn-primary btn-sm',
                                                 'data' => [
-                                                    'confirm' => 'This will create a user account and send login credentials to ' . $company->company_email . '. Continue?',
+                                                    'confirm' => 'Create user account for ' . 
+                                                        Html::encode($company['company_name']) . '?'
                                                 ],
                                             ]) ?>
                                         <?php ActiveForm::end(); ?>
@@ -79,11 +117,6 @@ const ROLE_SUPER_ADMIN = 4;
                     </tbody>
                 </table>
             </div>
-            <?php if (empty($companies)): ?>
-                <div class="alert alert-info">
-                    No companies found.
-                </div>
-            <?php endif; ?>
         </div>
     </div>
 </div>

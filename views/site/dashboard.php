@@ -606,19 +606,30 @@ document.getElementById('contractSearch').addEventListener('keyup', function() {
             ]),
             'columns' => [
                 ['class' => 'yii\grid\SerialColumn'],
-                [
-                    'attribute' => 'company_id',
-                    'value' => function ($model) {
-                        return $model->company ? $model->company->company_name : $model->company_id;
-                    }
-                ],
+                
                 [
                     'attribute' => 'requested_by',
+                    'label' => 'Company Name',
                     'value' => function ($model) {
-                        return $model->getRequesterName();
-                    }
+                        if (empty($model->requested_by)) {
+                            return 'Not Set';
+                        }
+                        $user = User::findOne($model->requested_by);
+                        if (!$user) {
+                            return 'User Not Found';
+                        }
+                        // Get company name
+                        $company = Company::findOne($user->company_id);
+                        return $company ? Html::encode($company->name) : 'Company Not Found';
+                    },
                 ],
-                'extension_period',
+                [
+                    'attribute' => 'renewal_duration',
+                    'label' => 'Extension Period',
+                    'value' => function ($model) {
+                        return $model->renewal_duration . ' Months';
+                    },
+                ],
                 'current_end_date:date',
                 'new_end_date:date',
                 'notes',

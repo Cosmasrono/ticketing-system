@@ -20,7 +20,7 @@ $config = [
     ],
     'components' => [
 
-        'timezone'=>'UTC',
+        'timezone' => 'UTC',
         'request' => [
             // !!! insert a secret key in the following (if it is empty) - this is required by cookie validation
             'cookieValidationKey' => 'your-secret-key',
@@ -28,14 +28,14 @@ $config = [
             // 'enableCsrfCookie' => true,
         ],
 
-     
-    'cloudinary' => [
-        'class' => 'app\components\CloudinaryComponent',
-        'cloud_name' => 'dscbboswt',
-        'api_key' => '165833264188614',
-        'api_secret' => 'LfgHbl18_gohlTycrjr3OdQvEWE',
-    ],
- 
+
+        'cloudinary' => [
+            'class' => 'app\components\CloudinaryComponent',
+            'cloud_name' => 'dscbboswt',
+            'api_key' => '165833264188614',
+            'api_secret' => 'LfgHbl18_gohlTycrjr3OdQvEWE',
+        ],
+
         'cache' => [
             'class' => 'yii\caching\FileCache',
         ],

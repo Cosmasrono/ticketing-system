@@ -1,89 +1,58 @@
 <?php
-// views/site/requestPasswordResetToken.php
 
 use yii\helpers\Html;
-use yii\bootstrap5\ActiveForm;
+use yii\widgets\ActiveForm;
 
-$this->title = 'Request Password Reset';
+$this->title = 'Request password reset';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
 <div class="site-request-password-reset">
-    <div class="row justify-content-center">
-        <div class="col-lg-5">
-            <div class="card">
-                <div class="card-body">
-                    <h1 class="text-center mb-4"><?= Html::encode($this->title) ?></h1>
-                    <p class="text-center mb-4">Please enter your company email. A password reset link will be sent there.</p>
+    <h1><?= Html::encode($this->title) ?></h1>
 
-                    <?php $form = ActiveForm::begin([
-                        'id' => 'request-password-reset-form',
-                        'options' => ['class' => 'form-vertical'],
-                    ]); ?>
+    <?php if (Yii::$app->session->hasFlash('success')): ?>
+        <div class="alert alert-success">
+            <?= Yii::$app->session->getFlash('success') ?>
+        </div>
+    <?php elseif (Yii::$app->session->hasFlash('error')): ?>
+        <div class="alert alert-danger">
+            <?= Yii::$app->session->getFlash('error') ?>
+        </div>
+    <?php else: ?>
+        <p>Please fill out your email. A link to reset password will be displayed.</p>
 
-                    <?= $form->field($model, 'company_email', [
-                        'options' => ['class' => 'form-group mb-3']
-                    ])->textInput([
-                        'autofocus' => true,
-                        'placeholder' => 'Enter your company email',
-                        'class' => 'form-control'
-                    ]) ?>
+        <?php $form = ActiveForm::begin(['id' => 'request-password-reset-form']); ?>
 
-                    <div class="form-group text-center">
-                        <?= Html::submitButton('Send Reset Link', [
-                            'class' => 'btn btn-primary btn-block'
-                        ]) ?>
-                    </div>
+            <?= $form->field($model, 'company_email')->textInput(['autofocus' => true]) ?>
 
-                    <div class="text-center mt-3">
-                        <?= Html::a('Back to login', ['site/login'], [
-                            'class' => 'text-muted text-decoration-none'
-                        ]) ?>
-                    </div>
-
-                    <?php ActiveForm::end(); ?>
-                </div>
+            <div class="form-group">
+                <?= Html::submitButton('Send', ['class' => 'btn btn-primary']) ?>
             </div>
 
-            <?php if (Yii::$app->session->hasFlash('success')): ?>
-                <div class="alert alert-success mt-3">
-                    <?= Yii::$app->session->getFlash('success') ?>
-                </div>
-            <?php endif; ?>
-
-            <?php if (Yii::$app->session->hasFlash('error')): ?>
-                <div class="alert alert-danger mt-3">
-                    <?= Yii::$app->session->getFlash('error') ?>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
+        <?php ActiveForm::end(); ?>
+    <?php endif; ?>
 </div>
 
-<?php
-$css = <<<CSS
-    .site-request-password-reset {
-        padding: 40px 0;
-    }
-    .card {
-        box-shadow: 0 2px 4px rgba(0,0,0,.1);
-    }
-    .card-body {
-        padding: 30px;
-    }
-    .form-control {
-        height: 45px;
-    }
-    .btn-primary {
-        height: 45px;
-        font-size: 16px;
-        width: 100%;
-    }
-    .alert {
-        margin-bottom: 20px;
-    }
-    .text-decoration-none:hover {
-        text-decoration: underline !important;
-    }
-CSS;
-$this->registerCss($css);
-?>
+<style>
+/* Orange-themed Request Password Reset Form Styles */
+.site-request-password-reset {
+    max-width: 400px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #FFF3E0; /* Light orange background */
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.site-request-password-reset h1 {
+    color: #FF9800; /* Orange */
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.site-request-password-reset p {
+    color: #F57C00; /* Dark orange */
+    margin-bottom: 20px;
+}
+
+.form-group {
+</style>

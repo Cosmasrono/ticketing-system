@@ -2,7 +2,7 @@
 // models/ResetPasswordForm.php
 
 namespace app\models;
-
+use Yii;
 use yii\base\InvalidArgumentException;
 use yii\base\Model;
 

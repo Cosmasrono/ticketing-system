@@ -48,59 +48,65 @@ class UserController extends Controller
         return true;
     }
 
-    public function actionProfile($id = null)
+    public function actionProfile($id)
     {
-        // If no ID is provided, use the current user's ID
-        if ($id === null) {
-            $id = Yii::$app->user->id;
-        }
-
         $user = User::findOne($id);
         if ($user === null) {
             throw new NotFoundHttpException('The requested user does not exist.');
         }
 
         // Get the associated company data
-        $company = Company::findOne(['company_name' => $user->company_name]);
+        $company = Company::find()
+            ->where(['company_name' => $user->company_name])
+            ->one();
+
         if ($company === null) {
             throw new NotFoundHttpException('Company not found.');
         }
 
-        // Fetch tickets and renewals
-        $tickets = Ticket::find()->where(['company_id' => $company->id])->all();
-        $renewals = ContractRenewal::find()->where(['company_id' => $company->id])->all();
+        // Create new renewal model instance
+        $model = new ContractRenewal();
 
-        // Check if the current user is a super admin (role 4)
-        $isSuperAdmin = Yii::$app->user->identity->role === 4;
+        // Get the associated company data with explicit ID selection
+        $companyDetails = Yii::$app->db->createCommand("
+            SELECT 
+                c.id as id,
+                c.company_name,
+                c.company_email,
+                c.start_date,
+                c.end_date,
+                c.status,
+                c.company_type,
+                c.subscription_level,
+                c.created_at,
+                c.updated_at
+            FROM company c
+            WHERE c.company_name = :company_name
+            LIMIT 1
+        ")
+        ->bindValue(':company_name', $user->company_name)
+        ->queryOne();
 
-        // Fetch additional statistics for super admin
-        $ticketStats = null;
-        $renewalStats = null;
-        
-        if ($isSuperAdmin) {
-            $ticketStats = [
-                'total' => Ticket::find()->where(['company_id' => $company->id])->count(),
-                'pending' => Ticket::find()->where(['company_id' => $company->id, 'status' => 'pending'])->count(),
-                'approved' => Ticket::find()->where(['company_id' => $company->id, 'status' => 'approved'])->count(),
-                'closed' => Ticket::find()->where(['company_id' => $company->id, 'status' => 'closed'])->count(),
-                'breached_sla' => Ticket::find()->where(['company_id' => $company->id, 'sla_status' => 'breached'])->count(),
-            ];
+        // Debug logging
+        Yii::debug("Company Details Query Result:", 'application');
+        Yii::debug($companyDetails, 'application');
 
-            $renewalStats = [
-                'total' => ContractRenewal::find()->where(['company_id' => $company->id])->count(),
-                'pending' => ContractRenewal::find()->where(['company_id' => $company->id, 'renewal_status' => 'pending'])->count(),
-                'approved' => ContractRenewal::find()->where(['company_id' => $company->id, 'renewal_status' => 'approved'])->count(),
-            ];
+        if (!isset($companyDetails['id'])) {
+            Yii::error("Company ID not found for company_name: {$user->company_name}");
+            throw new NotFoundHttpException('Company details not found.');
         }
 
-        // Company details for display
-        $companyDetails = [
-            'name' => $company->company_name,
-            'email' => $company->company_email,
-            'status' => $company->status,
-            'startDate' => $company->start_date,
-            'endDate' => $company->end_date,
-        ];
+        // Fetch tickets for this company
+        $tickets = Ticket::find()
+            ->where(['company_id' => $company->id])
+            ->orderBy(['created_at' => SORT_DESC])
+            ->all();
+
+        // Fetch contract renewals for this company
+        $renewals = ContractRenewal::find()
+            ->where(['company_id' => $company->id])
+            ->orderBy(['created_at' => SORT_DESC])
+            ->all();
 
         return $this->render('profile', [
             'user' => $user,
@@ -108,9 +114,7 @@ class UserController extends Controller
             'tickets' => $tickets,
             'renewals' => $renewals,
             'companyDetails' => $companyDetails,
-            'isSuperAdmin' => $isSuperAdmin,
-            'ticketStats' => $ticketStats,
-            'renewalStats' => $renewalStats,
+            'model' => $model,
         ]);
     }
 

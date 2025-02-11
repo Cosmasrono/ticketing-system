@@ -2487,66 +2487,80 @@ public function actionCreateDeveloper()
 // }
 
 
-public function actionRenewContract($id = null)
-{
-    // Get company based on logged-in user
-    $userId = Yii::$app->user->id;
-    $company = Company::find()
-        ->where(['id' => $id])
-        // ->orWhere(['id' => $userId])
-        ->one();
 
-    if (!$company) {
-        Yii::$app->session->setFlash('error', 'Company not found.');
-        return $this->redirect(['user/profile', 'id' => $userId]);
-    }
+// public function actionRenewContract($id)
+// {
+//     // Get logged-in user details
+//     $userId = Yii::$app->user->id;
+    
+//     // Find company using the passed ID with eager loading
+//     $company = Company::find()
+//         ->where(['id' => $id])
+//         ->one();
+    
+//     if (!$company) {
+//         Yii::$app->session->setFlash('error', 'Company not found.');
+//         return $this->redirect(['user/profile', 'id' => $userId]);
+//     }
 
-    // Log company data for debugging
-    Yii::debug("Company Data Found: " . print_r([
-        'id' => $company->id,
-        'name' => $company->company_name,
-        'email' => $company->company_email,
-        'start_date' => $company->start_date,
-        'end_date' => $company->end_date,
-    ], true));
+//     // Check if contract dates are set
+//     if (empty($company->start_date) || empty($company->end_date)) {
+//         // Get admin email from params or config
+//         $adminEmail = Yii::$app->params['adminEmail'] ?? 'admin@example.com';
+        
+//         Yii::$app->session->setFlash('warning', 
+//             'Contract dates are not properly set. Please contact the administrator at ' . 
+//             Html::a($adminEmail, 'mailto:' . $adminEmail, ['class' => 'alert-link']) . 
+//             ' to update your contract information.'
+//         );
+//         return $this->redirect(['user/profile', 'id' => $userId]);
+//     }
 
-    $model = new ContractRenewal();
-    $model->company_id = $company->id;
-    $model->requested_by = $userId;
-    $model->current_end_date = $company->end_date;
-    $model->renewal_status = 'pending';
+//     // Create new renewal model
+//     $model = new ContractRenewal();
+//     $model->company_id = $company->id;
+//     $model->requested_by = $userId;
+//     $model->current_end_date = $company->end_date;
+//     $model->renewal_status = 'pending';
 
-    if ($model->load(Yii::$app->request->post())) {
-        try {
-            if (!empty($company->end_date)) {
-                $currentEndDate = new \DateTime($company->end_date);
-                $newEndDate = clone $currentEndDate;
-                $newEndDate->modify("+{$model->extension_period} months");
-                $model->new_end_date = $newEndDate->format('Y-m-d');
-                
-                if ($model->save()) {
-                    Yii::$app->session->setFlash('success', 'Contract renewal request has been submitted successfully and is pending approval.');
-                    return $this->redirect(['user/profile', 'id' => $userId]);
-                } else {
-                    Yii::$app->session->setFlash('error', 'Error saving renewal request: ' . implode(', ', $model->getFirstErrors()));
-                }
-            } else {
-                Yii::$app->session->setFlash('error', 'Contract end date is not set. Please contact administrator.');
-            }
-        } catch (\Exception $e) {
-            Yii::error("Error processing renewal dates: " . $e->getMessage());
-            Yii::$app->session->setFlash('error', 'Error processing renewal dates.');
-        }
-    }
+//     if ($model->load(Yii::$app->request->post())) {
+//         try {
+//             $currentEndDate = new \DateTime($company->end_date);
+//             $newEndDate = clone $currentEndDate;
+//             $newEndDate->modify("+{$model->extension_period} months");
+//             $model->new_end_date = $newEndDate->format('Y-m-d');
+            
+//             if ($model->save()) {
+//                 Yii::$app->session->setFlash('success', 'Contract renewal request has been submitted successfully and is pending approval.');
+//                 return $this->redirect(['user/profile', 'id' => $userId]);
+//             } else {
+//                 Yii::$app->session->setFlash('error', 'Error saving renewal request: ' . implode(', ', $model->getFirstErrors()));
+//             }
+//         } catch (\Exception $e) {
+//             Yii::error("Error processing renewal dates: " . $e->getMessage());
+//             Yii::$app->session->setFlash('error', 'Error processing renewal dates.');
+//         }
+//     }
 
-    return $this->render('renew-contract', [
-        'model' => $model,
-        'company' => $company,
-    ]);
-}
+//     // Debug information
+//     Yii::debug('Company Data:', 'application');
+//     Yii::debug([
+//         'id' => $company->id,
+//         'name' => $company->company_name,
+//         'start_date' => $company->start_date,
+//         'end_date' => $company->end_date,
+//         'status' => $company->status,
+//     ]);
+
+//     return $this->render('renew-contract', [
+//         'model' => $model,
+//         'company' => $company,
+//     ]);
+// }
 
 // Add this action for admin approval
 public function actionApproveRenewal($id)
+
 {
     if (!Yii::$app->user->can('admin')) {
         throw new ForbiddenHttpException('You are not authorized to perform this action.');
@@ -3022,77 +3036,99 @@ public function actionGetCompanyExpiry()
 
 public function actionUpdateRenewalStatus()
 {
-    Yii::$app->response->format = Response::FORMAT_JSON;
-    
-    if (!Yii::$app->request->isAjax) {
-        return ['success' => false, 'message' => 'Invalid request'];
+    Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+
+    if (!Yii::$app->request->isPost) {
+        return ['success' => false, 'message' => 'Invalid request method'];
     }
 
-    $id = Yii::$app->request->post('id');
+    $id = (int)Yii::$app->request->post('id');
     $status = Yii::$app->request->post('status');
 
+    // Basic validation
     if (!$id || !$status) {
         return ['success' => false, 'message' => 'Missing required parameters'];
     }
 
-    $renewal = ContractRenewal::findOne($id);
-    if (!$renewal) {
-        return ['success' => false, 'message' => 'Renewal request not found'];
-    }
+    $db = Yii::$app->db;
+    $transaction = $db->beginTransaction();
 
-    $transaction = Yii::$app->db->beginTransaction();
     try {
-        // Update renewal status
-        $renewal->renewal_status = $status;
-        
-        // If approved, update company end date
+        // First, check if the renewal exists
+        $renewal = $db->createCommand('SELECT * FROM contract_renewal WHERE id = :id')
+            ->bindValue(':id', $id)
+            ->queryOne();
+
+        if (!$renewal) {
+            throw new \Exception('Renewal request not found');
+        }
+
+        // Update status
+        $statusResult = $db->createCommand()
+            ->update('contract_renewal', 
+                ['renewal_status' => $status],
+                'id = :id',
+                [':id' => $id])
+            ->execute();
+
+        if ($statusResult === false) {
+            throw new \Exception('Failed to update status');
+        }
+
+        // If approved, update dates
         if ($status === 'approved') {
-            $company = Company::findOne($renewal->company_id);
-            if ($company) {
-                // Update company end date using updateAttributes to skip validation
-                $result = $company->updateAttributes([
-                    'end_date' => $renewal->new_end_date
-                ]);
-                
-                if (!$result) {
-                    throw new \Exception('Failed to update company end date');
-                }
+            // Calculate new end date
+            $extensionPeriod = new \DateTime($renewal['extension_period']);
+            $extensionPeriod->modify('+' . $renewal['renewal_duration'] . ' months');
+            $newEndDate = $extensionPeriod->format('Y-m-d');
+
+            // Update renewal end date
+            $renewalResult = $db->createCommand()
+                ->update('contract_renewal', 
+                    ['new_end_date' => $newEndDate],
+                    'id = :id',
+                    [':id' => $id])
+                ->execute();
+
+            if ($renewalResult === false) {
+                throw new \Exception('Failed to update renewal end date');
+            }
+
+            // Update company end date
+            $companyResult = $db->createCommand()
+                ->update('company', 
+                    ['end_date' => $newEndDate],
+                    'id = :id',
+                    [':id' => $renewal['company_id']])
+                ->execute();
+
+            if ($companyResult === false) {
+                throw new \Exception('Failed to update company end date');
             }
         }
 
-        // Update renewal status using updateAttributes
-        $result = $renewal->updateAttributes([
-            'renewal_status' => $status,
-            'updated_at' => date('Y-m-d H:i:s')
-        ]);
-
-        if (!$result) {
-            throw new \Exception('Failed to update renewal status');
-        }
-
         $transaction->commit();
-
-        // Send notification email
-        try {
-            $renewal->sendRenewalNotification($company);
-        } catch (\Exception $e) {
-            Yii::error('Failed to send notification email: ' . $e->getMessage());
-            // Don't throw the exception as the main operation succeeded
-        }
-        
         return [
             'success' => true,
-            'message' => $status === 'approved' ? 
-                'Renewal approved and company contract extended' : 
-                'Renewal request rejected'
+            'message' => $status === 'approved' 
+                ? 'Contract renewal approved and dates updated successfully'
+                : 'Status updated successfully'
         ];
 
     } catch (\Exception $e) {
         $transaction->rollBack();
-        Yii::error('Contract renewal error: ' . $e->getMessage());
+        
+        Yii::error([
+            'action' => 'updateRenewalStatus',
+            'error' => $e->getMessage(),
+            'renewal_id' => $id,
+            'status' => $status,
+            'sql_error' => $db->getLastError()
+        ]);
+
         return [
             'success' => false,
-            'message' => $e->getMessage()
+            'message' => YII_DEBUG ? $e->getMessage() : 'An error occurred while updating the status'
         ];
     }
 }
@@ -3445,5 +3481,181 @@ public function actionUpdateStatus() {
 //         'company' => $company,
 //     ]);
 // }
+ 
+
+// In SiteController.php
+// public function actionRenewContract($id)
+// {
+//     $companyDetails = Company::findOne($id);
+//     if (!$companyDetails) {
+//         throw new NotFoundHttpException("Company not found.");
+//     }
+
+//     $model = new \app\models\ContractRenewal();
+    
+//     // Set initial values
+//     $model->company_id = $companyDetails->id;
+//     $model->current_end_date = $companyDetails->end_date;
+
+//     // Check if it's an AJAX request
+//     if (Yii::$app->request->isAjax) {
+//         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        
+//         if ($model->load(Yii::$app->request->post())) {
+//             // Make sure current_end_date is set
+//             if (empty($model->current_end_date)) {
+//                 $model->current_end_date = $companyDetails->end_date;
+//             }
+            
+//             // Set additional fields
+//             $model->requested_by = Yii::$app->user->id;
+//             $model->created_at = date('Y-m-d H:i:s');
+//             $model->updated_at = date('Y-m-d H:i:s');
+//             $model->renewal_status = 0; // pending status
+            
+//             if ($model->save()) {
+//                 return [
+//                     'success' => true,
+//                     'message' => 'Contract renewal submitted successfully'
+//                 ];
+//             } else {
+//                 return [
+//                     'success' => false,
+//                     'errors' => $model->getErrors(),
+//                     'message' => 'Failed to save contract renewal'
+//                 ];
+//             }
+//         } else {
+//             return [
+//                 'success' => false,
+//                 'errors' => $model->getErrors(),
+//                 'message' => 'Failed to load form data'
+//             ];
+//         }
+//     }
+
+//     // If not AJAX, render the form
+//     return $this->render('renew-contract', [
+//         'model' => $model,
+//         'company' => $companyDetails,
+//     ]);
+// }
+
+
+public function actionRenewContract($id)
+{
+    $company = Company::findOne($id);
+    if (!$company) {
+        throw new NotFoundHttpException('Company not found.');
+    }
+
+    $currentEndDate = $company->getAttribute('end_date');
+    if (empty($currentEndDate)) {
+        Yii::$app->session->setFlash('error', 'Company end date not found.');
+        return $this->redirect(['profile', 'id' => Yii::$app->user->id]);
+    }
+
+    $renewal = new ContractRenewal();
+    
+    // Set initial values
+    $renewal->company_id = (int)$id;
+    $renewal->current_end_date = $currentEndDate;
+    $renewal->extension_period = date('Y-m-d', strtotime($currentEndDate . ' +1 day'));
+    $renewal->requested_by = (int)Yii::$app->user->id;
+    $renewal->renewal_status = 'pending';
+
+    if (Yii::$app->request->isPost) {
+        $transaction = Yii::$app->db->beginTransaction();
+        try {
+            $post = Yii::$app->request->post();
+            
+            // Ensure company_id is correct before loading
+            $post['ContractRenewal']['company_id'] = (int)$id;
+            
+            if ($renewal->load($post) && $renewal->validate()) {
+                // Force set these values after load for security
+                $renewal->company_id = (int)$id;
+                $renewal->current_end_date = $currentEndDate;
+                $renewal->requested_by = (int)Yii::$app->user->id;
+                $renewal->renewal_status = 'pending';
+
+                // Calculate new end date based on renewal duration
+                $extensionStartDate = new \DateTime($renewal->extension_period);
+                $extensionStartDate->modify('+' . $renewal->renewal_duration . ' months');
+                $newEndDate = $extensionStartDate->format('Y-m-d');
+                
+                // Set the new end date in renewal
+                $renewal->new_end_date = $newEndDate;
+
+                // First update the company end date with optimistic locking
+                $updateResult = Yii::$app->db->createCommand()
+                    ->update('company', 
+                        ['end_date' => $newEndDate],
+                        'id = :id AND end_date = :current_end_date',
+                        [
+                            ':id' => $company->id,
+                            ':current_end_date' => $currentEndDate
+                        ]
+                    )->execute();
+
+                if ($updateResult === 0) {
+                    throw new \Exception('Company end date could not be updated. The data may have changed since you loaded the page.');
+                }
+
+                // Log successful company update
+                Yii::info('Company end date updated successfully: ' . json_encode([
+                    'company_id' => $company->id,
+                    'old_end_date' => $currentEndDate,
+                    'new_end_date' => $newEndDate
+                ]));
+
+                // Then save the renewal record
+                if (!$renewal->save()) {
+                    throw new \Exception('Failed to save renewal request: ' . json_encode($renewal->errors));
+                }
+
+                // Log successful renewal save
+                Yii::info('Contract renewal saved successfully: ' . json_encode([
+                    'company_id' => $renewal->company_id,
+                    'current_end_date' => $renewal->current_end_date,
+                    'extension_period' => $renewal->extension_period,
+                    'new_end_date' => $renewal->new_end_date,
+                    'renewal_duration' => $renewal->renewal_duration
+                ]));
+
+                $transaction->commit();
+                Yii::$app->session->setFlash('success', 'Contract renewal request submitted successfully. New end date: ' . Yii::$app->formatter->asDate($newEndDate));
+                return $this->redirect(['profile', 'id' => Yii::$app->user->id]);
+            } else {
+                throw new \Exception('Validation failed: ' . implode('; ', $renewal->getErrorSummary(true)));
+            }
+        } catch (\Exception $e) {
+            $transaction->rollBack();
+            
+            // Enhanced error logging
+            Yii::error('Contract renewal failed: ' . $e->getMessage());
+            Yii::error('Contract renewal attempt details: ' . json_encode([
+                'company_id' => $company->id,
+                'current_end_date' => $currentEndDate,
+                'attempted_new_date' => isset($newEndDate) ? $newEndDate : null,
+                'renewal_data' => $renewal->attributes
+            ]));
+            
+            // Log database errors
+            $lastError = Yii::$app->db->getLastError();
+            if ($lastError) {
+                Yii::error('Database error details: ' . json_encode($lastError));
+            }
+            
+            Yii::$app->session->setFlash('error', 'Failed to submit contract renewal: ' . $e->getMessage());
+        }
+    }
+
+    return $this->render('renew-contract', [
+        'company' => $company,
+        'renewal' => $renewal,
+        'currentEndDate' => $currentEndDate,
+    ]);
+}
 }
     

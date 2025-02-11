@@ -1,95 +1,86 @@
 <?php
-
 namespace app\models;
 
 use Yii;
 use yii\db\ActiveRecord;
-use app\models\Company;
-use app\models\User;
-use yii\behaviors\TimestampBehavior;
-use yii\db\Expression;
 
 class ContractRenewal extends ActiveRecord
 {
     public static function tableName()
     {
-        return 'contract_renewal'; // Changed to contract_renewal table
+        return 'contract_renewal';
     }
 
     public function rules()
     {
         return [
-            [['company_id', 'requested_by', 'extension_period', 'current_end_date'], 'required'],
-            [['company_id', 'requested_by', 'extension_period'], 'integer'],
-            ['notes', 'string'],
-            ['renewal_status', 'in', 'range' => ['pending', 'approved', 'rejected']],
-            [['current_end_date', 'new_end_date', 'created_at', 'updated_at'], 'safe'],
-            ['renewal_status', 'default', 'value' => 'pending'],
+            [['company_id', 'current_end_date', 'extension_period', 'renewal_duration', 'requested_by'], 'required'],
+            [['company_id', 'renewal_duration', 'requested_by'], 'integer'],
+            [['current_end_date', 'extension_period'], 'safe'],
+            [['notes'], 'string'],
+            [['renewal_status'], 'string'],
+            [['renewal_status'], 'default', 'value' => 'pending'],
+            [['company_id'], 'exist', 'skipOnError' => true, 'targetClass' => Company::class, 'targetAttribute' => ['company_id' => 'id']],
+
         ];
     }
 
-    public function behaviors()
+    public function attributeLabels()
     {
         return [
-            [
-                'class' => TimestampBehavior::class,
-                'value' => new Expression('NOW()'),
-            ],
+            'id' => 'ID',
+            'company_id' => 'Company',
+            'renewal_duration' => 'Duration (Months)',
+            'requested_by' => 'Requested By',
+            'extension_period' => 'Extension Period',
+            'notes' => 'Notes',
+            'renewal_status' => 'Status',
+            'current_end_date' => 'Current End Date',
+            'new_end_date' => 'New End Date',
+            'renewed_at' => 'Renewed At',
+            'created_at' => 'Created At',
+            'updated_at' => 'Updated At',
         ];
+    }
+
+    /**
+     * Gets the related Company record
+     */
+    public function getCompany()
+    {
+        return $this->hasOne(Company::class, ['id' => 'company_id']);
+    }
+
+    /**
+     * Gets the related User record who requested the renewal
+     */
+    public function getRequestedByUser()
+    {
+        return $this->hasOne(User::class, ['id' => 'requested_by']);
+    }
+
+    /**
+     * Gets the requester's name
+     */
+    public function getRequesterName()
+    {
+        return $this->requestedByUser ? $this->requestedByUser->name : 'Unknown';
     }
 
     public function beforeSave($insert)
     {
-        if (!parent::beforeSave($insert)) {
-            return false;
-        }
-
-        // Ensure dates are in the correct format
-        if ($this->current_end_date) {
-            $date = new \DateTime($this->current_end_date);
-            $this->current_end_date = $date->format('Y-m-d');
-        }
-
-        if ($this->new_end_date) {
-            $date = new \DateTime($this->new_end_date);
-            $this->new_end_date = $date->format('Y-m-d');
-        }
-
-        // Set current_end_date from company if not set
-        if ($insert && empty($this->current_end_date)) {
-            $company = Company::findOne($this->company_id);
-            if ($company) {
-                $this->current_end_date = $company->end_date;
+        if (parent::beforeSave($insert)) {
+            if ($insert) {
+                $this->renewal_status = 'pending';
             }
-        }
-
-        // Calculate new_end_date
-        if ($insert && $this->extension_period) {
-            $currentEndDate = strtotime($this->current_end_date);
-            $newEndDate = strtotime("+{$this->extension_period} months", $currentEndDate);
-            $this->new_end_date = date('Y-m-d', $newEndDate);
-        }
-
-        // If renewal_status is being changed to 'approved'
-        if (!$insert && $this->isAttributeChanged('renewal_status') && $this->renewal_status === 'approved') {
-            // Update company end_date
-            $company = Company::findOne($this->company_id);
-            if ($company) {
-                $company->end_date = $this->new_end_date;
-                if (!$company->save()) {
-                    Yii::$app->session->setFlash('error', 'Failed to update company end date.');
-                    return false;
-                }
-                
-                // Log the contract renewal
-                Yii::info("Contract renewed for company {$company->company_name}. New end date: {$this->new_end_date}", 'contract');
-                
-                // Send notification email
-                $this->sendRenewalNotification($company);
+            if ($this->isNewRecord) {
+                $this->created_at = date('Y-m-d H:i:s');
+                $this->requested_by = Yii::$app->user->id;
             }
+            $this->updated_at = date('Y-m-d H:i:s');
+            return true;
         }
-
-        return true;
+        return false;
     }
 
     /**
@@ -141,33 +132,6 @@ class ContractRenewal extends ActiveRecord
             Yii::error("Failed to update renewal status: {$e->getMessage()}", 'contract');
             return false;
         }
-    }
-
-    public function attributeLabels()
-    {
-        return [
-            'id' => 'ID',
-            'company_id' => 'Company',
-            'requested_by' => 'Requested By',
-            'extension_period' => 'Extension Period',
-            'notes' => 'Notes',
-            'renewal_status' => 'Status',
-            'current_end_date' => 'Current End Date',
-            'new_end_date' => 'New End Date',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
-        ];
-    }
-
-    // Relations
-    public function getCompany()
-    {
-        return $this->hasOne(Company::class, ['id' => 'company_id']);
-    }
-
-    public function getRequestedBy()
-    {
-        return $this->hasOne(User::class, ['id' => 'requested_by']);
     }
 
     // Helper method to get extension period options

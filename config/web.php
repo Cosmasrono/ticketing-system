@@ -96,6 +96,7 @@ $config = [
                 'profile/<id:\d+>' => 'site/profile',
                 'user-profile/<id:\d+>' => 'user-profile/view',
                 'admin-profile/<id:\d+>' => 'admin-profile/view',
+                'contract-renewal/<action>' => 'contract-renewal/<action>',
             ],
         ],
         'session' => [

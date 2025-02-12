@@ -4,8 +4,6 @@ namespace app\models;
 
 use Yii;
 use yii\db\ActiveRecord;
-use yii\behaviors\TimestampBehavior;
-use yii\db\Expression;
 
 class Company extends ActiveRecord
 {
@@ -16,19 +14,7 @@ class Company extends ActiveRecord
     const ROLE_SUPER_ADMIN = 'super_admin';
 
     public $role;
-    public $id; // Assuming you have an id column
-    public $name; // Assuming you have a name column
-    public $company_name; // Assuming you have a company_name column
-    public $company_email; // Assuming you have a company_email column
-    public $company_type; // Assuming you have a company_type column
-    public $subscription_level; // Assuming you have a subscription_level column
-    public $modules; // Assuming you have a modules column
-    public $created_at; // Assuming you have a created_at column
-    public $updated_at; // Assuming you have an updated_at column
-    public $status; // Assuming you have a status column
-    public $start_date; // New property
-    public $end_date; // New property
-    public $renewed_at; // New property
+    public $name;
 
     public static function tableName()
     {
@@ -38,14 +24,14 @@ class Company extends ActiveRecord
     public function rules()
     {
         return [
-            [['company_name', 'company_email'], 'required'],
-            [['company_name', 'company_email'], 'string', 'max' => 255],
-            [['start_date', 'end_date', 'created_at', 'updated_at'], 'safe'],
-            [['status'], 'string'],
-            [['company_email'], 'email'],
-            [['company_name'], 'unique'],
-            [['company_email'], 'unique'],
-            
+            [['name', 'company_name', 'company_email'], 'required'],
+            [['start_date', 'end_date'], 'safe'],
+            [['status'], 'integer'],
+            [['modules'], 'safe'],
+            [['name', 'company_name', 'company_email'], 'string', 'max' => 255],
+            [['role'], 'string', 'max' => 50],
+            [['company_type', 'subscription_level'], 'string'],
+            ['company_email', 'email'],
         ];
     }
 
@@ -65,6 +51,7 @@ class Company extends ActiveRecord
     {
         return [
             'id' => 'ID',
+            'name' => 'Name',
             'company_name' => 'Company Name',
             'company_email' => 'Company Email',
             'start_date' => 'Start Date',
@@ -79,25 +66,16 @@ class Company extends ActiveRecord
         ];
     }
 
-    public function behaviors()
-    {
-        return [
-            [
-                'class' => TimestampBehavior::class,
-                'value' => new Expression('NOW()'),
-            ],
-        ];
-    }
-
     public function beforeSave($insert)
     {
         if (parent::beforeSave($insert)) {
-            // Convert dates to database format
-            if ($this->start_date) {
-                $this->start_date = Yii::$app->formatter->asDate($this->start_date, 'php:Y-m-d');
-            }
-            if ($this->end_date) {
-                $this->end_date = Yii::$app->formatter->asDate($this->end_date, 'php:Y-m-d');
+            if ($this->isNewRecord) {
+                $this->created_at = date('Y-m-d H:i:s');
+                $this->updated_at = date('Y-m-d H:i:s');
+                $this->start_date = date('Y-m-d');
+                $this->end_date = date('Y-m-d', strtotime('+1 year'));
+            } else {
+                $this->updated_at = date('Y-m-d H:i:s');
             }
             return true;
         }
@@ -193,56 +171,5 @@ class Company extends ActiveRecord
         return $this->getUsers()
             ->andWhere(['status' => 10]) // STATUS_ACTIVE = 10
             ->exists();
-    }
-
-    /**
-     * Gets query for [[ContractRenewals]]
-     */
-    public function getContractRenewals()
-    {
-        return $this->hasMany(ContractRenewal::class, ['company_id' => 'id']);
-    }
-
-    /**
-     * Gets the latest contract renewal
-     */
-    public function getLatestRenewal()
-    {
-        return $this->getContractRenewals()
-            ->orderBy(['created_at' => SORT_DESC])
-            ->one();
-    }
-
-    /**
-     * Check if company has active contract
-     */
-    public function getIsActive()
-    {
-        if (empty($this->end_date)) {
-            return false;
-        }
-        return strtotime($this->end_date) >= strtotime(date('Y-m-d'));
-    }
-
-    /**
-     * Get formatted status
-     */
-    public function getStatusText()
-    {
-        return $this->status ? 'Active' : 'Inactive';
-    }
-
-    /**
-     * Get days remaining in contract
-     */
-    public function getDaysRemaining()
-    {
-        if (empty($this->end_date)) {
-            return 0;
-        }
-        $end = strtotime($this->end_date);
-        $now = strtotime(date('Y-m-d'));
-        $diff = $end - $now;
-        return max(0, round($diff / (60 * 60 * 24)));
     }
 }

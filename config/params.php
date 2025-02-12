@@ -5,7 +5,7 @@ return [
     'senderEmail' => 'francismwaniki630@gmail.com',
     // ... other params ...
     'supportEmail' => 'francismwaniki630@gmail.com',
-    'senderName' => 'Your Company Name',
+    'senderName' => 'Iansoft',
   
         'user.passwordResetTokenExpire' => 86400, // 24 hours in seconds, adjust as needed
      // Token expires in 1 hour

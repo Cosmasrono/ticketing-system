@@ -190,18 +190,35 @@ JqueryAsset::register($this);
     <header id="header">
         <?php
         NavBar::begin([
-            'brandLabel' => Yii::$app->name,
+            'brandLabel' => Html::img('https://www.iansoftltd.com/assets/img/logo.jpg', ['alt'=>'Logo', 'class'=>'navbar-logo']),
             'brandUrl' => Yii::$app->homeUrl,
             'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
         ]);
 
-        $menuItems = [];
+        $menuItems = [
+            ['label' => 'Home', 'url' => ['/site/index']],
+            ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 
+             'url' => ['/ticket/create'],
+             'encode' => false],
+            ['label' => '<i class="fas fa-list"></i> View Tickets', 
+             'url' => ['/ticket/index'],
+             'encode' => false],
+            ['label' => '<i class="fas fa-cog"></i> Admin Panel', 
+             'url' => ['/site/admin'],
+             'encode' => false],
+            ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
+             'url' => ['/developer/view'],
+             'encode' => false],
+            ['label' => '<i class="fas fa-user"></i> Profile',
+             'url' => ['/user/profile', 'id' => Yii::$app->user->id],
+             'encode' => false],
+        ];
 
-        if (Yii::$app->user) {
-        //     $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
-        // } else {
+        if (Yii::$app->user->isGuest) {
+            $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
+        } else {
             $menuItems[] = [
-                'label' => 'Logout (' . Yii::$app->user->identity->company_email . ')',
+                'label' => 'Logout (' . Yii::$app->user->identity->company_name . ')',
                 'url' => ['/site/logout'],
                 'linkOptions' => ['data-method' => 'post']
             ];

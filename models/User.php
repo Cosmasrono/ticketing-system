@@ -417,17 +417,56 @@ public function isUser()
     // {
     //     return $this->role === 'admin';
     // }
+    public static function isPasswordResetTokenValid($token)
+    {
+        if (empty($token)) {
+            Yii::debug("Token is empty");
+            return false;
+        }
+    
+        // Add debug logging
+        Yii::debug("Checking token validity: " . $token);
+        
+        $user = static::findOne([
+            'password_reset_token' => $token,
+        ]);
+    
+        if (!$user) {
+            Yii::debug("No user found with token: " . $token);
+            return false;
+        }
+    
+        Yii::debug("User found with status: " . $user->status);
+        Yii::debug("Token created at: " . $user->token_created_at);
+        
+        // If you have token expiration logic:
+        $expire = Yii::$app->params['user.passwordResetTokenExpire'] ?? 3600; // 1 hour default
+        $isValid = $user->token_created_at + $expire >= time();
+        
+        Yii::debug("Token is " . ($isValid ? "valid" : "expired"));
+        
+        return $isValid;
+    }
+    
     public static function findByPasswordResetToken($token)
     {
         if (!static::isPasswordResetTokenValid($token)) {
             Yii::error('Token validation failed: ' . $token);
             return null;
         }
-
-        return static::findOne([
+    
+        $user = static::findOne([
             'password_reset_token' => $token,
             'status' => [self::STATUS_ACTIVE, self::STATUS_UNVERIFIED],
         ]);
+    
+        if (!$user) {
+            Yii::debug("User not found or has invalid status");
+        } else {
+            Yii::debug("User found with status: " . $user->status);
+        }
+    
+        return $user;
     }
     
     public function removePasswordResetToken()
@@ -909,16 +948,16 @@ public function verify()
     //     }
     // }
 
-    public static function isPasswordResetTokenValid($token)
-    {
-        if (empty($token)) {
-            return false;
-        }
+    // public static function isPasswordResetTokenValid($token)
+    // {
+    //     if (empty($token)) {
+    //         return false;
+    //     }
 
-        $timestamp = (int) substr($token, strrpos($token, '_') + 1);
-        $expire = Yii::$app->params['user.passwordResetTokenExpire'] ?? 3600;
-        return $timestamp + $expire >= time();
-    }
+    //     $timestamp = (int) substr($token, strrpos($token, '_') + 1);
+    //     $expire = Yii::$app->params['user.passwordResetTokenExpire'] ?? 3600;
+    //     return $timestamp + $expire >= time();
+    // }
 
     public static function isPasswordResetTokenExpired($token)
     {

@@ -30,7 +30,7 @@ $this->title = 'Iansoft - Help Desk Solutions';
             <div class="col-lg-6">
                 <div class="hero-image-wrapper animate__animated animate__fadeInRight">
                     <div class="image-container">
-                        <img src="https://b2core.com/app/uploads/2024/04/How-to-Create-a-Ticketing-System.png" 
+                        <img src="https://th.bing.com/th/id/OIP.039yf0EGyNlEedi7TJhyoAHaE-?rs=1&pid=ImgDetMain" 
                              alt="Help Desk Dashboard" 
                              class="hero-image parallax-effect">
                         <div class="pulse-effect"></div>

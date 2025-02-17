@@ -104,3 +104,4 @@ Thumbs.db
 *.sqlite
 *.sqlite3
  
+config/db.php

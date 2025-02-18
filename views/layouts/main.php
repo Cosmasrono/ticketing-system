@@ -186,6 +186,9 @@ JqueryAsset::register($this);
         </header>
         
 <?php else: ?>
+
+
+
     <!-- Regular Header for Authenticated Users -->
     <header id="header">
         <?php
@@ -215,7 +218,7 @@ JqueryAsset::register($this);
         ];
 
         if (Yii::$app->user->isGuest) {
-            $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
+            // $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
         } else {
             $menuItems[] = [
                 'label' => 'Logout (' . Yii::$app->user->identity->company_name . ')',
@@ -249,7 +252,7 @@ JqueryAsset::register($this);
     <!-- Guest Landing Page Footer -->
     <footer id="footer" class="footer">
         <div class="container footer-top">
-            <div class="row gy-4">
+            <div class="row">
                 <div class="col-lg-5 col-md-5 footer-about">
                     <a href="<?= Yii::$app->homeUrl ?>" class="d-flex align-items-center">
                         <h3 class="sitename">Iansoft Technologies</h3>
@@ -288,6 +291,15 @@ JqueryAsset::register($this);
 
     <!-- Preloader -->
     <div id="preloader"></div>
+ 
+    <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+  <script src="assets/vendor/php-email-form/validate.js"></script>
+  <script src="assets/vendor/aos/aos.js"></script>
+  <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
+  <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
+  <script src="assets/vendor/waypoints/noframework.waypoints.js"></script>
+  <script src="assets/vendor/imagesloaded/imagesloaded.pkgd.min.js"></script>
+  <script src="assets/vendor/isotope-layout/isotope.pkgd.min.js"></script>
 
 <?php else: ?>
     <!-- Regular Footer for Authenticated Users -->

@@ -51,16 +51,17 @@ $this->title = 'Iansoft - Help Desk Solutions';
                     <a href="#" class="read-more"><span>Read More</span><i class="bi bi-arrow-right"></i></a>
                 </div>
             </div>
-        </div>
-    </section>
-
-    <!-- How it works Section -->
-    <section id="howitworks" class="section why-us light-background">
-        <div class="container-fluid">
-            <div class="row gy-4">
-                <div class="col-lg-7 d-flex flex-column justify-content-center order-2 order-lg-1">
-                    <div class="content px-xl-5" data-aos="fade-up" data-aos-delay="100">
-                        <h3><span>How it</span><strong> works</strong></h3>
+            <div class="col-lg-6">
+                <div class="hero-image-wrapper animate__animated animate__fadeInRight">
+                    <div class="image-container">
+                        <img src="https://th.bing.com/th/id/OIP.039yf0EGyNlEedi7TJhyoAHaE-?rs=1&pid=ImgDetMain" 
+                             alt="Help Desk Dashboard" 
+                             class="hero-image parallax-effect">
+                        <div class="pulse-effect"></div>
+                    </div>
+                    <div class="floating-card card-1" data-tilt>
+                        <i class="fas fa-ticket-alt"></i>
+                        <span>24/7 Support</span>
                     </div>
                     <div class="faq-container px-xl-5" data-aos="fade-up" data-aos-delay="200">
                         <div class="faq-item faq-active">

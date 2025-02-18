@@ -184,136 +184,146 @@ JqueryAsset::register($this);
                 <a class="btn-getstarted" href="/site/login">Login</a>
             </div>
         </header>
-        
-<?php else: ?>
 
-
-
-    <!-- Regular Header for Authenticated Users -->
-    <header id="header">
-        <?php
-        NavBar::begin([
-            'brandLabel' => Html::img('https://www.iansoftltd.com/assets/img/logo.jpg', ['alt'=>'Logo', 'class'=>'navbar-logo']),
-            'brandUrl' => Yii::$app->homeUrl,
-            'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
-        ]);
-
-        $menuItems = [
-            ['label' => 'Home', 'url' => ['/site/index']],
-            ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 
-             'url' => ['/ticket/create'],
-             'encode' => false],
-            ['label' => '<i class="fas fa-list"></i> View Tickets', 
-             'url' => ['/ticket/index'],
-             'encode' => false],
-            ['label' => '<i class="fas fa-cog"></i> Admin Panel', 
-             'url' => ['/site/admin'],
-             'encode' => false],
-            ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 
-             'url' => ['/developer/view'],
-             'encode' => false],
-            ['label' => '<i class="fas fa-user"></i> Profile',
-             'url' => ['/user/profile', 'id' => Yii::$app->user->id],
-             'encode' => false],
-        ];
-
-        if (Yii::$app->user->isGuest) {
-            // $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
-        } else {
-            $menuItems[] = [
-                'label' => 'Logout (' . Yii::$app->user->identity->company_name . ')',
-                'url' => ['/site/logout'],
-                'linkOptions' => ['data-method' => 'post']
-            ];
-        }
-
-        echo Nav::widget([
-            'options' => ['class' => 'navbar-nav ms-auto mb-2 mb-md-0'],
-            'items' => $menuItems
-        ]);
-
-        NavBar::end();
-        ?>
-    </header>
-<?php endif; ?>
-
-<main id="main" class="flex-shrink-0" role="main">
-    <?php if (!(Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index')): ?>
-        <div class="container">
-            <?= Alert::widget() ?>
-            <?= $content ?>
-        </div>
     <?php else: ?>
-        <?= $content ?>
+        <!-- Regular Header for Authenticated Users -->
+        <header id="header">
+            <?php
+            NavBar::begin([
+                'brandLabel' => Html::img('https://www.iansoftltd.com/assets/img/logo.jpg', ['alt' => 'Logo', 'class' => 'navbar-logo']),
+                'brandUrl' => Yii::$app->homeUrl,
+                'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
+            ]);
+
+            $menuItems = [
+                ['label' => 'Home', 'url' => ['/site/index']],
+                [
+                    'label' => '<i class="fas fa-plus-circle"></i> Create Ticket',
+                    'url' => ['/ticket/create'],
+                    'encode' => false
+                ],
+                [
+                    'label' => '<i class="fas fa-list"></i> View Tickets',
+                    'url' => ['/ticket/index'],
+                    'encode' => false
+                ],
+                [
+                    'label' => '<i class="fas fa-cog"></i> Admin Panel',
+                    'url' => ['/site/admin'],
+                    'encode' => false
+                ],
+                [
+                    'label' => '<i class="fas fa-code"></i> Developer Dashboard',
+                    'url' => ['/developer/view'],
+                    'encode' => false
+                ],
+                [
+                    'label' => '<i class="fas fa-user"></i> Profile',
+                    'url' => ['/user/profile', 'id' => Yii::$app->user->id],
+                    'encode' => false
+                ],
+            ];
+
+            if (Yii::$app->user->isGuest) {
+                $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
+            } else {
+                $menuItems[] = [
+                    'label' => 'Logout (' . Yii::$app->user->identity->company_name . ')',
+                    'url' => ['/site/logout'],
+                    'linkOptions' => ['data-method' => 'post']
+                ];
+            }
+
+            echo Nav::widget([
+                'options' => ['class' => 'navbar-nav ms-auto mb-2 mb-md-0'],
+                'items' => $menuItems
+            ]);
+
+            NavBar::end();
+            ?>
+        </header>
     <?php endif; ?>
-</main>
 
-<?php if (Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index'): ?>
-    <!-- Guest Landing Page Footer -->
-    <footer id="footer" class="footer">
-        <div class="container footer-top">
-            <div class="row">
-                <div class="col-lg-5 col-md-5 footer-about">
-                    <a href="<?= Yii::$app->homeUrl ?>" class="d-flex align-items-center">
-                        <h3 class="sitename">Iansoft Technologies</h3>
-                    </a>
-                    <div class="footer-contact pt-3">
-                        <p>Nachu Plaza, 10th Floor</p>
-                        <p>Nairobi, Kenya</p>
+    <main id="main" class="flex-shrink-0" role="main">
+        <?php if (!(Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index')): ?>
+            <div class="container">
+                <?= Alert::widget() ?>
+                <?= $content ?>
+            </div>
+        <?php else: ?>
+            <?= $content ?>
+        <?php endif; ?>
+    </main>
+
+    <?php if (Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index'): ?>
+        <!-- Guest Landing Page Footer -->
+        <footer id="footer" class="footer">
+            <div class="container footer-top">
+                <div class="row gy-4">
+                    <div class="col-lg-5 col-md-5 footer-about">
+                        <a href="<?= Yii::$app->homeUrl ?>" class="d-flex align-items-center">
+                            <h3 class="sitename">Iansoft Technologies</h3>
+                        </a>
+                        <div class="footer-contact pt-3">
+                            <p>Nachu Plaza, 10th Floor</p>
+                            <p>Nairobi, Kenya</p>
+                        </div>
                     </div>
-                </div>
 
-                <div class="col-lg-2 col-md-2">
-                    <!-- Spacer column -->
-                </div>
+                    <div class="col-lg-2 col-md-2">
+                        <!-- Spacer column -->
+                    </div>
 
-                <div class="col-lg-5 col-md-5 text-lg-end">
-                    <h4>Connect with Us</h4>
-                    <div class="social-links d-flex justify-content-lg-end">
-                        <a href=""><i class="bi bi-twitter-x"></i></a>
-                        <a href=""><i class="bi bi-facebook"></i></a>
-                        <a href=""><i class="bi bi-whatsapp"></i></a>
-                        <a href=""><i class="bi bi-linkedin"></i></a>
+                    <div class="col-lg-5 col-md-5 text-lg-end">
+                        <h4>Connect with Us</h4>
+                        <div class="social-links d-flex justify-content-lg-end">
+                            <a href=""><i class="bi bi-twitter"></i></a>
+                            <a href=""><i class="bi bi-facebook"></i></a>
+                            <a href=""><i class="bi bi-whatsapp"></i></a>
+                            <a href=""><i class="bi bi-linkedin"></i></a>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="container copyright text-center mt-4">
-            <p>© <span>Iansoft</span> <strong class="px-1 sitename">Technologies</strong> <span><?= date('Y') ?></span></p>
-        </div>
-    </footer>
-
-    <!-- Scroll Top Button -->
-    <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-        <i class="bi bi-arrow-up-short"></i>
-    </a>
-
-    <!-- Preloader -->
-    <div id="preloader"></div>
- 
-    <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-  <script src="assets/vendor/php-email-form/validate.js"></script>
-  <script src="assets/vendor/aos/aos.js"></script>
-  <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
-  <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
-  <script src="assets/vendor/waypoints/noframework.waypoints.js"></script>
-  <script src="assets/vendor/imagesloaded/imagesloaded.pkgd.min.js"></script>
-  <script src="assets/vendor/isotope-layout/isotope.pkgd.min.js"></script>
-
-<?php else: ?>
-    <!-- Regular Footer for Authenticated Users -->
-    <footer id="footer" class="mt-auto py-3 bg-light">
-        <div class="container">
-            <div class="row text-muted">
-                <div class="col-md-6 text-center text-md-start">&copy; Iansoft Technologies <?= date('Y') ?></div>
-                <div class="col-md-6 text-center text-md-end"><?= Yii::powered() ?></div>
+            <div class="container copyright text-center mt-4">
+                <p>© <span>Iansoft</span> <strong class="px-1 sitename">Technologies</strong> <span><?= date('Y') ?></span></p>
             </div>
-        </div>
-    </footer>
-<?php endif; ?>
+        </footer>
 
-<?php $this->endBody() ?>
-</body>
+        <!-- Scroll Top Button -->
+        <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
+            <i class="bi bi-arrow-up-short"></i>
+        </a>
+
+        <!-- Preloader -->
+        <div id="preloader"></div>
+        <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+        <script src="assets/vendor/php-email-form/validate.js"></script>
+        <script src="assets/vendor/aos/aos.js"></script>
+        <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
+        <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
+        <script src="assets/vendor/waypoints/noframework.waypoints.js"></script>
+        <script src="assets/vendor/imagesloaded/imagesloaded.pkgd.min.js"></script>
+        <script src="assets/vendor/isotope-layout/isotope.pkgd.min.js"></script>
+
+
+    <?php else: ?>
+        <!-- Regular Footer for Authenticated Users -->
+        <footer id="footer" class="mt-auto py-3 bg-light">
+            <div class="container">
+                <div class="row text-muted">
+                    <div class="col-md-6 text-center text-md-start">&copy; Iansoft Technologies <?= date('Y') ?></div>
+                    <div class="col-md-6 text-center text-md-end"><?= Yii::powered() ?></div>
+                </div>
+            </div>
+        </footer>
+    <?php endif; ?>
+
+    <?php $this->endBody() ?>
+    </body>
+
 </html>
 <?php $this->endPage() ?>
+<?php
+

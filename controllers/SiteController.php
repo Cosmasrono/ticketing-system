@@ -276,11 +276,11 @@ public function actionCreateCompany()
     public function actionIndex()
     {
         // If user is guest, show landing page
-        if (Yii::$app->user->isGuest) {
-            return $this->render('index-guest');
-        }
+        // if (Yii::$app->user->isGuest) {
+        //     return $this->render('index-guest');
+        // }
 
-        // Otherwise show the regular dashboard
+        // // Otherwise show the regular dashboard
         return $this->render('index');
     }
 

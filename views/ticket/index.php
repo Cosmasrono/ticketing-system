@@ -10,6 +10,7 @@ use yii\widgets\Pjax;
 $this->title = 'My Tickets';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
+
 <div class="ticket-index">
 
     <h1><?= Html::encode($this->title) ?></h1>

@@ -382,6 +382,7 @@ $this->registerJs("
 }
 </style>
 
+<div class="container">
 <div style="height: 60px;">
     <!-- Spacer for main header -->
 </div>
@@ -1466,4 +1467,6 @@ $this->registerJs("
     }
 ", View::POS_END);
 ?>
+
+</div>
  

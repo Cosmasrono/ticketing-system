@@ -19,6 +19,7 @@ if (Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index') {
     LandingAsset::register($this);
 } else {
     AppAsset::register($this);
+    LandingAsset::register($this);
 }
 
 $this->registerCsrfMetaTags();
@@ -242,17 +243,22 @@ JqueryAsset::register($this);
                 'items' => $menuItems
             ]);
 
+
             NavBar::end();
             ?>
         </header>
+        <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
     <?php endif; ?>
 
     <main id="main" class="flex-shrink-0" role="main">
         <?php if (!(Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index')): ?>
+
+              <!--?= $content ?--> 
             <div class="container">
                 <?= Alert::widget() ?>
                 <?= $content ?>
-            </div>
+            </div> 
+
         <?php else: ?>
             <?= $content ?>
         <?php endif; ?>
@@ -298,7 +304,6 @@ JqueryAsset::register($this);
         <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
             <i class="bi bi-arrow-up-short"></i>
         </a>
-
         <!-- Preloader -->
         <div id="preloader"></div>
         <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
@@ -310,17 +315,57 @@ JqueryAsset::register($this);
         <script src="assets/vendor/imagesloaded/imagesloaded.pkgd.min.js"></script>
         <script src="assets/vendor/isotope-layout/isotope.pkgd.min.js"></script>
 
-
     <?php else: ?>
         <!-- Regular Footer for Authenticated Users -->
-        <footer id="footer" class="mt-auto py-3 bg-light">
-            <div class="container">
-                <div class="row text-muted">
-                    <div class="col-md-6 text-center text-md-start">&copy; Iansoft Technologies <?= date('Y') ?></div>
-                    <div class="col-md-6 text-center text-md-end"><?= Yii::powered() ?></div>
+        <footer id="footer" class="footer">
+            <div class="container footer-top">
+                <div class="row gy-4">
+                    <div class="col-lg-5 col-md-5 footer-about">
+                        <a href="<?= Yii::$app->homeUrl ?>" class="d-flex align-items-center">
+                            <h3 class="sitename">Iansoft Technologies</h3>
+                        </a>
+                        <div class="footer-contact pt-3">
+                            <p>Nachu Plaza, 10th Floor</p>
+                            <p>Nairobi, Kenya</p>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-2 col-md-2">
+                        <!-- Spacer column -->
+                    </div>
+
+                    <div class="col-lg-5 col-md-5 text-lg-end">
+                        <h4>Connect with Us</h4>
+                        <div class="social-links d-flex justify-content-lg-end">
+                            <a href=""><i class="bi bi-twitter"></i></a>
+                            <a href=""><i class="bi bi-facebook"></i></a>
+                            <a href=""><i class="bi bi-whatsapp"></i></a>
+                            <a href=""><i class="bi bi-linkedin"></i></a>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <div class="container copyright text-center mt-4">
+                <p>© <span>Iansoft</span> <strong class="px-1 sitename">Technologies</strong> <span><?= date('Y') ?></span></p>
+            </div>
         </footer>
+
+        <!-- Scroll Top Button -->
+        <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
+            <i class="bi bi-arrow-up-short"></i>
+        </a>
+        <!-- Preloader -->
+        <div id="preloader"></div>
+        <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+        <script src="assets/vendor/php-email-form/validate.js"></script>
+        <script src="assets/vendor/aos/aos.js"></script>
+        <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
+        <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
+        <script src="assets/vendor/waypoints/noframework.waypoints.js"></script>
+        <script src="assets/vendor/imagesloaded/imagesloaded.pkgd.min.js"></script>
+        <script src="assets/vendor/isotope-layout/isotope.pkgd.min.js"></script>
+
     <?php endif; ?>
 
     <?php $this->endBody() ?>

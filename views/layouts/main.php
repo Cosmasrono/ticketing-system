@@ -42,7 +42,7 @@ JqueryAsset::register($this);
     <style>
         /* Navbar styling */
         .navbar {
-            background: linear-gradient(to right, #FF8C00, #FF4500) !important;
+            background: #37517e !important;
             /* Orange gradient */
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             padding: 0.5rem 1rem;
@@ -166,11 +166,13 @@ JqueryAsset::register($this);
     <!-- Guest Landing Page Header -->
 
     <body class="guest-index-page">
-        <header id="guest-header" class="guest-header d-flex align-items-center fixed-top">
-            <div class="container-fluid container-xl d-flex align-items-center justify-content-between">
+    <header id="guest-header" class="guest-header d-flex align-items-center fixed-top">
+            <div class="container-fluid d-flex">
                 <a href="<?= Yii::$app->homeUrl ?>" class="logo d-flex align-items-center">
                     <img src="https://www.iansoftltd.com/assets/img/logo.jpg" alt="Iansoft Logo">
                 </a>
+            </div>
+            <div class="container-fluid container-xl d-flex align-items-center justify-content-end">
                 <nav id="navmenu" class="navmenu">
                     <ul>
                         <li><a href="#hero" class="active">Home</a></li>
@@ -184,6 +186,7 @@ JqueryAsset::register($this);
                 <a class="btn-getstarted" href="/site/login">Login</a>
             </div>
         </header>
+
 
     <?php else: ?>
         <!-- Regular Header for Authenticated Users -->
@@ -225,7 +228,7 @@ JqueryAsset::register($this);
             ];
 
             if (Yii::$app->user->isGuest) {
-                $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
+                // $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
             } else {
                 $menuItems[] = [
                     'label' => 'Logout (' . Yii::$app->user->identity->company_name . ')',

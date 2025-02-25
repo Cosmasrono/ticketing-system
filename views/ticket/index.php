@@ -10,12 +10,12 @@ use yii\widgets\Pjax;
 $this->title = 'My Tickets';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
-<div class="ticket-index">
+<div class="container ticket-index">
 
-    <h1><?= Html::encode($this->title) ?></h1>
+    <h1 class="text-black"><?= Html::encode($this->title) ?></h1>
 
     <p>
-        <?= Html::a('Create Ticket', ['create'], ['class' => 'btn btn-success']) ?>
+        <?= Html::a('Create Ticket', ['create'], ['class' => 'btn btn-success w-100 p-2 mt-3', 'style' => 'max-width: 200px;']) ?>
     </p>
 
     <?php Pjax::begin(); ?>

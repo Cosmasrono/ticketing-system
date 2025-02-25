@@ -521,12 +521,12 @@ $this->registerJs("
 
     <!-- Overview Section -->
     <div id="overview" class="content-section active">
-        <h2>Dashboard Overview</h2>
+        <h2 class="text-primary fw-bold mb-0">Dashboard Overview</h2>
         <!-- Add this section to your admin dashboard -->
        
         <div class="card mb-4">
             <div class="card-header">
-                <h3>Clients with Comments</h3>
+                <h3 class="text-white">Clients with Comments</h3>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -590,7 +590,7 @@ document.getElementById('contractSearch').addEventListener('keyup', function() {
 
 <!-- contracts section -->
 <div id="contracts" class="content-section">
-    <h2>Contract Renewals</h2>
+    <h2 class="text-primary fw-bold mb-0">Contract Renewals</h2>
     <p>Total Renewals: <?= Html::encode(count($contractRenewals)) ?></p>
     <div>
         <?= Html::a('View Renewals', ['contract/index'], ['class' => 'btn btn-primary']) ?>
@@ -723,14 +723,14 @@ $this->registerJs($js);
 
 
 
-<div id="clients" class="content-section">
-    <h2>Clients</h2>
+<div id="clients" class="body-client content-section">
+    <h2 class="text-primary fw-bold mb-0">Clients</h2>
     <!-- Clients content -->
 
 
 <style>
 .client-dashboard {
-    padding: 20px;
+    padding: 0px;
 }
 
 .dashboard-header {
@@ -816,7 +816,7 @@ $this->registerJs($js);
 }
 </style>
 
-<section id="clients" class="section">
+<section id="clients" class="client-section">
     <div class="client-dashboard">
         <!-- Dashboard Header -->
         <div class="dashboard-header">
@@ -834,7 +834,7 @@ $this->registerJs($js);
         <!-- Client List Card -->
         <div class="card client-card">
             <div class="card-header">
-                <h3 class="mb-0">Client List</h3>
+                <h3 class="mb-0 text-white">Client List</h3>
                 <div class="search-box">
                     <input type="text" id="clientSearch" class="form-control" placeholder="Search clients...">
                 </div>
@@ -869,8 +869,8 @@ $this->registerJs($js);
                                         <?= Html::encode($client->company_name) ?>
                                     </div>
                                 </td>
-                                <td>
-                                    <a href="mailto:<?= Html::encode($client->company_email) ?>">
+                                <td class="text-black">
+                                    <a class="text-black" href="mailto:<?= Html::encode($client->company_email) ?>">
                                         <?= Html::encode($client->company_email) ?>
                                     </a>
                                 </td>

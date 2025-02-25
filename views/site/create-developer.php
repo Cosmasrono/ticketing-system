@@ -6,9 +6,9 @@ use yii\bootstrap5\ActiveForm;
 <div class="create-developer">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <div class="card shadow-lg">
-                <div class="card-header bg-success text-white">
-                    <h2 class="text-center mb-0">Create Developer</h2>
+            <div class="card">
+                <div class="card-header text-white">
+                    <h2 class="text-center mb-0 text-black">Create Developer</h2>
                 </div>
                 <div class="card-body">
                     <?php $form = ActiveForm::begin([
@@ -49,7 +49,7 @@ use yii\bootstrap5\ActiveForm;
 
                     <div class="form-group text-center">
                         <?= Html::submitButton('Create Developer', [
-                            'class' => 'btn btn-success btn-lg mt-3',
+                            'class' => 'btn btn-success w-100 p-2 mt-3', 'style' => 'max-width: 200px;',
                             'data' => ['confirm' => 'Are you sure you want to create this developer?']
                         ]) ?>
                     </div>

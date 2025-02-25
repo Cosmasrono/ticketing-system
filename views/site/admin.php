@@ -105,7 +105,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
     </div>
 
     <!-- Add this search form above the GridView -->
-    <div class="card mb-4">
+    <div class="card mb-4 bg-orange">
         <div class="card-body">
             <?php
             // Get unique company names for dropdown
@@ -137,25 +137,25 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
 
     <!-- Add this section after company selection -->
     <div class="card mb-4" id="companyTicketsSection" style="display: none;">
-        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">
+        <div class="card-header  d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-black">
                 <i class="fas fa-ticket-alt me-2"></i>
                 <span id="selectedCompanyName"></span> - Tickets Overview
             </h5>
             <div class="btn-group">
-                <button class="btn btn-light btn-sm" id="exportExcel">
+                <button class="btn btn-sm" id="exportExcel">
                     <i class="fas fa-file-excel me-1"></i> Export to Excel
                 </button>
-                <button class="btn btn-light btn-sm ms-2" id="printTickets">
+                <button class="btn btn-sm ms-2" id="printTickets">
                     <i class="fas fa-print me-1"></i> Print
                 </button>
             </div>
         </div>
         <div class="card-body">
             <!-- Company Statistics -->
-            <div class="row mb-4">
+            <div class="row mb-4 gap-2">
                 <div class="col-md-3">
-                    <div class="card bg-info text-white">
+                    <div class="card bg-white text-white">
                         <div class="card-body">
                             <h6>Total Tickets</h6>
                             <h3 id="companyTotalTickets">0</h3>
@@ -163,7 +163,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-success text-white">
+                    <div class="card bg-white text-white">
                         <div class="card-body">
                             <h6>Resolved Tickets</h6>
                             <h3 id="companyResolvedTickets">0</h3>
@@ -171,7 +171,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-warning text-white">
+                    <div class="card bg-white text-white">
                         <div class="card-body">
                             <h6>Pending Tickets</h6>
                             <h3 id="companyPendingTickets">0</h3>
@@ -179,7 +179,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <div class="card bg-danger text-white">
+                    <div class="card bg-white text-white">
                         <div class="card-body">
                             <h6>Critical Tickets</h6>
                             <h3 id="companyCriticalTickets">0</h3>
@@ -191,7 +191,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
             <!-- Filtered Tickets Table -->
             <div class="table-responsive mt-3">
                 <table class="table table-hover" id="companyTicketsTable">
-                    <thead class="table-light">
+                    <thead class="">
                         <tr>
                             <th>ID</th>
                             <th>Module</th>
@@ -708,13 +708,13 @@ body {
 .card {
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s, box-shadow 0.2s;
+    /* transition: transform 0.2s, box-shadow 0.2s; */
     width: 100%; /* Ensure cards take full width */
-    background-color: #ffe4b5; /* Light orange background */
+    background-color: lightgray; /* Light orange background */
     border: none; /* Remove borders */
 }
 .card:hover {
-    transform: scale(1.05);
+    /* transform: scale(1.05); */
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
 }
 
@@ -785,7 +785,7 @@ body {
     overflow: hidden;
     width: 100%; /* Ensure the table fits the screen */
 }
-.table thead th {
+.table-head th {
     background-color: #ff8c00; /* Orange for the table header */
     color: #ffffff;
 }

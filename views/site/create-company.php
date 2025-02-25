@@ -1,4 +1,5 @@
 <?php
+
 use yii\helpers\Html;
 use yii\bootstrap5\ActiveForm;
 use yii\helpers\ArrayHelper;
@@ -20,71 +21,72 @@ foreach ($clientCompanies as $company) {
 }
 $companiesJson = Json::encode($companiesForJs);
 ?>
-
-<div class="create-user">
-    <div class="card">
-        <div class="card-header">
-            <h2><?= Html::encode($this->title) ?></h2>
-        </div>
-        <div class="card-body">
-            <?php $form = ActiveForm::begin(['id' => 'create-user-form']); ?>
-            
-            <?= $form->field($model, 'name')->textInput([
-                'id' => 'name',
-                'class' => 'form-control',
-                'maxlength' => true,
-                'readonly' => true  // Make it readonly since it will be autofilled
-            ]) ?>
-
-            <?= $form->field($model, 'company_name')->dropDownList(
-                $companyList,
-                [
-                    'prompt' => 'Select Company',
-                    'id' => 'company-dropdown',
-                    'class' => 'form-control'
-                ]
-            ) ?>
-
-            <?= $form->field($model, 'company_email')->textInput([
-                'id' => 'company-email',
-                'readonly' => true
-            ]) ?>
-
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <?= $form->field($model, 'start_date')->input('date', [
-                        'class' => 'form-control',
-                        'required' => true,
-                        'min' => date('Y-m-d'),
-                        'id' => 'start-date-input'
-                    ]) ?>
-                </div>
-                <div class="col-md-6">
-                    <?= $form->field($model, 'end_date')->input('date', [
-                        'class' => 'form-control',
-                        'required' => true,
-                        'min' => date('Y-m-d'),
-                        'id' => 'end-date-input'
-                    ]) ?>
-                </div>
+<div class="row justify-content-center">
+    <div class=" col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="text-black text-center"><?= Html::encode($this->title) ?></h2>
             </div>
+            <div class="card-body">
+                <?php $form = ActiveForm::begin(['id' => 'create-user-form']); ?>
 
-            <div class="modules-section" style="display: none;">
-                <h4>Company Modules</h4>
-                <div id="modules-container" class="row">
-                    <!-- Modules will be displayed here -->
+                <?= $form->field($model, 'name')->textInput([
+                    'id' => 'name',
+                    'class' => 'form-control',
+                    'maxlength' => true,
+                    'readonly' => true  // Make it readonly since it will be autofilled
+                ]) ?>
+
+                <?= $form->field($model, 'company_name')->dropDownList(
+                    $companyList,
+                    [
+                        'prompt' => 'Select Company',
+                        'id' => 'company-dropdown',
+                        'class' => 'form-control'
+                    ]
+                ) ?>
+
+                <?= $form->field($model, 'company_email')->textInput([
+                    'id' => 'company-email',
+                    'readonly' => true
+                ]) ?>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <?= $form->field($model, 'start_date')->input('date', [
+                            'class' => 'form-control',
+                            'required' => true,
+                            'min' => date('Y-m-d'),
+                            'id' => 'start-date-input'
+                        ]) ?>
+                    </div>
+                    <div class="col-md-6">
+                        <?= $form->field($model, 'end_date')->input('date', [
+                            'class' => 'form-control',
+                            'required' => true,
+                            'min' => date('Y-m-d'),
+                            'id' => 'end-date-input'
+                        ]) ?>
+                    </div>
                 </div>
-            </div>
 
-            <div class="form-group">
-                <?= Html::submitButton('Save', ['class' => 'btn btn-success']) ?>
-            </div>
+                <div class="modules-section" style="display: none;">
+                    <h4>Company Modules</h4>
+                    <div id="modules-container" class="row">
+                        <!-- Modules will be displayed here -->
+                    </div>
+                </div>
 
-            <?php ActiveForm::end(); ?>
+                <div class="form-group d-flex justify-content-center">
+                    <?= Html::submitButton('Save', ['class' => 'btn btn-success w-100 p-2 mt-3', 'style' => 'max-width: 200px;']) ?>
+                </div>
+
+
+                <?php ActiveForm::end(); ?>
+            </div>
         </div>
     </div>
 </div>
-
 <?php
 $js = <<<JS
 $(document).ready(function() {

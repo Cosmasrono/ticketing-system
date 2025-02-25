@@ -18,7 +18,7 @@ use yii\helpers\Url;
 if (Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index') {
     LandingAsset::register($this);
 } else {
- //   AppAsset::register($this);
+    //AppAsset::register($this);
     LandingAsset::register($this);
 }
 
@@ -43,7 +43,7 @@ JqueryAsset::register($this);
     <style>
         /* Navbar styling */
         .navbar {
-        background:#37517e  !important;
+            background: #37517e !important;
             /* background: linear-gradient(to right, #FF8C00, #FF4500) !important; */
             /* Orange gradient */
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -51,7 +51,7 @@ JqueryAsset::register($this);
         }
 
 
-      
+
 
         /* Brand/Logo styling */
         .navbar-brand {
@@ -172,10 +172,12 @@ JqueryAsset::register($this);
 
     <body class="guest-index-page">
         <header id="guest-header" class="guest-header d-flex align-items-center fixed-top">
-            <div class="container-fluid container-xl d-flex align-items-center justify-content-between">
+            <div class="container-fluid d-flex">
                 <a href="<?= Yii::$app->homeUrl ?>" class="logo d-flex align-items-center">
                     <img src="https://www.iansoftltd.com/assets/img/logo.jpg" alt="Iansoft Logo">
                 </a>
+            </div>
+            <div class="container-fluid container-xl d-flex align-items-center justify-content-end">
                 <nav id="navmenu" class="navmenu">
                     <ul>
                         <li><a href="#hero" class="active">Home</a></li>
@@ -185,8 +187,8 @@ JqueryAsset::register($this);
                     </ul>
                     <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
                 </nav>
+                <div><a class="btn-getstarted" href="/site/login">Login</a></div>
 
-                <a class="btn-getstarted" href="/site/login">Login</a>
             </div>
         </header>
 
@@ -246,15 +248,13 @@ JqueryAsset::register($this);
 
             NavBar::end();
             ?>
-             <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
+            <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
         </header>
     <?php endif; ?>
 
     <main id="main" class="flex-shrink-0" role="main">
-        <?php if (!(Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index')): ?>
-
-
-            <div class="">
+        <?php if (!(Yii::$app->user->isGuest) && Yii::$app->controller->action->id !== 'index'): ?>
+            <div class="container">
                 <?= Alert::widget() ?>
                 <?= $content ?>
             </div>
@@ -376,4 +376,3 @@ JqueryAsset::register($this);
 </html>
 <?php $this->endPage() ?>
 <?php
-

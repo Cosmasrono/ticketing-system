@@ -6,9 +6,9 @@ use yii\bootstrap5\ActiveForm;
 <div class="create-admin">
     <div class="row justify-content-center">
         <div class="col-lg-8">
-            <div class="card shadow-lg">
-                <div class="card-header bg-danger text-white">
-                    <h2 class="text-center mb-0">Create Administrator</h2>
+            <div class="card ">
+                <div class="card-header  text-black">
+                    <h2 class="text-center text-black mb-0">Create Administrator</h2>
                 </div>
                 <div class="card-body">
                     <?php $form = ActiveForm::begin(['id' => 'create-admin-form']); ?>
@@ -21,7 +21,7 @@ use yii\bootstrap5\ActiveForm;
                     <?= $form->field($model, 'role')->hiddenInput(['value' => 'admin'])->label(false) ?>
 
                     <div class="form-group text-center">
-                        <?= Html::submitButton('Create Administrator', ['class' => 'btn btn-danger btn-lg mt-3']) ?>
+                        <?= Html::submitButton('Create Administrator', ['class' => 'btn btn-success w-100 p-2 mt-3', 'style' => 'max-width: 200px;']) ?>
                     </div>
 
                     <?php ActiveForm::end(); ?>

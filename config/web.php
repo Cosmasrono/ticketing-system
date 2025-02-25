@@ -146,7 +146,7 @@ $config = [
                 $response = $event->sender;
                 if (isset($_SERVER['HTTP_ORIGIN'])) {
                     // Allow only specific origins
-                    $allowedOrigins = ['http://localhost:8080', 'http://localhost:3000'];
+                    $allowedOrigins = ['http://localhost:9090', 'http://localhost:3000'];
                     if (in_array($_SERVER['HTTP_ORIGIN'], $allowedOrigins)) {
                         $response->headers->set('Access-Control-Allow-Origin', $_SERVER['HTTP_ORIGIN']);
                     }

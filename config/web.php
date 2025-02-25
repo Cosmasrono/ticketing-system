@@ -65,8 +65,10 @@ $config = [
         ],
         'db' => $db,
         'urlManager' => [
+            'class' => 'yii\web\UrlManager',
             'enablePrettyUrl' => true,
             'showScriptName' => false,
+            'baseUrl' => 'http://localhost:82',
             'rules' => [
                 'site/first-login' => 'site/first-login',
                 'admin/<id:\d+>' => 'site/admin',

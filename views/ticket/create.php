@@ -8,7 +8,7 @@ $this->title = 'Create Ticket';
 ?>
 
 <div class="ticket-create">
-    <h1><?= Html::encode($this->title) ?></h1>
+    <h1 class="text-black"><?= Html::encode($this->title) ?></h1>
 
     <?php if (Yii::$app->session->hasFlash('success')): ?>
         <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -109,7 +109,7 @@ $this->title = 'Create Ticket';
 
     <div class="form-group">
         <?= Html::submitButton('Create Ticket', [
-            'class' => 'btn btn-success',
+            'class' => 'btn btn-success w-100 p-2 mt-3', 'style' => 'max-width: 200px;',
             'id' => 'submit-button'
         ]) ?>
     </div>

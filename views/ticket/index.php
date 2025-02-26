@@ -12,121 +12,73 @@ $this->params['breadcrumbs'][] = $this->title;
 ?>
 <div class="container ticket-index">
 
-    <h1 class="text-black"><?= Html::encode($this->title) ?></h1>
+    <h1 class="fw-semibold"> <?= Html::encode($this->title) ?> </h1>
 
-    <p>
-        <?= Html::a('Create Ticket', ['create'], ['class' => 'btn btn-success w-100 p-2 mt-3', 'style' => 'max-width: 200px;']) ?>
+    <p class="text-center">
+        <?= Html::a(
+            '<i class="fas fa-plus-circle"></i> Create Ticket',
+            ['create'],
+            [
+                'class' => 'btn custom-btn w-100 p-2 mt-3 rounded-1 d-flex align-items-center justify-content-center gap-2',
+                'style' => 'max-width: 220px;'
+            ]
+        )
+        ?>
     </p>
+
+
 
     <?php Pjax::begin(); ?>
 
     <?= GridView::widget([
         'dataProvider' => $dataProvider,
+        'tableOptions' => ['class' => 'table table-striped table-hover shadow-sm custom-table'],
         'columns' => [
             ['class' => 'yii\grid\SerialColumn'],
             'id',
             [
                 'attribute' => 'company_name',
-                'value' => function($model) {
-                    return !empty($model->company_name) ? $model->company_name : Yii::$app->user->identity->company_name;
-                }
+                'value' => fn($model) => $model->company_name ?: Yii::$app->user->identity->company_name,
             ],
             [
                 'attribute' => 'module',
-                'value' => function($model) {
-                    return !empty($model['module']) ? $model['module'] : '(not set)';
-                }
+                'value' => fn($model) => $model['module'] ?: '(not set)',
             ],
             [
                 'attribute' => 'issue',
-                'value' => function($model) {
-                    return !empty($model['issue']) ? $model['issue'] : '(not set)';
-                }
+                'value' => fn($model) => $model['issue'] ?: '(not set)',
             ],
-            
             [
                 'attribute' => 'description',
                 'format' => 'ntext',
-                'contentOptions' => ['style' => 'max-width:300px; overflow:hidden; text-overflow:ellipsis;'],
+                'contentOptions' => ['style' => 'max-width:350px; overflow:hidden; text-overflow:ellipsis;'],
             ],
             [
                 'attribute' => 'status',
                 'format' => 'raw',
-                'value' => function($model) {
+                'value' => function ($model) {
                     $statusClasses = [
-                        'pending' => 'badge bg-warning',
-                        'closed' => 'badge bg-secondary',
+                        'pending' => 'badge bg-warning text-dark',
+                        'closed' => 'badge bg-success',
                         'escalated' => 'badge bg-danger',
                     ];
-                    $class = isset($statusClasses[$model->status]) ? $statusClasses[$model->status] : 'badge bg-primary';
-                    return Html::tag('span', $model->status, ['class' => $class]);
+                    $class = $statusClasses[$model->status] ?? 'badge bg-primary';
+                    return Html::tag('span', ucfirst($model->status), ['class' => $class]);
                 }
-            ],
-            [
-                'attribute' => 'feedback',
-                'value' => function($model) {
-                    return !empty($model->feedback) ? $model->feedback : '(no feedback)';
-                },
-                'contentOptions' => ['style' => 'max-width:200px; overflow:hidden; text-overflow:ellipsis;'],
             ],
             [
                 'attribute' => 'created_at',
                 'format' => 'datetime',
             ],
             [
-                'label' => 'Attachments',
-                'format' => 'raw',
-                'value' => function ($model) {
-                    $ticketData = Yii::$app->db->createCommand('
-                        SELECT screenshot_url, voice_note_url 
-                        FROM ticket 
-                        WHERE id = :id
-                    ')
-                    ->bindValue(':id', $model->id)
-                    ->queryOne();
-                    
-                    $buttons = [];
-                    
-                    // Screenshot button
-                    if (!empty($ticketData['screenshot_url'])) {
-                        $buttons[] = Html::button('<i class="fas fa-image"></i> Screenshot', [
-                            'class' => 'btn btn-orange btn-xs view-screenshot mb-1',
-                            'data-src' => $ticketData['screenshot_url'],
-                            'title' => 'View Screenshot'
-                        ]);
-                    }
-                    
-                    // Voice note button
-                    if (!empty($ticketData['voice_note_url'])) {
-                        $buttons[] = Html::button('<i class="fas fa-microphone"></i> Voice Note', [
-                            'class' => 'btn btn-info btn-xs view-voice-note mb-1',
-                            'data-src' => $ticketData['voice_note_url'],
-                            'title' => 'Play Voice Note'
-                        ]);
-                    }
-                    
-                    if (empty($buttons)) {
-                        return '<span class="text-muted">No attachments</span>';
-                    }
-                    
-                    return implode('<br>', $buttons);
-                },
-                'contentOptions' => ['class' => 'text-center', 'style' => 'min-width:120px;'],
-            ],
-            [
                 'class' => 'yii\grid\ActionColumn',
                 'template' => '{delete} {close}',
                 'buttons' => [
-                    'delete' => function ($url, $model, $key) {
-                        return Html::a('Delete', ['delete', 'id' => $model->id], [
-                            'class' => 'btn btn-danger btn-xs',
-                            'data' => [
-                                'confirm' => 'Are you sure you want to delete this ticket?',
-                                'method' => 'post',
-                            ],
-                        ]);
-                    },
-                    'close' => function ($url, $model, $key) {
+                    'delete' => fn($url, $model) => Html::a('Delete', ['delete', 'id' => $model->id], [
+                        'class' => 'btn btn-danger btn-xs',
+                        'data' => ['confirm' => 'Are you sure you want to delete this ticket?', 'method' => 'post'],
+                    ]),
+                    'close' => function ($url, $model) {
                         if ($model->status !== 'closed') {
                             return Html::button('<i class="fas fa-times-circle"></i> Close', [
                                 'class' => 'btn btn-warning btn-xs close-ticket',
@@ -135,295 +87,84 @@ $this->params['breadcrumbs'][] = $this->title;
                                 'title' => 'Close this ticket'
                             ]);
                         }
-                        return '<span class="badge bg-secondary">Closed</span>';
+                        return '<span class="badge bg-success">Closed</span>';
                     },
                 ],
-                'contentOptions' => ['style' => 'min-width:200px;'],
+                'contentOptions' => ['style' => 'min-width:180px;'],
             ],
         ],
     ]); ?>
 
+
     <?php Pjax::end(); ?>
-
-</div>
-
-<!-- Update the voice note modal structure -->
-<div class="modal fade" id="voiceNoteModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Voice Note</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body text-center">
-                <audio id="voiceNotePlayer" controls class="w-100">
-                    <source src="" type="audio/wav">
-                    Your browser does not support the audio element.
-                </audio>
-                <div class="mt-3">
-                    <a id="downloadVoiceNote" href="" download class="btn btn-sm btn-primary">
-                        <i class="fas fa-download"></i> Download
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
 </div>
 
 <style>
-.grid-view td {
-    white-space: normal !important;
-    vertical-align: middle !important;
-}
-
-.badge {
-    padding: 5px 10px;
-    font-size: 12px;
-}
-
-.btn-xs {
-    padding: 1px 5px;
-    font-size: 12px;
-    line-height: 1.5;
-    border-radius: 3px;
-}
-
-.ticket-screenshot {
-    max-width: 100%;
-    height: auto;
-    display: block;
-}
-
-.btn-orange {
-    background-color: #ff9800; /* Orangish color */
-    border-color: #ff9800;
-    color: #fff;
-}
-
-.btn-orange:hover {
-    background-color: #e68900; /* Darker shade on hover */
-    border-color: #e68900;
-}
-
-.btn-warning {
-    background-color: #ffc107;
-    border-color: #ffc107;
-    color: #000;
-}
-
-.btn-warning:hover {
-    background-color: #e0a800;
-    border-color: #d39e00;
-    color: #000;
-}
-
-.close-ticket {
-    margin-left: 5px;
-}
-
-.badge.bg-secondary {
-    font-size: 11px;
-    padding: 4px 8px;
-}
-
-.swal-image-custom {
-    max-width: 100%;
-    max-height: 70vh; /* Limit height to 70% of viewport height */
-    width: auto;
-    height: auto;
-    object-fit: contain;
-    margin: 0 auto;
-}
-
-.swal2-popup {
-    padding: 1em !important;
-}
-
-.swal2-content {
-    padding: 0 !important;
-}
-
-/* Optional: Add a subtle border and shadow to the image */
-.swal-image-custom {
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-/* Ensure modal is not too tall on smaller screens */
-@media (max-height: 768px) {
-    .swal-image-custom {
-        max-height: 60vh;
+   .custom-table thead th {
+   
+        color:  #1B1D4E !important;
+      
     }
-}
 
-/* Add these new styles */
-#voiceNoteModal .modal-body {
-    padding: 20px;
-}
+    .custom-btn {
+        background-color:#748386;
+        /* Primary Blue */
+        color: white;
+        border: none;
+        transition: background-color 0.3s ease, transform 0.2s ease;
+    }
 
-#voiceNotePlayer {
-    width: 100%;
-    max-width: 100%;
-    margin-bottom: 10px;
-}
+    .custom-btn:hover {
+        background-color: #5F6B72;
+        color: white;
 
-.btn-xs {
-    margin: 2px;
-    min-width: 100px;
-}
+        
+    }
 
-.modal-dialog {
-    max-width: 500px;
-}
+    .custom-btn i {
+        font-size: 1.2rem;
+        /* Slightly larger icon */
+    }
 
-.audio-controls {
-    margin-top: 10px;
-}
+    .ticket-index {
+        margin-top: 30px;
 
-#downloadVoiceNote {
-    text-decoration: none;
-    margin-top: 10px;
-}
+        padding: 20px;
+        border-radius: 8px;
+    }
 
-#voiceNoteModal .modal-content {
-    border-radius: 8px;
-}
+    .table-hover tbody tr:hover {
+        background-color: #e3f2fd;
+    }
 
-#voiceNoteModal .modal-header {
-    border-bottom: 1px solid #dee2e6;
-    background-color: #f8f9fa;
-}
+    .btn-outline-primary {
+        border-color: #E85720;
+        color: #E85720;
+    }
+
+    .btn-outline-primary:hover {
+        background-color: white;
+        color: #1C1C4E;
+    }
+
+    .btn-create {
+        background-color: #E85720;
+        color: white;
+        font-weight: normal;
+        border-radius: 5%;
+    }
+
+    .btn-create:hover {
+        background-color: #d04d1c;
+        color: white;
+    }
+
+    .btn-warning {
+        background-color: #ffc107;
+        color: black;
+    }
+
+    .btn-danger {
+        background-color: #dc3545;
+    }
 </style>
-
-<?php
-$this->registerJs("
-    // Screenshot viewer
-    $(document).on('click', '.view-screenshot', function() {
-        const imageUrl = $(this).data('src');
-        Swal.fire({
-            imageUrl: imageUrl,
-            imageAlt: 'Screenshot',
-            width: '60%',
-            showCloseButton: true,
-            showConfirmButton: false,
-            customClass: {
-                image: 'swal-image-custom'
-            }
-        });
-    });
-
-    // Voice note player
-    $(document).on('click', '.view-voice-note', function() {
-        const audioUrl = $(this).data('src');
-        const player = document.getElementById('voiceNotePlayer');
-        const downloadBtn = document.getElementById('downloadVoiceNote');
-        
-        // Set the audio source
-        player.src = audioUrl;
-        
-        // Set download link
-        downloadBtn.href = audioUrl;
-        
-        // Show modal
-        const voiceNoteModal = new bootstrap.Modal(document.getElementById('voiceNoteModal'));
-        voiceNoteModal.show();
-        
-        // Play the audio
-        player.load(); // Reload the audio element
-        
-        // Reset audio when modal is closed
-        $('#voiceNoteModal').on('hidden.bs.modal', function () {
-            player.pause();
-            player.currentTime = 0;
-        });
-    });
-
-    // Close ticket functionality
-    $(document).on('click', '.close-ticket', function(e) {
-        e.preventDefault();
-        const ticketId = $(this).data('id');
-        const button = $(this);
-        
-        Swal.fire({
-            title: 'Close Ticket',
-            text: 'Please provide a comment before closing this ticket:',
-            input: 'textarea',
-            inputPlaceholder: 'Enter your comment here...',
-            showCancelButton: true,
-            confirmButtonColor: '#ffc107',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: 'Yes, close it!',
-            cancelButtonText: 'Cancel'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const comment = result.value; // Get the comment from the input
-                Swal.fire({
-                    title: 'Processing...',
-                    text: 'Please wait while we close the ticket',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
-
-                $.ajax({
-                    url: '" . Yii::$app->urlManager->createUrl(['ticket/close']) . "',
-                    type: 'POST',
-                    data: {
-                        id: ticketId,
-                        comment: comment, // Send the comment with the request
-                        _csrf: '" . Yii::$app->request->csrfToken . "'
-                    },
-                    dataType: 'json'
-                })
-                .done(function(response) {
-                    if (response.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Ticket Closed!',
-                            text: 'The ticket has been successfully closed.',
-                            showConfirmButton: false,
-                            timer: 1500
-                        }).then(() => {
-                            button.replaceWith('<span class=\"badge bg-secondary\">Closed</span>');
-                            button.closest('tr').find('td:nth-child(5)').html(
-                                '<span class=\"badge bg-secondary\">closed</span>'
-                            );
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: response.message || 'Failed to close ticket'
-                        });
-                    }
-                })
-                .fail(function(jqXHR) {
-                    let errorMessage = 'An error occurred while closing the ticket.';
-                    try {
-                        const response = JSON.parse(jqXHR.responseText);
-                        if (response.message) {
-                            errorMessage = response.message;
-                        }
-                    } catch (e) {
-                        console.error('Error parsing response:', e);
-                    }
-
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: errorMessage
-                    });
-                });
-            }
-        });
-    });
-");
-?>
-
-<!-- Add SweetAlert2 CDN -->
-<?php $this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11', ['position' => \yii\web\View::POS_HEAD]); ?>
-
-<!-- Add Font Awesome for the eye icon -->
-<?php $this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css'); ?>

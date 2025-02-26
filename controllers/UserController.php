@@ -10,6 +10,7 @@ use yii\web\NotFoundHttpException;
 use app\models\Company;
 use app\models\Ticket;
 use app\models\ContractRenewal;
+use yii\rbac\Role;
 
 class UserController extends Controller
 {
@@ -21,7 +22,7 @@ class UserController extends Controller
                 'rules' => [
                     [
                         'allow' => true,
-                        'roles' => ['@'],  // Authenticated users only
+                        'roles' => ['@','admin'],  // Authenticated users only
                     ],
                 ],
             ],
@@ -123,6 +124,7 @@ class UserController extends Controller
         'id' => $company->id,
         'company_name' => $company->company_name,
         'company_email' => $company->company_email,
+        'role'=>$company->role,
         'start_date' => $company->start_date,
         'end_date' => $company->end_date,
         'status' => $company->status,

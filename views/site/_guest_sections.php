@@ -48,7 +48,7 @@ $this->title = 'Iansoft - Help Desk Solutions';
                         <li><i class="bi bi-check2-circle"></i> <span>Real-time tracking for instant updates on ticket status</span></li>
                         <li><i class="bi bi-check2-circle"></i> <span>24/7 expert support to keep your operations running smoothly</span></li>
                     </ul>
-                    <a href="#" class="read-more"><span>Read More</span><i class="bi bi-arrow-right"></i></a>
+                    <a href="/" class="read-more"><span>Read More</span><i class="bi bi-arrow-right"></i></a>
                 </div>
             </div>
         </div>

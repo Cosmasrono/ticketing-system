@@ -1,4 +1,5 @@
 <?php
+
 use yii\helpers\Html;
 use yii\bootstrap5\ActiveForm;
 use yii\helpers\Json;
@@ -7,115 +8,137 @@ use app\models\Ticket;
 $this->title = 'Create Ticket';
 ?>
 
-<div class="ticket-create">
-    <h1><?= Html::encode($this->title) ?></h1>
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card border-0 shadow">
+                <div class="card-header text-white text-center" style="background-color: ;">
+                    <h3 class="mb-0"><?= Html::encode($this->title) ?></h3>
+                </div>
+                <div class="card-body p-4">
 
-    <?php if (Yii::$app->session->hasFlash('success')): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="fas fa-check-circle me-2"></i>
-            <?= Yii::$app->session->getFlash('success') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    <?php endif; ?>
+                    <!-- Success and Error Alerts -->
+                    <?php if (Yii::$app->session->hasFlash('success')): ?>
+                        <div class="alert alert-success alert-dismissible fade show" role="alert">
+                            <?= Yii::$app->session->getFlash('success') ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
 
-    <?php if (Yii::$app->session->hasFlash('error')): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fas fa-exclamation-circle me-2"></i>
-            <?= Yii::$app->session->getFlash('error') ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    <?php endif; ?>
+                    <?php if (Yii::$app->session->hasFlash('error')): ?>
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <?= Yii::$app->session->getFlash('error') ?>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    <?php endif; ?>
 
-    <?php $form = ActiveForm::begin([
-        'options' => [
-            'enctype' => 'multipart/form-data',
-            'id' => 'ticket-form'
-        ]
-    ]); ?>
+                    <?php $form = ActiveForm::begin([
+                        'options' => [
+                            'enctype' => 'multipart/form-data',
+                            'id' => 'ticket-form'
+                        ]
+                    ]); ?>
 
-    <?= $form->field($model, 'company_name')->textInput([
-        'value' => Yii::$app->user->identity->company_name,
-        'readonly' => true
-    ]) ?>
+                    <!-- Company Name -->
+                    <div class="mb-3">
+                        <?= $form->field($model, 'company_name')->textInput([
+                            'value' => Yii::$app->user->identity->company_name,
+                            'readonly' => true,
+                            'class' => 'form-control bg-light'
+                        ]) ?>
+                    </div>
 
-    <?= $form->field($model, 'module')->dropDownList(
-        $companyModules,
-        [
-            'prompt' => 'Select Module',
-            'id' => 'ticket-module',
-            'class' => 'form-control'
-        ]
-    ) ?>
+                    <!-- Module & Issue -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <?= $form->field($model, 'module')->dropDownList(
+                                $companyModules,
+                                ['prompt' => 'Select Module', 'id' => 'ticket-module', 'class' => 'form-select']
+                            ) ?>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <?= $form->field($model, 'issue')->dropDownList(
+                                [],
+                                ['prompt' => 'Select Issue', 'id' => 'ticket-issue', 'class' => 'form-select']
+                            )->hint('Select a module first') ?>
+                        </div>
+                    </div>
 
-    <?= $form->field($model, 'issue')->dropDownList(
-        [],
-        [
-            'prompt' => 'Select Issue',
-            'id' => 'ticket-issue',
-            'class' => 'form-control'
-        ]
-    )->hint('Please select a module first') ?>
+                    <!-- Severity -->
+                    <div class="mb-3">
+                        <?= $form->field($model, 'severity')->dropDownList(
+                            [
+                                Ticket::SEVERITY_LOW => 'Low',
+                                Ticket::SEVERITY_MEDIUM => 'Medium',
+                                Ticket::SEVERITY_HIGH => 'High',
+                                Ticket::SEVERITY_CRITICAL => 'Critical'
+                            ],
+                            ['prompt' => 'Select Severity', 'class' => 'form-select']
+                        ) ?>
+                    </div>
 
-    <?= $form->field($model, 'severity')->dropDownList(
-        [
-            Ticket::SEVERITY_LOW => 'Low',
-            Ticket::SEVERITY_MEDIUM => 'Medium',
-            Ticket::SEVERITY_HIGH => 'High',
-            Ticket::SEVERITY_CRITICAL => 'Critical'
-        ],
-        [
-            'prompt' => 'Select Severity'
-        ]
-    ) ?>
+                    <!-- Description -->
+                    <div class="mb-3">
+                        <?= $form->field($model, 'description')->textarea(['rows' => 4, 'class' => 'form-control']) ?>
+                    </div>
 
-    <?= $form->field($model, 'description')->textarea(['rows' => 6]) ?>
+                    <!-- Screenshot Upload -->
+                    <div class="mb-3">
+                        <?= $form->field($model, 'screenshot')->fileInput([
+                            'class' => 'form-control',
+                            'accept' => 'image/*',
+                            'required' => true
+                        ])->hint('Allowed file types: PNG, JPG, JPEG, GIF. Max size: 5MB') ?>
+                    </div>
 
-    <?= $form->field($model, 'screenshot')->fileInput([
-        'class' => 'form-control',
-        'accept' => 'image/*',
-        'required' => true
-    ])->hint('Required. Allowed file types: PNG, JPG, JPEG, GIF. Max size: 5MB') ?>
+                    <!-- Voice Note Recording -->
+                    <div class="p-3 rounded" style="background-color: #f8f9fa;">
+                        <label class="form-label fw-bold">Voice Note</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" id="recordButton" class="btn text-white" style="background-color:#5F6B72">
+                                <i class="fas fa-microphone"></i> Start Recording
+                            </button>
+                            <button type="button" id="stopButton" class="btn btn-danger" style="display:none;">
+                                <i class="fas fa-stop"></i> Stop Recording
+                            </button>
+                            <span id="recordingStatus" class="text-muted ms-2"></span>
+                        </div>
+                        <div id="recordingsList" class="mt-2" style="display:none;">
+                            <audio id="recordedAudio" controls class="w-100"></audio>
+                            <input type="hidden" name="voice_note_url" id="voice_note_url">
+                            <div class="mt-2">
+                                <button type="button" id="saveVoiceNote" class="btn btn-success btn-sm">
+                                    <i class="fas fa-save"></i> Save Voice Note
+                                </button>
+                                <button type="button" id="discardVoiceNote" class="btn btn-danger btn-sm">
+                                    <i class="fas fa-trash"></i> Discard
+                                </button>
+                            </div>
+                        </div>
+                    </div>
 
-    <!-- Voice Note Recording Section -->
-    <div class="voice-note-section mb-4">
-        <label class="form-label">Voice Note</label>
-        <div class="d-flex align-items-center gap-2 mb-2">
-            <button type="button" id="recordButton" class="btn btn-primary">
-                <i class="fas fa-microphone"></i> Start Recording
-            </button>
-            <button type="button" id="stopButton" class="btn btn-danger" style="display:none;">
-                <i class="fas fa-stop"></i> Stop Recording
-            </button>
-            <span id="recordingStatus" class="text-muted ms-2"></span>
-        </div>
-        <div id="recordingsList" class="mt-2" style="display:none;">
-            <audio id="recordedAudio" controls></audio>
-            <input type="hidden" name="voice_note_url" id="voice_note_url">
-            <div class="mt-2">
-                <button type="button" id="saveVoiceNote" class="btn btn-success btn-sm">
-                    <i class="fas fa-save"></i> Save Voice Note
-                </button>
-                <button type="button" id="discardVoiceNote" class="btn btn-danger btn-sm">
-                    <i class="fas fa-trash"></i> Discard
-                </button>
+                    <!-- Image Preview -->
+                    <div class="preview-container mt-3 text-center" style="display:none;">
+                        <img id="image-preview" src="" alt="Preview" class="img-thumbnail shadow" style="max-width: 250px;">
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid mt-4">
+                        <?= Html::submitButton('Create Ticket', [
+                            'class' => 'btn text-white p-2',
+                            'style' => 'background-color: #EA5626;',
+                            'id' => 'submit-button'
+                        ]) ?>
+                    </div>
+
+                    <?php ActiveForm::end(); ?>
+
+                </div>
             </div>
         </div>
     </div>
-
-    <!-- Image preview container -->
-    <div class="preview-container mt-2 mb-3" style="display:none;">
-        <img id="image-preview" src="" alt="Preview" style="max-width: 200px;" class="img-thumbnail">
-    </div>
-
-    <div class="form-group">
-        <?= Html::submitButton('Create Ticket', [
-            'class' => 'btn btn-success',
-            'id' => 'submit-button'
-        ]) ?>
-    </div>
-
-    <?php ActiveForm::end(); ?>
 </div>
+
 
 <?php
 $moduleIssuesJson = Json::encode($moduleIssues);
@@ -328,21 +351,44 @@ $this->registerJs($script);
 ?>
 
 <style>
-/* ... your existing styles ... */
+    .btn-str {
+        background-color: #748386;
+        /* Primary Blue */
+        color: white;
+        border: none;
+  
+    }
 
-.voice-note-section {
-    border: 1px solid #ddd;
-    padding: 15px;
-    border-radius: 5px;
-    background-color: #f8f9fa;
-}
+    /* ... your existing styles ... */
+    .custom-btn {
+        background-color: #EA5626;
+        color: white;
+        border: none;
+    }
 
-#recordingStatus {
-    font-family: monospace;
-}
+    .custom-btn:hover {
+        background-color: #C7471E;
+        color: white;
+    }
 
-#recordedAudio {
-    width: 100%;
-    max-width: 300px;
-}
+
+    .ticket-create {
+        margin-top: 30px;
+    }
+
+    .voice-note-section {
+        border: 1px solid #ddd;
+        padding: 15px;
+        border-radius: 5px;
+        background-color: #f8f9fa;
+    }
+
+    #recordingStatus {
+        font-family: monospace;
+    }
+
+    #recordedAudio {
+        width: 100%;
+        max-width: 300px;
+    }
 </style>

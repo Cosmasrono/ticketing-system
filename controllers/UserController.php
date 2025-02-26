@@ -10,6 +10,7 @@ use yii\web\NotFoundHttpException;
 use app\models\Company;
 use app\models\Ticket;
 use app\models\ContractRenewal;
+use yii\rbac\Role;
 
 class UserController extends Controller
 {
@@ -21,7 +22,7 @@ class UserController extends Controller
                 'rules' => [
                     [
                         'allow' => true,
-                        'roles' => ['@'],  // Authenticated users only
+                        'roles' => ['@','admin'],  // Authenticated users only
                     ],
                 ],
             ],
@@ -49,76 +50,74 @@ class UserController extends Controller
     }
 
     public function actionProfile($id)
-    {
-        $user = User::findOne($id);
-        if ($user === null) {
-            throw new NotFoundHttpException('The requested user does not exist.');
-        }
+{
+    $user = User::findOne($id);
+    if (!$user) {
+        throw new NotFoundHttpException('The requested user does not exist.');
+    }
 
-        $company = Company::findOne(['company_name' => $user->company_name]);
-        if ($company === null) {
-            throw new NotFoundHttpException('Company not found.');
-        }
+    $company = Company::findOne(['company_name' => $user->company_name]);
+    if (!$company) {
+        throw new NotFoundHttpException('Company not found.');
+    }
 
-        // Get current user's role
-        $isCEO = Yii::$app->user->identity->role === 4;
+    // Get the current user's role
+    $isCEO = Yii::$app->user->identity->role === 4;
 
-        // Initialize variables
-        $tickets = [];
-        $ticketStats = null;
-        $companyStats = null;
-        $developerStats = null;
+    // Initialize variables
+    $tickets = [];
+    $ticketStats = null;
+    $companyStats = null;
+    $developerStats = null;
 
-        // For CEO (role 4), fetch all tickets with detailed information
-        if ($isCEO) {
-            $tickets = Ticket::find()
-                ->select([
-                    'ticket.*',
-                    'company.company_name',
-                    'company.company_email'
-                ])
-                ->alias('ticket')
-                ->leftJoin('company', 'ticket.company_id = company.id')
-                ->orderBy(['last_update_at' => SORT_DESC])
-                ->all();
+    if ($isCEO) {
+        // Fetch all tickets with company details
+        $tickets = Ticket::find()
+            ->alias('t')
+            ->select(['t.*', 'c.company_name', 'c.company_email'])
+            ->leftJoin('company c', 't.created_by = c.id')
+            ->orderBy(['t.last_update_at' => SORT_DESC])
+            ->all();
 
-            // Calculate detailed statistics for CEO
-            $ticketStats = [
-                'total' => Ticket::find()->count(),
-                'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
-                'approved' => Ticket::find()->where(['status' => 'approved'])->count(),
-                'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
-                'breached_sla' => Ticket::find()->where(['sla_status' => 'breached'])->count(),
-                'high_severity' => Ticket::find()->where(['>=', 'severity_level', 3])->count(),
-            ];
+        // Calculate ticket statistics
+        $ticketStats = [
+            'total' => Ticket::find()->count(),
+            'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
+            'approved' => Ticket::find()->where(['status' => 'approved'])->count(),
+            'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
+            'breached_sla' => Ticket::find()->where(['sla_status' => 'breached'])->count(),
+            'high_severity' => Ticket::find()->where(['>=', 'severity_level', 3])->count(),
+        ];
 
-            // Get company-wise ticket distribution
-            $companyStats = Ticket::find()
-                ->select(['company.company_name', 'COUNT(*) as ticket_count'])
-                ->leftJoin('company', 'ticket.company_id = company.id')
-                ->groupBy(['company.company_name'])
-                ->asArray()
-                ->all();
+        // Get ticket distribution by company
+        $companyStats = Ticket::find()
+            ->alias('t')
+            ->select(['c.company_name', 'COUNT(*) as ticket_count'])
+            ->leftJoin('company c', 't.company_id = c.id')
+            ->groupBy('c.company_name')
+            ->asArray()
+            ->all();
 
-            // Get developer stats (for users with role = 3)
-            $developerStats = (new \yii\db\Query())
-                ->select([
-                    'u.id',
-                    'COUNT(t.id) as total_tickets',
-                    'SUM(CASE WHEN t.sla_status = "breached" THEN 1 ELSE 0 END) as breached_tickets'
-                ])
-                ->from(['u' => 'user'])
-                ->leftJoin(['t' => 'ticket'], 't.developer_id = u.id')
-                ->where(['u.role' => 3])
-                ->groupBy(['u.id'])
-                ->having(['>', 'total_tickets', 0])
-                ->all();
-        } else {
-            $tickets = Ticket::find()
-                ->where(['company_id' => $company->id])
-                ->orderBy(['created_at' => SORT_DESC])
-                ->all();
-        }
+        // Get developer statistics (role = 3)
+        $developerStats = (new \yii\db\Query())
+            ->select([
+                'u.id',
+                'COUNT(t.id) as total_tickets',
+                'SUM(CASE WHEN t.sla_status = "breached" THEN 1 ELSE 0 END) as breached_tickets'
+            ])
+            ->from(['u' => 'user'])
+            ->leftJoin(['t' => 'ticket'], 't.developer_id = u.id')
+            ->where(['u.role' => 3])
+            ->groupBy('u.id')
+            ->having(['>', 'total_tickets', 0])
+            ->all();
+    } else {
+        // Fetch tickets for the user's company only
+        $tickets = Ticket::find()
+            ->where(['created_by' => $company->id])
+            ->orderBy(['created_at' => SORT_DESC])
+            ->all();
+    }
 
         $companyDetails = [
             'id' => $company->id,
@@ -131,20 +130,33 @@ class UserController extends Controller
             'created_at' => $company->created_at,
             'updated_at' => $company->updated_at,
         ];
+    // Prepare company details
+    $companyDetails = [
+        'id' => $company->id,
+        'company_name' => $company->company_name,
+        'company_email' => $company->company_email,
+        'role'=>$company->role,
+        'start_date' => $company->start_date,
+        'end_date' => $company->end_date,
+        'status' => $company->status,
+        'created_at' => $company->created_at,
+        'updated_at' => $company->updated_at,
+    ];
 
-        return $this->render('profile', [
-            'user' => $user,
-            'company' => $company,
-            'tickets' => $tickets,
-            'renewals' => $renewals ?? [],
-            'ticketStats' => $ticketStats,
-            'companyStats' => $companyStats,
-            'developerStats' => $developerStats,
-            'isCEO' => $isCEO,
-            'companyDetails' => $companyDetails,
-            'model' => $model ?? null,
-        ]);
-    }
+    return $this->render('profile', [
+        'user' => $user,
+        'company' => $company,
+        'tickets' => $tickets,
+        'renewals' => $renewals ?? [],
+        'ticketStats' => $ticketStats,
+        'companyStats' => $companyStats,
+        'developerStats' => $developerStats,
+        'isCEO' => $isCEO,
+        'companyDetails' => $companyDetails,
+        'model' => $model ?? null,
+    ]);
+}
+
 
     public function actionGetDevelopers()
     {

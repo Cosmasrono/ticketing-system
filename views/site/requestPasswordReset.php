@@ -13,8 +13,13 @@ $this->params['breadcrumbs'][] = $this->title;
     <div class="row justify-content-center">
         <div class="col-lg-5">
             <div class="card">
-                <div class="card-body">
-                    <h1 class="text-center mb-4"><?= Html::encode($this->title) ?></h1>
+                <div class="card-body p-5 text-center">
+                    <div class="text-center mb-2">
+                        <a href="<?= Yii::$app->homeUrl ?>">
+                            <img src="https://www.iansoftltd.com/assets/img/logo.jpg" alt="Reset Password" class="img-fluid" style="max-width: 100px;">
+                        </a>
+                    </div>
+                    <h2 class="text-center mb-4"><?= Html::encode($this->title) ?></h2>
 
                     <p class="text-muted text-center mb-4">
                         Please enter your email. A link to reset password will be sent there.
@@ -91,4 +96,4 @@ $css = <<<CSS
     }
 CSS;
 $this->registerCss($css);
-?> 
+?>

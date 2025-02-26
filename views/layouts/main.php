@@ -37,141 +37,93 @@ JqueryAsset::register($this);
 <head>
     <meta charset="<?= Yii::$app->charset ?>">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <?php $this->registerCsrfMetaTags() ?>
     <title><?= Html::encode($this->title) ?></title>
     <?php $this->head() ?>
     <style>
-        /* Navbar styling */
+        /* Navbar Styling */
         .navbar {
-            background: #37517e !important;
-            /* background: linear-gradient(to right, #FF8C00, #FF4500) !important; */
-            /* Orange gradient */
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            padding: 0.5rem 1rem;
+            background: rgba(40, 58, 90, 0.85) !important;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            padding: 0.6rem 1rem;
+            transition: all 0.4s ease-in-out;
+            margin-bottom: 20px;
         }
 
-
-
-
-        /* Brand/Logo styling */
-        .navbar-brand {
-            color: #fff !important;
-            font-weight: bold;
-            font-size: 1.5rem;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+        .navbar-nav {
+            display: flex;
+            gap: 18px;
+            margin-bottom: 20px;
         }
 
-        /* Navigation links */
-        .navbar-nav .nav-link {
-            color: rgba(255, 255, 255, 0.9) !important;
-            padding: 0.5rem 1rem !important;
-            transition: all 0.3s ease;
+        /* User Icon Dropdown */
+        .nav-item.dropdown .nav-link {
+            font-size: 16px;
+            color: #F8F9FA !important;
+            padding: 4px 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 4px;
         }
 
-        .navbar-nav .nav-link:hover {
-            color: #fff !important;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-        }
-
-        /* Active link */
-        .navbar-nav .nav-item.active .nav-link {
-            color: #fff !important;
-            background-color: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-        }
-
-        /* Logout button */
-        .btn-link.logout {
-            color: rgba(255, 255, 255, 0.9) !important;
-            text-decoration: none;
-            padding: 0.5rem 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .btn-link.logout:hover {
-            color: #fff !important;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 4px;
-        }
-
-        /* Icons styling */
-        .fas {
-            margin-right: 5px;
-        }
-
-        /* Mobile menu button */
-        .navbar-toggler {
-            border-color: rgba(255, 255, 255, 0.5);
-        }
-
-        .navbar-toggler:focus {
-            box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
-        }
-
-        /* Dropdown menu styling */
         .dropdown-menu {
-            background-color: #FF8C00;
-            border: none;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            padding: 8px;
         }
 
         .dropdown-item {
-            color: rgba(255, 255, 255, 0.9);
+            color: #161616;
+            font-weight: 500;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: all 0.3s ease-in-out;
         }
 
         .dropdown-item:hover {
-            background-color: rgba(255, 255, 255, 0.1);
-            color: #fff;
+            background-color: rgba(232, 87, 32, 0.1);
+            color: #E85720;
         }
 
-        /* Responsive adjustments */
+        /* Brand Logo Styling */
+        .navbar-logo {
+            max-height: 55px;
+            margin-right: 10px;
+            border-radius: 10px;
+        }
+
         @media (max-width: 768px) {
-            .navbar-nav {
-                padding: 0.5rem 0;
-            }
-
-            .nav-item {
-                margin: 0.25rem 0;
-            }
-
             .navbar-collapse {
-                background-color: #FF8C00;
+                background: rgba(40, 58, 90, 0.95);
                 padding: 1rem;
-                border-radius: 0 0 4px 4px;
+                border-radius: 0 0 10px 10px;
+                transition: all 0.5s ease-in-out;
             }
         }
 
-        /* Add some spacing for fixed navbar */
         body {
-            padding-top: 60px;
+            padding-top:70px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         main {
-            margin-top: 20px;
-        }
-
-        .navbar-logo {
-            max-height: 40px;
-            width: auto;
-            margin-right: 10px;
-        }
-
-        .navbar-brand {
-            display: flex;
-            align-items: center;
+            flex: 1;
         }
     </style>
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 </head>
 
-<?php $this->beginBody() ?>
+<body class="guest-index-page <?= Yii::$app->user->isGuest && in_array(Yii::$app->controller->action->id, ['login', 'request-password-reset', 'super-admin-signup']) ? 'guest-index-page' : '' ?>">
 
-<?php if (Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index'): ?>
-    <!-- Guest Landing Page Header -->
-
-    <body class="guest-index-page">
-        <header id="guest-header" class="guest-header d-flex align-items-center fixed-top">
+    <?php if (Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index'): ?>
+        <!-- Guest Landing Page Header -->
+        <header id="guest-header" class="guest-header d-flex align-items-center fixed-top p-10">
             <div class="container-fluid d-flex">
                 <a href="<?= Yii::$app->homeUrl ?>" class="logo d-flex align-items-center">
                     <img src="https://www.iansoftltd.com/assets/img/logo.jpg" alt="Iansoft Logo">
@@ -188,10 +140,10 @@ JqueryAsset::register($this);
                     <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
                 </nav>
                 <div><a class="btn-getstarted" href="/site/login">Login</a></div>
-
             </div>
         </header>
-
+    <?php elseif (Yii::$app->user->isGuest && in_array(Yii::$app->controller->action->id, ['login', 'request-password-reset', 'super-admin-signup'])): ?>
+        <!-- No header displayed for login, register, and superadmin registration -->
     <?php else: ?>
         <!-- Regular Header for Authenticated Users -->
         <header id="header">
@@ -267,6 +219,50 @@ if (!Yii::$app->user->isGuest) {
 } else {
     $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
 }
+            $menuItems = [
+                ['label' => 'Home', 'url' => ['/site/index']],
+                [
+                    'label' => '<i class="fas fa-plus-circle"></i> Create Ticket',
+                    'url' => ['/ticket/create'],
+                    'encode' => false
+                ],
+                [
+                    'label' => '<i class="fas fa-list"></i> View Tickets',
+                    'url' => ['/ticket/index'],
+                    'encode' => false
+                ],
+                [
+                    'label' => '<i class="fas fa-cog"></i> Admin Panel',
+                    'url' => ['/site/admin'],
+                    'encode' => false
+                ],
+                [
+                    'label' => '<i class="fas fa-code"></i> Developer Dashboard',
+                    'url' => ['/developer/view'],
+                    'encode' => false
+                ]
+            ];
+
+            if (Yii::$app->user->isGuest) {
+                // $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
+            } else {
+                $menuItems[] = [
+                    'label' => '<i class="fas fa-user"></i> ' . Html::encode(Yii::$app->user->identity->company_name),
+                    'encode' => false,
+                    'options' => ['class' => 'nav-item dropdown'],
+                    'url' => '#',
+                    'linkOptions' => [
+                        'class' => 'nav-link dropdown-toggle',
+                        'data-bs-toggle' => 'dropdown',
+                        'aria-expanded' => 'false'
+                    ],
+                    'items' => [
+                        ['label' => 'Profile', 'url' => ['/user/profile', 'id' => Yii::$app->user->id]],
+                        ['label' => 'Logout', 'url' => ['/site/logout'], 'linkOptions' => ['data-method' => 'post']]
+                    ]
+                ];
+            }
+
             echo Nav::widget([
                 'options' => ['class' => 'navbar-nav ms-auto mb-2 mb-md-0'],
                 'items' => $menuItems
@@ -281,7 +277,7 @@ if (!Yii::$app->user->isGuest) {
     <main id="main" class="flex-shrink-0" role="main">
         <?php if (!(Yii::$app->user->isGuest) && Yii::$app->controller->action->id !== 'index'): ?>
             <div class="container">
-                <?= Alert::widget() ?>
+                 <!--?= Alert::widget() ?> -->
                 <?= $content ?>
             </div>
         <?php else: ?>
@@ -289,55 +285,9 @@ if (!Yii::$app->user->isGuest) {
         <?php endif; ?>
     </main>
 
-    <?php if (Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index'): ?>
-        <!-- Guest Landing Page Footer -->
-        <footer id="footer" class="footer">
-            <div class="container footer-top">
-                <div class="row gy-4">
-                   
-
-                    <div class="col-lg-2 col-md-2">
-                        <!-- Spacer column -->
-                    </div>
-
-                    <div class="col-lg-5 col-md-5 text-lg-end">
-                        <h4>Connect with Us</h4>
-                        <div class="social-links d-flex justify-content-lg-end">
-                            <a href=""><i class="bi bi-twitter"></i></a>
-                            <a href=""><i class="bi bi-facebook"></i></a>
-                            <a href=""><i class="bi bi-whatsapp"></i></a>
-                            <a href=""><i class="bi bi-linkedin"></i></a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="container copyright text-center mt-4">
-                <p>© <span>Iansoft</span> <strong class="px-1 sitename">Technologies</strong> <span><?= date('Y') ?></span></p>
-            </div>
-        </footer>
-
-        <!-- Scroll Top Button -->
-        <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-            <i class="bi bi-arrow-up-short"></i>
-        </a>
-
-        <!-- Preloader -->
-        <div id="preloader"></div>
-        <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-        <script src="assets/vendor/php-email-form/validate.js"></script>
-        <script src="assets/vendor/aos/aos.js"></script>
-        <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
-        <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
-        <script src="assets/vendor/waypoints/noframework.waypoints.js"></script>
-        <script src="assets/vendor/imagesloaded/imagesloaded.pkgd.min.js"></script>
-        <script src="assets/vendor/isotope-layout/isotope.pkgd.min.js"></script>
-
-
-    <?php else: ?>
-        <!-- Regular Footer for Authenticated Users -->
-        <footer id="footer" class="footer">
-            <div class="container footer-top">
+    <?php if (!(Yii::$app->user->isGuest && in_array(Yii::$app->controller->action->id, ['login', 'request-password-reset', 'super-admin-signup']))): ?>
+        <footer id="finefooter" class="finefooter">
+            <div class="container footer-bottom">
                 <div class="row gy-4">
                     <div class="col-lg-5 col-md-5 footer-about">
                         <a href="<?= Yii::$app->homeUrl ?>" class="d-flex align-items-center">
@@ -348,11 +298,9 @@ if (!Yii::$app->user->isGuest) {
                             <p>Nairobi, Kenya</p>
                         </div>
                     </div>
-
                     <div class="col-lg-2 col-md-2">
                         <!-- Spacer column -->
                     </div>
-
                     <div class="col-lg-5 col-md-5 text-lg-end">
                         <h4>Connect with Us</h4>
                         <div class="social-links d-flex justify-content-lg-end">
@@ -364,32 +312,31 @@ if (!Yii::$app->user->isGuest) {
                     </div>
                 </div>
             </div>
-
             <div class="container copyright text-center mt-4">
                 <p>© <span>Iansoft</span> <strong class="px-1 sitename">Technologies</strong> <span><?= date('Y') ?></span></p>
             </div>
         </footer>
-
-        <!-- Scroll Top Button -->
-        <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
-            <i class="bi bi-arrow-up-short"></i>
-        </a>
-
-        <!-- Preloader -->
-        <div id="preloader"></div>
-        <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
-        <script src="assets/vendor/php-email-form/validate.js"></script>
-        <script src="assets/vendor/aos/aos.js"></script>
-        <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
-        <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
-        <script src="assets/vendor/waypoints/noframework.waypoints.js"></script>
-        <script src="assets/vendor/imagesloaded/imagesloaded.pkgd.min.js"></script>
-        <script src="assets/vendor/isotope-layout/isotope.pkgd.min.js"></script>
-
     <?php endif; ?>
 
+
+    <!-- Scroll Top Button -->
+    <a href="#" id="scroll-top" class="scroll-top d-flex align-items-center justify-content-center">
+        <i class="bi bi-arrow-up-short"></i>
+    </a>
+
+    <!-- Preloader -->
+    <!-- <div id="preloader"></div> -->
+    <script src="assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/vendor/php-email-form/validate.js"></script>
+    <script src="assets/vendor/aos/aos.js"></script>
+    <script src="assets/vendor/glightbox/js/glightbox.min.js"></script>
+    <script src="assets/vendor/swiper/swiper-bundle.min.js"></script>
+    <script src="assets/vendor/waypoints/noframework.waypoints.js"></script>
+    <script src="assets/vendor/imagesloaded/imagesloaded.pkgd.min.js"></script>
+    <script src="assets/vendor/isotope-layout/isotope.pkgd.min.js"></script>
+
     <?php $this->endBody() ?>
-    </body>
+</body>
 
 </html>
 <?php $this->endPage() ?>

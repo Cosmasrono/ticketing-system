@@ -15,8 +15,16 @@ $this->params['breadcrumbs'][] = $this->title;
 ?>
 <div class="developer-dashboard container-fluid">
 
+<<<<<<< HEAD
     <h1><?= Html::encode($this->title) ?></h1>
   
+=======
+    <h1 class="text-black"><?= Html::encode($this->title) ?></h1>
+
+    <h2 class="">Welcome, <?= Html::encode($user->name) ?></h2>
+    <p class="">Email: <?= Html::encode($user->company_email) ?></p>
+
+>>>>>>> 9e3864c03e9aa6c3f8c920fc99b838e8815722b6
     <?php if (Yii::$app->session->hasFlash('success')): ?>
         <div class="alert alert-success">
             <?= Yii::$app->session->getFlash('success') ?>
@@ -29,7 +37,7 @@ $this->params['breadcrumbs'][] = $this->title;
         </div>
     <?php endif; ?>
 
-    <h3>Tickets Assigned to You</h3>
+    <h3 class="text-black">Tickets Assigned to You</h3>
 
     <?php Pjax::begin(); ?>
     <?= GridView::widget([

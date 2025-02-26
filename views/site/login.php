@@ -7,88 +7,77 @@ use yii\bootstrap5\ActiveForm;
 /** @var yii\bootstrap5\ActiveForm $form */
 /** @var app\models\LoginForm $model */
 
-// echo "CSRF Parameter: " . Yii::$app->request->csrfParam . "<br>";
-// echo "CSRF Token: " . Yii::$app->request->csrfToken . "<br>";
-
 $this->title = 'Login';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
-<div class="site-login">
-    <div class="row justify-content-center">
-        <div class="col-lg-5">
-            <div class="card">
-                <div class="card-body">
-                    <h1 class="text-center mb-4"><?= Html::encode($this->title) ?></h1>
 
-                    <?php $form = ActiveForm::begin([
-                        'id' => 'login-form',
-                        'options' => ['class' => 'form-vertical'],
-                    ]); ?>
+<div class="site-login d-flex align-items-center justify-content-center">
+    <div class="col-lg-4">
+        <div class="card shadow-lg border-0 rounded-0">
+            <div class="card-body p-5">
+                <div class="text-center mb-2">
+                    <a href="<?= Yii::$app->homeUrl ?>">
+                        <img src="https://www.iansoftltd.com/assets/img/logo.jpg" alt="Reset Password" class="img-fluid" style="max-width: 100px;">
+                    </a>
+                </div>
+                <h2 class="text-center mb-3 fw-semibold">
+                    <?= Html::encode($this->title) ?>
+                </h2>
 
-                    <?= $form->field($model, 'company_email', [
-                        'options' => ['class' => 'form-group mb-3']
-                    ])->textInput([
+                <?php $form = ActiveForm::begin([
+                    'id' => 'login-form',
+                    'options' => ['class' => 'needs-validation', 'novalidate' => 'true'],
+                ]); ?>
+
+                <?= $form->field($model, 'company_email', [
+                    'inputOptions' => [
+                        'class' => 'form-control rounded-sm',
+                        'placeholder' => 'Company Email',
                         'autofocus' => true,
-                        'placeholder' => 'Enter your company email',
-                        'class' => 'form-control'
+                    ],
+                ])->label(false) ?>
+
+                <?= $form->field($model, 'password', [
+                    'inputOptions' => [
+                        'class' => 'form-control rounded-sm',
+                        'placeholder' => 'Password',
+                    ],
+                ])->passwordInput()->label(false) ?>
+
+                <?php if (!empty($model->isFirstLogin)): ?>
+                    <div class="alert alert-info">Please set your new password below.</div>
+                    <?= $form->field($model, 'new_password', [
+                        'inputOptions' => [
+                            'class' => 'form-control rounded-sm',
+                            'placeholder' => 'New Password',
+                        ],
+                    ])->passwordInput()->label(false) ?>
+                <?php endif; ?>
+
+                <div class="d-flex justify-content-between align-items-center">
+                    <?= $form->field($model, 'rememberMe', ['options' => ['class' => 'mb-0 mt-2']])->checkbox([
+                        'class' => 'form-check-input',
+                        'labelOptions' => ['class' => 'form-check-label ms-2'],
                     ]) ?>
-
-                    <?= $form->field($model, 'password', [
-                        'options' => ['class' => 'form-group mb-3']
-                    ])->passwordInput([
-                        'placeholder' => 'Enter your password',
-                        'class' => 'form-control'
-                    ]) ?>
-
-                    <?php if (isset($model->isFirstLogin) && $model->isFirstLogin): ?>
-                        <div class="alert alert-info">
-                            Please set your new password below.
-                        </div>
-
-                        <?= $form->field($model, 'new_password', [
-                            'options' => ['class' => 'form-group mb-3']
-                        ])->passwordInput([
-                            'placeholder' => 'Enter your new password',
-                            'class' => 'form-control'
-                        ]) ?>
-                    <?php endif; ?>
-
-                    <?= $form->field($model, 'rememberMe', [
-                        'options' => ['class' => 'form-group mb-3']
-                    ])->checkbox([
-                        'template' => "<div class=\"custom-control custom-checkbox\">{input} {label}</div>\n<div class=\"col-lg-8\">{error}</div>",
-                        'class' => 'custom-control-input',
-                        'labelOptions' => ['class' => 'custom-control-label'],
-                    ]) ?>
-
-                    <div class="form-group text-center">
-                        <?= Html::submitButton('Login', [
-                            'class' => 'btn btn-primary btn-block',
-                            'name' => 'login-button'
-                        ]) ?>
-                    </div>
-
-                    <div class="text-center mt-3">
-                        <?= Html::a('Forgot Password?', ['site/request-password-reset'], [
-                            'class' => 'text-muted text-decoration-none'
-                        ]) ?>
-                    </div>
-
-                    <div class="text-center" style="margin-top: 20px;">
-                        <?= Html::a('Super Admin Registration', ['site/super-admin-signup'], ['class' => 'btn btn-info']) ?>
-                    </div>
-
-                    <?php ActiveForm::end(); ?>
+                    <?= Html::a('Forgot Password?', ['site/request-password-reset'], ['class' => 'text-muted text-decoration-none small']) ?>
                 </div>
+
+                <div class="text-center mt-4">
+                    <?= Html::submitButton('Login', ['class' => 'btn btn-primary rounded-sm w-100 py-2']) ?>
+                </div>
+
+                <div class="text-center mt-3">
+                    <?= Html::a('Super Admin Registration', ['site/super-admin-signup'], ['class' => 'btn btn-outline-primary rounded-sm w-100 py-2']) ?>
+                </div>
+
+                <?php ActiveForm::end(); ?>
+
+                <?php if (Yii::$app->session->hasFlash('error')): ?>
+                    <div class="alert alert-danger mt-3">
+                        <?= Yii::$app->session->getFlash('error') ?>
+                    </div>
+                <?php endif; ?>
             </div>
-
-            <?php if (Yii::$app->session->hasFlash('error')): ?>
-                <div class="alert alert-danger mt-3">
-                    <?= Yii::$app->session->getFlash('error') ?>
-                </div>
-            <?php endif; ?>
-
-    
         </div>
     </div>
 </div>
@@ -96,26 +85,43 @@ $this->params['breadcrumbs'][] = $this->title;
 <?php
 $css = <<<CSS
     .site-login {
-        padding: 40px 0;
+        background: linear-gradient(135deg, #1C1C4E, #E85720);
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-top: -70px;
     }
     .card {
-        box-shadow: 0 2px 4px rgba(0,0,0,.1);
-    }
-    .card-body {
-        padding: 30px;
+        border-radius: 0px;
     }
     .form-control {
         height: 45px;
+        font-size: 16px;
+        padding-left: 15px;
     }
     .btn-primary {
-        height: 45px;
-        font-size: 16px;
+        background-color: #E85720;
+        border-color: #E85720;
+        transition: 0.3s;
     }
-    .alert {
-        margin-bottom: 20px;
+    .btn-primary:hover {
+        background-color: #d04d1c;
+        border-color: #d04d1c;
     }
-    .text-decoration-none:hover {
-        text-decoration: underline !important;
+    .btn-outline-primary {
+        border-color: #E85720;
+        color: #E85720;
+    }
+    .btn-outline-primary:hover {
+        background-color: white;
+        color: #1C1C4E;
+    }
+    .text-muted:hover {
+        color: #E85720 !important;
+    }
+    .logo {
+        max-height: 70px;
     }
 CSS;
 $this->registerCss($css);

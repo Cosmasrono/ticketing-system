@@ -16,10 +16,7 @@ $this->params['breadcrumbs'][] = $this->title;
 <div class="developer-dashboard container-fluid">
 
     <h1><?= Html::encode($this->title) ?></h1>
-
-    <h2>Welcome, <?= Html::encode($user->name) ?></h2>
-    <p>Email: <?= Html::encode($user->company_email) ?></p>
-
+  
     <?php if (Yii::$app->session->hasFlash('success')): ?>
         <div class="alert alert-success">
             <?= Yii::$app->session->getFlash('success') ?>

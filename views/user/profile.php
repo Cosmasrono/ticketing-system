@@ -76,6 +76,7 @@ $isCEO = $currentUserRole === 4;
         'attributes' => [
             'company_name',
             'company_email:email',
+            "role",
             'start_date:date',
             'end_date:date',
             [

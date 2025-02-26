@@ -202,45 +202,71 @@ JqueryAsset::register($this);
                 'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
             ]);
 
-            $menuItems = [
-                ['label' => 'Home', 'url' => ['/site/index']],
-                [
-                    'label' => '<i class="fas fa-plus-circle"></i> Create Ticket',
-                    'url' => ['/ticket/create'],
-                    'encode' => false
-                ],
-                [
-                    'label' => '<i class="fas fa-list"></i> View Tickets',
-                    'url' => ['/ticket/index'],
-                    'encode' => false
-                ],
-                [
-                    'label' => '<i class="fas fa-cog"></i> Admin Panel',
-                    'url' => ['/site/admin'],
-                    'encode' => false
-                ],
-                [
-                    'label' => '<i class="fas fa-code"></i> Developer Dashboard',
-                    'url' => ['/developer/view'],
-                    'encode' => false
-                ],
-                [
-                    'label' => '<i class="fas fa-user"></i> Profile',
-                    'url' => ['/user/profile', 'id' => Yii::$app->user->id],
-                    'encode' => false
-                ],
-            ];
+          
+// Add this code where you define menuItems in your layout file
+$menuItems = [
+    ['label' => 'Home', 'url' => ['/site/index']],
+];
 
-            if (Yii::$app->user->isGuest) {
-                $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
-            } else {
-                $menuItems[] = [
-                    'label' => 'Logout (' . Yii::$app->user->identity->company_name . ')',
-                    'url' => ['/site/logout'],
-                    'linkOptions' => ['data-method' => 'post']
-                ];
-            }
-
+// Check user role and add appropriate menu items
+if (!Yii::$app->user->isGuest) {
+    $user = Yii::$app->user->identity;
+    $userRole = $user->role; // Assuming 'role' is a property that contains 1, 2, 3, or 4
+    
+    // Admin (1) or Superadmin (4) - show admin dashboard
+    if ($userRole == 1 || $userRole == 4) {
+        $menuItems[] = [
+            'label' => '<i class="fas fa-cog"></i> Admin Panel',
+            'url' => ['/site/admin'],
+            'encode' => false
+        ];
+        $menuItems[] = [
+            'label' => '<i class="fas fa-user"></i> Profile',
+            'url' => ['/user/profile', 'id' => Yii::$app->user->id],
+            'encode' => false
+        ];
+    } 
+    // Developer (3) - show developer dashboard only
+    elseif ($userRole == 3) {
+        $menuItems[] = [
+            'label' => '<i class="fas fa-code"></i> Developer Dashboard',
+            'url' => ['/developer/view'],
+            'encode' => false
+        ];
+        $menuItems[] = [
+            'label' => '<i class="fas fa-user"></i> Profile',
+            'url' => ['/user/profile', 'id' => Yii::$app->user->id],
+            'encode' => false
+        ];
+    } 
+    // Regular user (2) - show create and view tickets
+    elseif ($userRole == 2) {
+        $menuItems[] = [
+            'label' => '<i class="fas fa-plus-circle"></i> Create Ticket',
+            'url' => ['/ticket/create'],
+            'encode' => false
+        ];
+        $menuItems[] = [
+            'label' => '<i class="fas fa-list"></i> View Tickets',
+            'url' => ['/ticket/index'],
+            'encode' => false
+        ];
+        $menuItems[] = [
+            'label' => '<i class="fas fa-user"></i> Profile',
+            'url' => ['/user/profile', 'id' => Yii::$app->user->id],
+            'encode' => false
+        ];
+    }
+    
+    // Add logout option for all authenticated users
+    $menuItems[] = [
+        'label' => 'Logout (' . $user->company_name . ')',
+        'url' => ['/site/logout'],
+        'linkOptions' => ['data-method' => 'post']
+    ];
+} else {
+    $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
+}
             echo Nav::widget([
                 'options' => ['class' => 'navbar-nav ms-auto mb-2 mb-md-0'],
                 'items' => $menuItems
@@ -268,15 +294,7 @@ JqueryAsset::register($this);
         <footer id="footer" class="footer">
             <div class="container footer-top">
                 <div class="row gy-4">
-                    <div class="col-lg-5 col-md-5 footer-about">
-                        <a href="<?= Yii::$app->homeUrl ?>" class="d-flex align-items-center">
-                            <h3 class="sitename">Iansoft Technologies</h3>
-                        </a>
-                        <div class="footer-contact pt-3">
-                            <p>Nachu Plaza, 10th Floor</p>
-                            <p>Nairobi, Kenya</p>
-                        </div>
-                    </div>
+                   
 
                     <div class="col-lg-2 col-md-2">
                         <!-- Spacer column -->

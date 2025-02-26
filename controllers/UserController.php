@@ -124,6 +124,7 @@ class UserController extends Controller
             'id' => $company->id,
             'company_name' => $company->company_name,
             'company_email' => $company->company_email,
+            'role'=>$company->role,
             'start_date' => $company->start_date,
             'end_date' => $company->end_date,
             'status' => $company->status,

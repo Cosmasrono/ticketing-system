@@ -5,7 +5,7 @@ use yii\widgets\ActiveForm;
 $this->title = 'Add Client';
 ?>
 
-<div class="add-client">
+<div class="add-client" style="margin-top: 30px;">
     <div class="card">
         <div class="card-header">
             <h2><?= Html::encode($this->title) ?></h2>

@@ -62,58 +62,37 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
         </div>
     </div>
     <style>
-        .custom-pending {
-            background-color: #007bff !important;
+        .icon-circle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 70px;
+            /* Adjust size as needed */
+            height: 70px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            /* Semi-transparent white */
+            color: white;
+            font-size: 2rem;
+            margin-bottom: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
 
-        /* Blue */
-        .custom-approved {
-            background-color: #28a745 !important;
-        }
-
-        /* Green */
-        .custom-cancelled {
-            background-color: #dc3545 !important;
-        }
-
-        /* Red */
-        .custom-assigned {
+        .custom-reassigned {
             background-color: #17a2b8 !important;
         }
 
-        /* Teal */
-        .custom-not-assigned {
-            background-color: #ffc107 !important;
-        }
-
-        /* Yellow */
-        .custom-closed {
-            background-color: #6c757d !important;
-        }
-
-        /* Gray */
-        .custom-reopen {
-            background-color: #6610f2 !important;
-        }
-
-        /* Purple */
-        .custom-reassigned {
-            background-color: #20c997 !important;
-        }
-
-        /* Light Green */
+        /* Teal for reassigned */
         .custom-escalated {
             background-color: #ff5733 !important;
         }
 
-        /* Orange-Red */
-
+        /* Bright Orange-Red for escalated */
         .modern-card {
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
             padding: 20px;
             transition: transform 0.3s ease-in-out;
-            color: white;
         }
 
         .modern-card:hover {
@@ -128,84 +107,48 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
 
     <!-- Ticket Count Cards -->
     <div class="row text-center mb-4">
-        <?php
-        $statuses = [
-            ['title' => 'Pending Tickets', 'count' => $ticketCounts['pending'] ?? 0, 'bg' => 'custom-pending', 'icon' => 'fa-clock'],
-            ['title' => 'Approved Tickets', 'count' => $ticketCounts['approved'] ?? 0, 'bg' => 'custom-approved', 'icon' => 'fa-check-circle'],
-            ['title' => 'Cancelled Tickets', 'count' => $ticketCounts['cancelled'] ?? 0, 'bg' => 'custom-cancelled', 'icon' => 'fa-times-circle'],
-            ['title' => 'Assigned Tickets', 'count' => $ticketCounts['assigned'] ?? 0, 'bg' => 'custom-assigned', 'icon' => 'fa-user-check'],
-            ['title' => 'Unassigned Tickets', 'count' => $ticketCounts['notAssigned'] ?? 0, 'bg' => 'custom-not-assigned', 'icon' => 'fa-user-times'],
-            ['title' => 'Closed Tickets', 'count' => $ticketCounts['closed'] ?? 0, 'bg' => 'custom-closed', 'icon' => 'fa-lock'],
-            ['title' => 'Reopen Tickets', 'count' => $ticketCounts['reopen'] ?? 0, 'bg' => 'custom-reopen', 'icon' => 'fa-redo'],
-            ['title' => 'Reassigned Tickets', 'count' => $ticketCounts['reassigned'] ?? 0, 'bg' => 'custom-reassigned', 'icon' => 'fa-exchange-alt'],
-            ['title' => 'Escalated Tickets', 'count' => $ticketCounts['escalated'] ?? 0, 'bg' => 'custom-escalated', 'icon' => 'fa-exclamation-triangle'],
-        ];
+    <?php
+    $statuses = [
+        ['title' => 'Pending Tickets', 'count' => $ticketCounts['pending'] ?? 0, 'bg' => 'primary', 'icon' => 'fa-clock'],
+        ['title' => 'Approved Tickets', 'count' => $ticketCounts['approved'] ?? 0, 'bg' => 'success', 'icon' => 'fa-check-circle'],
+        ['title' => 'Cancelled Tickets', 'count' => $ticketCounts['cancelled'] ?? 0, 'bg' => 'danger', 'icon' => 'fa-times-circle'],
+        ['title' => 'Assigned Tickets', 'count' => $ticketCounts['assigned'] ?? 0, 'bg' => 'info', 'icon' => 'fa-user-check'],
+        ['title' => 'Not Assigned Tickets', 'count' => $ticketCounts['notAssigned'] ?? 0, 'bg' => 'warning', 'icon' => 'fa-user-times'],
+        ['title' => 'Closed Tickets', 'count' => $ticketCounts['closed'] ?? 0, 'bg' => 'secondary', 'icon' => 'fa-lock'],
+        ['title' => 'Reopen Tickets', 'count' => $ticketCounts['reopen'] ?? 0, 'bg' => 'info', 'icon' => 'fa-redo'],
+        ['title' => 'Reassigned Tickets', 'count' => $ticketCounts['reassigned'] ?? 0, 'bg' => 'dark', 'icon' => 'fa-exchange-alt'], /* Custom color */
+        ['title' => 'Escalated Tickets', 'count' => $ticketCounts['escalated'] ?? 0, 'bg' => 'danger', 'icon' => 'fa-exclamation-triangle'], /* Custom color */
+    ];
 
-        foreach ($statuses as $status): ?>
-            <div class="col-lg-2 col-md-4 col-sm-6 mb-4">
-                <div class="card modern-card <?= $status['bg'] ?>">
-                    <div class="card-body text-center">
-                        <i class="fas <?= $status['icon'] ?> modern-icon"></i>
-                        <h2 class="card-title font-weight-bold"><?= $status['count'] ?></h2>
-                        <p class="card-text h5"><?= $status['title'] ?></p>
+    foreach ($statuses as $status): ?>
+        <div class="col-lg-2 col-md-4 col-sm-6 mb-4">
+            <div class="card text-white bg-<?= $status['bg'] ?> shadow-lg rounded-lg p-3">
+                <div class="card-body text-center">
+                    <div class="icon-circle">
+                        <i class="fas <?= $status['icon'] ?>"></i>
                     </div>
+                    <h2 class="card-title font-weight-bold"><?= $status['count'] ?></h2>
+                    <p class="card-text h5"><?= $status['title'] ?></p>
                 </div>
             </div>
-        <?php endforeach; ?>
-    </div>
-
-
+        </div>
+    <?php endforeach; ?>
+</div>
 
     <!-- Include Font Awesome -->
 
 
     <!-- Total Tickets -->
-    <style>
-        .total-tickets-card {
-            background: linear-gradient(135deg, #343a40, #212529);
-            /* Dark gradient */
-            color: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-            text-align: center;
-            padding: 2px;
-            transition: transform 0.3s ease-in-out;
-        }
-
-        .total-tickets-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .total-tickets-icon {
-            font-size: 3.5rem;
-            margin-bottom: 10px;
-            color: #ffc107;
-            /* Yellow to pop out */
-        }
-
-        .total-tickets-number {
-            font-size: 3rem;
-            font-weight: bold;
-            color: white;
-        }
-
-        .total-tickets-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-top: 10px;
-        }
-    </style>
-
     <div class="row justify-content-center mb-4">
-        <div class="col-lg-6 col-md-6 col-sm-8">
-            <div class="total-tickets-card">
-                <i class="fas fa-ticket-alt total-tickets-icon"></i>
-                <h2 class="total-tickets-number"><?= $ticketCounts['total'] ?? 0 ?></h2>
-                <p class="total-tickets-title">Total Tickets</p>
+        <div class="col-lg-4 col-md-6 col-sm-8">
+            <div class="card text-white bg-dark">
+                <div class="card-header">Total Tickets</div>
+                <div class="card-body">
+                    <h5 class="card-title"><?= $ticketCounts['total'] ?? 0 ?></h5>
+                </div>
             </div>
         </div>
     </div>
-
 
     <!-- Add this search form above the GridView -->
     <div class="card mb-4 bg-orange">
@@ -296,13 +239,13 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                 <table class="table table-hover" id="companyTicketsTable">
                     <thead class="">
                         <tr>
-                            <th>ID</th>
-                            <th>Module</th>
-                            <th>Issue</th>
-                            <th>Status</th>
-                            <th>Created At</th>
-                            <th>Assigned To</th>
-                            <th>Actions</th>
+                            <th style="color: #1B1D4E;">ID</th>
+                            <th style="color: #1B1D4E;">Module</th>
+                            <th style="color: #1B1D4E;">Issue</th>
+                            <th style="color: #1B1D4E;">Status</th>
+                            <th style="color: #1B1D4E;">Created At</th>
+                            <th style="color: #1B1D4E;">Assigned To</th>
+                            <th style="color: #1B1D4E;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -931,13 +874,13 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
     }
 
     .table-head th {
-        background-color: #ff8c00;
+        background-color: #1B1D4E;
         /* Orange for the table header */
         color: #ffffff;
     }
 
     .table tbody tr:hover {
-        background-color: #ffe4b5;
+        background-color: #1B1D4E;
         /* Light orange on row hover */
     }
 

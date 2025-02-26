@@ -125,8 +125,8 @@ $this->title = 'Create Ticket';
                     <!-- Submit Button -->
                     <div class="d-grid mt-4">
                         <?= Html::submitButton('Create Ticket', [
-                            'class' => 'btn text-white p-2',
-                            'style' => 'background-color: #EA5626;',
+                            'class' => 'btn custom-btn text-white p-2',
+                            'style' => 'background-color: ; max-width: 200px;',
                             'id' => 'submit-button'
                         ]) ?>
                     </div>

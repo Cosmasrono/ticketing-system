@@ -32,7 +32,7 @@ $this->params['breadcrumbs'][] = $this->title;
 
     <?= GridView::widget([
         'dataProvider' => $dataProvider,
-        'tableOptions' => ['class' => 'table table-striped table-hover shadow-sm custom-table'],
+        'tableOptions' => ['class' => 'table table-striped table-hover shadow-sm custom-table', 'id'=>'custom-table'],
         'columns' => [
             ['class' => 'yii\grid\SerialColumn'],
             'id',
@@ -101,21 +101,20 @@ $this->params['breadcrumbs'][] = $this->title;
 
 <style>
    .custom-table thead th {
-   
         color:  #1B1D4E !important;
-      
     }
 
     .custom-btn {
-        background-color:#748386;
+        
         /* Primary Blue */
+        background-color: #EA5626;
         color: white;
         border: none;
         transition: background-color 0.3s ease, transform 0.2s ease;
     }
 
     .custom-btn:hover {
-        background-color: #5F6B72;
+        background-color:rgb(230, 94, 48);
         color: white;
 
         
@@ -128,7 +127,6 @@ $this->params['breadcrumbs'][] = $this->title;
 
     .ticket-index {
         margin-top: 30px;
-
         padding: 20px;
         border-radius: 8px;
     }

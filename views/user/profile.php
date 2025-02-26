@@ -1,4 +1,5 @@
 <?php
+
 use yii\helpers\Html;
 use yii\widgets\DetailView;
 use yii\bootstrap5\ActiveForm;
@@ -19,8 +20,7 @@ use yii\grid\GridView;
 /* @var $tickets app\models\Ticket[] */
 /* @var $renewals app\models\ContractRenewal[] */
 
-$this->title = $companyDetails['company_name'] . ' Profile';
-
+// $this->title = "<span style='color: #007bff; font-weight: bold;'>" . Html::encode($companyDetails['company_name']) . "</span> Profile";
 // Initialize variables
 $duration = 'Not available';
 $isExpired = false;
@@ -34,29 +34,28 @@ if ($companyDetails['start_date'] && $companyDetails['end_date']) {
     try {
         $startDate = new DateTime($companyDetails['start_date']);
         $endDate = new DateTime($companyDetails['end_date']);
-        
+
         // Calculate total duration
         $interval = $startDate->diff($endDate);
         $duration = '';
         if ($interval->y > 0) $duration .= $interval->y . ' years ';
         if ($interval->m > 0) $duration .= $interval->m . ' months ';
         if ($interval->d > 0) $duration .= $interval->d . ' days';
-        
+
         // Calculate remaining time
         $remainingTime = $today->diff($endDate);
         $isExpired = $today > $endDate;
         $remainingDays = $remainingTime->days;
         $totalDays = $interval->days;
-        
+
         // Calculate progress
         if ($totalDays > 0) {
             $usedDays = $totalDays - $remainingDays;
             $progressPercentage = ($usedDays / $totalDays) * 100;
         }
-        
+
         // Show renew button if 10 or fewer days remaining or expired
         $showRenewButton = $remainingDays <= 10 || $isExpired;
-        
     } catch (\Exception $e) {
         Yii::error("Date calculation error: " . $e->getMessage());
         $duration = 'Error calculating duration';
@@ -68,8 +67,11 @@ $currentUserRole = Yii::$app->user->identity->role;
 $isCEO = $currentUserRole === 4;
 ?>
 
-<div class="company-profile">
-    <h1><?= Html::encode($this->title) ?></h1>
+<div class="company-profile" style="margin-top:30px;">
+    <?php
+    $this->title = "Profile : <span style='color: #EA5626; font-weight: normal;'>" . Html::encode($companyDetails['company_name']) . "</span> ";
+    ?>
+    <h1><?= $this->title ?></h1>
 
     <?= DetailView::widget([
         'model' => (object)$companyDetails,
@@ -83,7 +85,7 @@ $isCEO = $currentUserRole === 4;
                 'attribute' => 'status',
                 'value' => $companyDetails['status'] ? 'Active' : 'Inactive',
             ],
-             
+
             'created_at:datetime',
             'updated_at:datetime',
         ],
@@ -139,7 +141,7 @@ $isCEO = $currentUserRole === 4;
                                 // Debug information
                                 Yii::debug("Company Details: " . print_r($companyDetails, true));
                                 ?>
-                                
+
                                 <!-- Debug output visible on page -->
                                 <div class="alert alert-info">
                                     <small>
@@ -172,7 +174,7 @@ $isCEO = $currentUserRole === 4;
     </div>
 
     <!-- Rest of your view code (tickets and renewals tables) -->
-    
+
     <?php if ($isCEO): ?>
         <!-- CEO Dashboard Section -->
         <div class="card mt-4">
@@ -351,7 +353,7 @@ $isCEO = $currentUserRole === 4;
                     <div class="card-body">
                         <?php
                         $totalTickets = count($tickets);
-                        $breachedTickets = count(array_filter($tickets, function($ticket) {
+                        $breachedTickets = count(array_filter($tickets, function ($ticket) {
                             return $ticket->sla_status === 'breached';
                         }));
                         $slaCompliance = $totalTickets ? round((($totalTickets - $breachedTickets) / $totalTickets) * 100, 2) : 0;
@@ -361,7 +363,7 @@ $isCEO = $currentUserRole === 4;
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-header bg-info text-white">
@@ -397,4 +399,4 @@ $isCEO = $currentUserRole === 4;
             </div>
         </div>
     <?php endif; ?>
-</div> 
+</div>

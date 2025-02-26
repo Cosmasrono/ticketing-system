@@ -21,7 +21,7 @@ foreach ($clientCompanies as $company) {
 }
 $companiesJson = Json::encode($companiesForJs);
 ?>
-<div class="row justify-content-center">
+<div class="row justify-content-center" style="margin-top: 30px;">
     <div class=" col-lg-8">
         <div class="card">
             <div class="card-header">
@@ -78,7 +78,7 @@ $companiesJson = Json::encode($companiesForJs);
                 </div>
 
                 <div class="form-group d-flex justify-content-center">
-                    <?= Html::submitButton('Save', ['class' => 'btn btn-success w-100 p-2 mt-3', 'style' => 'max-width: 200px;']) ?>
+                    <?= Html::submitButton('Save', ['class' => 'btn w-100 p-2 mt-3', 'style' => 'background-color: #EA5626; color:white; max-width: 200px;']) ?>
                 </div>
 
 

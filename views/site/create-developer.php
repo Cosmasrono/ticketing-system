@@ -3,7 +3,7 @@ use yii\helpers\Html;
 use yii\bootstrap5\ActiveForm;
 ?>
 
-<div class="create-developer">
+<div class="create-developer" style="margin-top: 30px;">
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card">
@@ -49,7 +49,7 @@ use yii\bootstrap5\ActiveForm;
 
                     <div class="form-group text-center">
                         <?= Html::submitButton('Create Developer', [
-                            'class' => 'btn btn-success w-100 p-2 mt-3', 'style' => 'max-width: 200px;',
+                            'class' => 'btn  w-100 p-2 mt-3', 'style' => 'background-color: #EA5626; color:white; max-width: 200px;',
                             'data' => ['confirm' => 'Are you sure you want to create this developer?']
                         ]) ?>
                     </div>

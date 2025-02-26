@@ -13,12 +13,12 @@ use app\models\User;
 $this->title = 'Developer Dashboard';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
-<div class="developer-dashboard container-fluid">
+<div class="developer-dashboard container-fluid" style="margin-top: 30px;">
 
     <h1 class="text-black"><?= Html::encode($this->title) ?></h1>
 
-    <h2 class="">Welcome, <?= Html::encode($user->name) ?></h2>
-    <p class="">Email: <?= Html::encode($user->company_email) ?></p>
+    <h3 class="mt-4">Welcome,<span style="color:#EA5626;"><?= Html::encode($user->name) ?></span> </h3>
+    <!-- <p class="">Email: <?= Html::encode($user->company_email) ?></p> -->
 
     <?php if (Yii::$app->session->hasFlash('success')): ?>
         <div class="alert alert-success">
@@ -32,7 +32,7 @@ $this->params['breadcrumbs'][] = $this->title;
         </div>
     <?php endif; ?>
 
-    <h3 class="text-black">Tickets Assigned to You</h3>
+    <h4 class="mb-4">Tickets Assigned to You</h4>
 
     <?php Pjax::begin(); ?>
     <?= GridView::widget([
@@ -47,9 +47,9 @@ $this->params['breadcrumbs'][] = $this->title;
                     $value = Yii::$app->db->createCommand('
                         SELECT module FROM ticket WHERE id = :id
                     ')
-                    ->bindValue(':id', $model->id)
-                    ->queryScalar();
-                    
+                        ->bindValue(':id', $model->id)
+                        ->queryScalar();
+
                     return $value ? Html::encode($value) : '(not set)';
                 },
                 'format' => 'raw',
@@ -61,9 +61,9 @@ $this->params['breadcrumbs'][] = $this->title;
                     $value = Yii::$app->db->createCommand('
                         SELECT issue FROM ticket WHERE id = :id
                     ')
-                    ->bindValue(':id', $model->id)
-                    ->queryScalar();
-                    
+                        ->bindValue(':id', $model->id)
+                        ->queryScalar();
+
                     return $value ? Html::encode($value) : '(not set)';
                 },
                 'format' => 'raw',
@@ -80,13 +80,14 @@ $this->params['breadcrumbs'][] = $this->title;
                         if (!$escalatedBy) {
                             return 'null';
                         }
-                        
-                        $comment = Html::tag('div', 
+
+                        $comment = Html::tag(
+                            'div',
                             '<strong>Escalated by: ' . Html::encode($escalatedBy->name) . '</strong><br>' .
-                            '<div class="mt-2">' . Html::encode($model->escalation_comment) . '</div>',
+                                '<div class="mt-2">' . Html::encode($model->escalation_comment) . '</div>',
                             ['class' => 'alert alert-warning']
                         );
-                        
+
                         return Html::button('View', [
                             'class' => 'btn btn-sm btn-info view-comment',
                             'data-comment' => $comment,
@@ -106,12 +107,12 @@ $this->params['breadcrumbs'][] = $this->title;
                     if ($createdByUser && $createdByUser->company_name) {
                         return Html::encode($createdByUser->company_name);
                     }
-                    
+
                     // Fallback to ticket's company_name if available
                     if (!empty($model->company_name)) {
                         return Html::encode($model->company_name);
                     }
-                    
+
                     return '<span class="text-muted">Not Available</span>';
                 },
                 'format' => 'raw',
@@ -137,9 +138,9 @@ $this->params['breadcrumbs'][] = $this->title;
                 'template' => '{escalate} {close}',
                 'buttons' => [
                     'escalate' => function ($url, $model, $key) {
-                        $isDisabled = $model->status === Ticket::STATUS_ESCALATED || 
-                                      $model->status === 'closed' || 
-                                      $model->assigned_to !== Yii::$app->user->id;
+                        $isDisabled = $model->status === Ticket::STATUS_ESCALATED ||
+                            $model->status === 'closed' ||
+                            $model->assigned_to !== Yii::$app->user->id;
                         return Html::button('Escalate', [
                             'class' => 'btn btn-warning btn-sm' . ($isDisabled ? ' disabled' : ''),
                             'onclick' => !$isDisabled ? "escalateTicket({$model->id})" : 'return false;',
@@ -147,8 +148,8 @@ $this->params['breadcrumbs'][] = $this->title;
                         ]);
                     },
                     'close' => function ($url, $model, $key) {
-                        $isDisabled = $model->status === 'closed' || 
-                                      $model->assigned_to !== Yii::$app->user->id;
+                        $isDisabled = $model->status === 'closed' ||
+                            $model->assigned_to !== Yii::$app->user->id;
                         return Html::button('Close', [
                             'class' => 'btn btn-danger btn-sm' . ($isDisabled ? ' disabled' : ''),
                             'onclick' => !$isDisabled ? "closeTicket({$model->id})" : 'return false;',
@@ -238,7 +239,7 @@ $this->params['breadcrumbs'][] = $this->title;
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle text-warning"></i> 
+                    <i class="fas fa-exclamation-triangle text-warning"></i>
                     Escalation Details
                 </h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
@@ -253,7 +254,7 @@ $this->params['breadcrumbs'][] = $this->title;
                     <div class="escalation-message"></div>
                     <div class="escalation-meta mt-3">
                         <small class="text-muted">
-                            <i class="far fa-clock"></i> 
+                            <i class="far fa-clock"></i>
                             <span class="escalated-at"></span>
                         </small>
                     </div>
@@ -267,147 +268,147 @@ $this->params['breadcrumbs'][] = $this->title;
 </div>
 
 <style>
-.modal-lg {
-    max-width: 90%;
-}
+    .modal-lg {
+        max-width: 90%;
+    }
 
-.modal-body {
-    padding: 20px;
-}
+    .modal-body {
+        padding: 20px;
+    }
 
-.img-responsive {
-    max-width: 100%;
-    height: auto;
-}
+    .img-responsive {
+        max-width: 100%;
+        height: auto;
+    }
 
-.view-screenshot {
-    color: #fff;
-    background-color: #17a2b8;
-    border-color: #17a2b8;
-}
+    .view-screenshot {
+        color: #fff;
+        background-color: #17a2b8;
+        border-color: #17a2b8;
+    }
 
-.view-screenshot:hover {
-    background-color: #138496;
-    border-color: #117a8b;
-    color: #fff;
-    text-decoration: none;
-}
+    .view-screenshot:hover {
+        background-color: #138496;
+        border-color: #117a8b;
+        color: #fff;
+        text-decoration: none;
+    }
 
-.close-ticket {
-    cursor: pointer;
-}
+    .close-ticket {
+        cursor: pointer;
+    }
 
-.close-ticket.disabled {
-    opacity: 0.65;
-    cursor: not-allowed !important;
-    pointer-events: none !important;
-}
+    .close-ticket.disabled {
+        opacity: 0.65;
+        cursor: not-allowed !important;
+        pointer-events: none !important;
+    }
 
-.escalation-info {
-    margin: 10px 0;
-}
+    .escalation-info {
+        margin: 10px 0;
+    }
 
-.escalation-text {
-    white-space: pre-wrap;
-    word-break: break-word;
-    line-height: 1.5;
-    padding: 10px;
-    background: rgba(255, 255, 255, 0.5);
-    border-radius: 4px;
-}
+    .escalation-text {
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.5;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.5);
+        border-radius: 4px;
+    }
 
-.escalation-alert {
-    margin-top: 10px;
-}
+    .escalation-alert {
+        margin-top: 10px;
+    }
 
-.escalation-header {
-    font-weight: bold;
-    color: #856404;
-}
+    .escalation-header {
+        font-weight: bold;
+        color: #856404;
+    }
 
-.escalation-message {
-    background: rgba(255, 255, 255, 0.7);
-    padding: 10px;
-    border-radius: 4px;
-    white-space: pre-wrap;
-    word-break: break-word;
-    font-size: 0.9em;
-    line-height: 1.4;
-}
+    .escalation-message {
+        background: rgba(255, 255, 255, 0.7);
+        padding: 10px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 0.9em;
+        line-height: 1.4;
+    }
 
-.alert-warning {
-    background-color: #fff3cd;
-    border-color: #ffeeba;
-    padding: 10px;
-}
-
-.escalation-message {
-    background: #fff;
-    padding: 8px;
-    border-radius: 4px;
-    font-size: 0.9em;
-    line-height: 1.4;
-    margin-top: 5px;
-    border: 1px solid rgba(0,0,0,0.1);
-}
-
-.alert-warning {
-    background-color: #fff3cd;
-    border-color: #ffeeba;
-    color: #856404;
-    padding: 8px;
-    margin-bottom: 0;
-}
-
-.escalation-header {
-    margin-bottom: 5px;
-    color: #856404;
-}
-
-.escalation-header i {
-    margin-right: 5px;
-}
-
-.view-escalation {
-    min-width: 120px;
-}
-
-.escalation-content {
-    background: #fff3cd;
-    border-radius: 4px;
-    padding: 15px;
-}
-
-.escalation-message {
-    background: #fff;
-    padding: 15px;
-    border-radius: 4px;
-    white-space: pre-wrap;
-    word-break: break-word;
-    line-height: 1.5;
-    border: 1px solid rgba(0,0,0,0.1);
-}
-
-#escalationModal .modal-header {
-    background: #fff3cd;
-    border-bottom: 1px solid #ffeeba;
-}
-
-#escalationModal .modal-title {
-    color: #856404;
-}
-
-/* Additional styles for responsiveness */
-@media (max-width: 768px) {
-    .developer-dashboard {
+    .alert-warning {
+        background-color: #fff3cd;
+        border-color: #ffeeba;
         padding: 10px;
     }
 
-    .modal-dialog {
-        width: 100%;
-        margin: 0;
+    .escalation-message {
+        background: #fff;
+        padding: 8px;
+        border-radius: 4px;
+        font-size: 0.9em;
+        line-height: 1.4;
+        margin-top: 5px;
+        border: 1px solid rgba(0, 0, 0, 0.1);
     }
-}
+
+    .alert-warning {
+        background-color: #fff3cd;
+        border-color: #ffeeba;
+        color: #856404;
+        padding: 8px;
+        margin-bottom: 0;
+    }
+
+    .escalation-header {
+        margin-bottom: 5px;
+        color: #856404;
+    }
+
+    .escalation-header i {
+        margin-right: 5px;
+    }
+
+    .view-escalation {
+        min-width: 120px;
+    }
+
+    .escalation-content {
+        background: #fff3cd;
+        border-radius: 4px;
+        padding: 15px;
+    }
+
+    .escalation-message {
+        background: #fff;
+        padding: 15px;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        line-height: 1.5;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    #escalationModal .modal-header {
+        background: #fff3cd;
+        border-bottom: 1px solid #ffeeba;
+    }
+
+    #escalationModal .modal-title {
+        color: #856404;
+    }
+
+    /* Additional styles for responsiveness */
+    @media (max-width: 768px) {
+        .developer-dashboard {
+            padding: 10px;
+        }
+
+        .modal-dialog {
+            width: 100%;
+            margin: 0;
+        }
+    }
 </style>
 
 <?php
@@ -430,418 +431,15 @@ $this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/boo
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-let currentTicketId = null;
+    let currentTicketId = null;
 
-function escalateTicket(ticketId) {
-    currentTicketId = ticketId;
-    $('#escalationComment').val(''); // Clear previous comments
-    $('#escalateModal').modal('show');
-}
-
-function submitEscalation() {
-    const comment = $('#escalationComment').val().trim();
-    const targetType = $('#escalationTarget').val();
-    const targetId = targetType === 'developer' ? $('#developerSelect').val() : null;
-
-    // Validate inputs
-    if (!comment) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Comment Required',
-            text: 'Please provide a comment for the escalation.'
-        });
-        return;
+    function escalateTicket(ticketId) {
+        currentTicketId = ticketId;
+        $('#escalationComment').val(''); // Clear previous comments
+        $('#escalateModal').modal('show');
     }
 
-    if (targetType === 'developer' && !targetId) {
-        Swal.fire({
-            icon: 'error',
-            title: 'Developer Required',
-            text: 'Please select a developer to escalate to.'
-        });
-        return;
-    }
-
-    // Show confirmation dialog
-    Swal.fire({
-        title: 'Confirm Escalation',
-        text: `Are you sure you want to escalate this ticket to ${targetType}?`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#f0ad4e',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Yes, escalate it!'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            // Show loading state
-            Swal.fire({
-                title: 'Processing...',
-                text: 'Please wait',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-
-            // Make the AJAX request
-            $.ajax({
-                url: '<?= \yii\helpers\Url::to(['/ticket/escalate']) ?>',
-                type: 'POST',
-                data: {
-                    id: currentTicketId,
-                    comment: comment,
-                    targetId: targetId,
-                    targetType: targetType,
-                    _csrf: '<?= Yii::$app->request->csrfToken ?>'
-                },
-                dataType: 'json'
-            })
-            .done(function(response) {
-                $('#escalateModal').modal('hide');
-                
-                if (response.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Success!',
-                        text: response.message,
-                        showConfirmButton: false,
-                        timer: 1500
-                    }).then(() => {
-                        location.reload();
-                    });
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: response.message || 'Failed to escalate ticket'
-                    });
-                }
-            })
-            .fail(function(jqXHR, textStatus, errorThrown) {
-                $('#escalateModal').modal('hide');
-                
-                let errorMessage = 'An error occurred while escalating the ticket.';
-                try {
-                    const response = JSON.parse(jqXHR.responseText);
-                    if (response.message) {
-                        errorMessage = response.message;
-                    }
-                } catch (e) {
-                    console.error('Error parsing response:', e);
-                }
-
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: errorMessage
-                });
-            });
-        }
-    });
-}
-
-// Remove the inline onclick handler and use event delegation instead
-$(document).ready(function() {
-    // For debugging
-    console.log('JavaScript loaded');
-    
-    $(document).on('click', '.close-ticket:not(.disabled)', function(e) {
-        e.preventDefault();
-        console.log('Close button clicked');
-        const ticketId = $(this).data('id');
-        if (ticketId) {
-            closeTicket(ticketId);
-        } else {
-            console.error('No ticket ID found on button');
-        }
-    });
-});
-
-function closeTicket(ticketId) {
-    Swal.fire({
-        title: 'Close Ticket',
-        text: 'Are you sure you want to close this ticket?',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Yes, close it!'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            // Show loading state
-            Swal.fire({
-                title: 'Processing...',
-                text: 'Please wait',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-
-            // Make the AJAX request to close the ticket
-            $.ajax({
-                url: '<?= \yii\helpers\Url::to(['/ticket/close']) ?>',
-                type: 'POST',
-                data: {
-                    id: ticketId,
-                    _csrf: '<?= Yii::$app->request->csrfToken ?>'
-                },
-                dataType: 'json'
-            })
-            .done(function(response) {
-                console.log('Server response:', response);
-                
-                if (response.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Success!',
-                        text: response.message,
-                        showConfirmButton: false,
-                        timer: 1500
-                    }).then(() => {
-                        location.reload();
-                    });
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: response.message || 'Failed to close ticket'
-                    });
-                }
-            })
-            .fail(function(jqXHR, textStatus, errorThrown) {
-                let errorMessage = 'An error occurred while closing the ticket.';
-                try {
-                    const response = JSON.parse(jqXHR.responseText);
-                    if (response.message) {
-                        errorMessage = response.message;
-                    }
-                } catch (e) {
-                    console.error('Error parsing response:', e);
-                }
-
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: errorMessage
-                });
-            });
-        }
-    });
-}
-
-// Add this to your existing JavaScript
-$(document).on('click', '.view-escalation', function() {
-    const comment = $(this).data('comment');
-    const ticketId = $(this).data('ticket-id');
-    
-    $('#escalationModal .escalation-message').html(comment);
-    $('#escalationModal .ticket-id').text('Ticket ID: ' + ticketId);
-    $('#escalationModal').modal('show');
-});
-
-$('body').on('click', '[data-toggle="modal"]', function(e) {
-    e.preventDefault();
-    var comment = $(this).data('comment');
-    bootbox.dialog({
-        message: comment,
-        title: 'Escalation Comment',
-        buttons: {
-            close: {
-                label: 'Close',
-                className: 'btn-default'
-            }
-        }
-    });
-});
-
-function showComment(button) {
-    bootbox.dialog({
-        title: 'Escalation Comment',
-        message: $(button).data('comment'),
-        size: 'medium',
-        buttons: {
-            close: {
-                label: 'Close',
-                className: 'btn-secondary'
-            }
-        }
-    });
-}
-
-$(document).ready(function() {
-    // Handle escalation target change
-    $('#escalationTarget').change(function() {
-        const selectedValue = $(this).val();
-        if (selectedValue === 'developer') {
-            $('#developerSelection').show();
-            $('#adminSelection').hide();
-            fetchDevelopers();
-        } else if (selectedValue === 'admin') {
-            $('#developerSelection').hide();
-            $('#adminSelection').hide(); // Hide admin selection as it's not needed
-            // No need to fetch admins since we're just escalating to admin status
-        }
-    });
-
-    // Handle escalation submission
-    $('#submitEscalation').on('click', function() {
-        const comment = $('#escalationComment').val().trim();
-        const targetType = $('#escalationTarget').val();
-        let targetId = null;
-
-        // Only get targetId if it's a developer escalation
-        if (targetType === 'developer') {
-            targetId = $('#developerSelect').val();
-        }
-
-        // Validate inputs
-        if (!comment) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Comment Required',
-                text: 'Please provide a comment for the escalation.'
-            });
-            return;
-        }
-
-        // Only validate developer selection if escalating to developer
-        if (targetType === 'developer' && !targetId) {
-            Swal.fire({
-                icon: 'error',
-                title: 'Developer Required',
-                text: 'Please select a developer to escalate to.'
-            });
-            return;
-        }
-
-        // Show confirmation dialog
-        Swal.fire({
-            title: 'Confirm Escalation',
-            text: `Are you sure you want to escalate this ticket to ${targetType}?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#f0ad4e',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, escalate it!'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                // Show loading state
-                Swal.fire({
-                    title: 'Processing...',
-                    text: 'Please wait',
-                    allowOutsideClick: false,
-                    didOpen: () => {
-                        Swal.showLoading();
-                    }
-                });
-
-                // Make the AJAX request
-                $.ajax({
-                    url: '<?= \yii\helpers\Url::to(['/ticket/escalate']) ?>',
-                    type: 'POST',
-                    data: {
-                        id: currentTicketId,
-                        comment: comment,
-                        targetId: targetId,
-                        targetType: targetType,
-                        _csrf: '<?= Yii::$app->request->csrfToken ?>'
-                    },
-                    dataType: 'json'
-                })
-                .done(function(response) {
-                    $('#escalateModal').modal('hide');
-                    
-                    if (response.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success!',
-                            text: response.message,
-                            showConfirmButton: false,
-                            timer: 1500
-                        }).then(() => {
-                            location.reload();
-                        });
-                    } else {
-                        Swal.fire({
-                            icon: 'error',
-                            title: 'Error',
-                            text: response.message || 'Failed to escalate ticket'
-                        });
-                    }
-                })
-                .fail(function(jqXHR, textStatus, errorThrown) {
-                    $('#escalateModal').modal('hide');
-                    
-                    let errorMessage = 'An error occurred while escalating the ticket.';
-                    try {
-                        const response = JSON.parse(jqXHR.responseText);
-                        if (response.message) {
-                            errorMessage = response.message;
-                        }
-                    } catch (e) {
-                        console.error('Error parsing response:', e);
-                    }
-
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: errorMessage
-                    });
-                });
-            }
-        });
-    });
-});
-
-function fetchDevelopers() {
-    $.ajax({
-        url: '<?= \yii\helpers\Url::to(['/user/get-developers']) ?>', // Adjust the URL as needed
-        type: 'GET',
-        dataType: 'json',
-        success: function(data) {
-            var developerSelect = $('#developerSelect');
-            developerSelect.empty(); // Clear existing options
-            developerSelect.append('<option value="">Select a Developer</option>'); // Default option
-            $.each(data, function(index, developer) {
-                developerSelect.append('<option value="' + developer.id + '">' + developer.name + '</option>');
-            });
-        },
-        error: function() {
-            console.error('Failed to fetch developers.');
-        }
-    });
-}
-
-$(document).ready(function() {
-    // Show developer selection when the modal is opened
-    $('#escalateModal').on('show.bs.modal', function() {
-        $('#developerSelect').val(''); // Reset the developer selection
-        fetchDevelopers(); // Fetch developers when the modal is opened
-    });
-
-    // Function to fetch developers
-    function fetchDevelopers() {
-        $.ajax({
-            url: '<?= \yii\helpers\Url::to(['/user/get-developers']) ?>', // Adjust the URL as needed
-            type: 'GET',
-            dataType: 'json',
-            success: function(data) {
-                var developerSelect = $('#developerSelect');
-                developerSelect.empty(); // Clear existing options
-                developerSelect.append('<option value="">Select a Developer</option>'); // Default option
-                $.each(data, function(index, developer) {
-                    developerSelect.append('<option value="' + developer.id + '">' + developer.name + '</option>');
-                });
-            },
-            error: function() {
-                console.error('Failed to fetch developers.');
-            }
-        });
-    }
-
-    // Handle escalation submission
-    $('#submitEscalation').on('click', function() {
+    function submitEscalation() {
         const comment = $('#escalationComment').val().trim();
         const targetType = $('#escalationTarget').val();
         const targetId = targetType === 'developer' ? $('#developerSelect').val() : null;
@@ -888,61 +486,464 @@ $(document).ready(function() {
 
                 // Make the AJAX request
                 $.ajax({
-                    url: '<?= \yii\helpers\Url::to(['/ticket/escalate']) ?>',
-                    type: 'POST',
-                    data: {
-                        id: currentTicketId,
-                        comment: comment,
-                        targetId: targetId,
-                        targetType: targetType,
-                        _csrf: '<?= Yii::$app->request->csrfToken ?>'
-                    },
-                    dataType: 'json'
-                })
-                .done(function(response) {
-                    $('#escalateModal').modal('hide');
-                    
-                    if (response.success) {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Success!',
-                            text: response.message,
-                            showConfirmButton: false,
-                            timer: 1500
-                        }).then(() => {
-                            location.reload();
-                        });
-                    } else {
+                        url: '<?= \yii\helpers\Url::to(['/ticket/escalate']) ?>',
+                        type: 'POST',
+                        data: {
+                            id: currentTicketId,
+                            comment: comment,
+                            targetId: targetId,
+                            targetType: targetType,
+                            _csrf: '<?= Yii::$app->request->csrfToken ?>'
+                        },
+                        dataType: 'json'
+                    })
+                    .done(function(response) {
+                        $('#escalateModal').modal('hide');
+
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Success!',
+                                text: response.message,
+                                showConfirmButton: false,
+                                timer: 1500
+                            }).then(() => {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message || 'Failed to escalate ticket'
+                            });
+                        }
+                    })
+                    .fail(function(jqXHR, textStatus, errorThrown) {
+                        $('#escalateModal').modal('hide');
+
+                        let errorMessage = 'An error occurred while escalating the ticket.';
+                        try {
+                            const response = JSON.parse(jqXHR.responseText);
+                            if (response.message) {
+                                errorMessage = response.message;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing response:', e);
+                        }
+
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
-                            text: response.message || 'Failed to escalate ticket'
+                            text: errorMessage
                         });
-                    }
-                })
-                .fail(function(jqXHR, textStatus, errorThrown) {
-                    $('#escalateModal').modal('hide');
-                    
-                    let errorMessage = 'An error occurred while escalating the ticket.';
-                    try {
-                        const response = JSON.parse(jqXHR.responseText);
-                        if (response.message) {
-                            errorMessage = response.message;
-                        }
-                    } catch (e) {
-                        console.error('Error parsing response:', e);
-                    }
-
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: errorMessage
                     });
-                });
+            }
+        });
+    }
+
+    // Remove the inline onclick handler and use event delegation instead
+    $(document).ready(function() {
+        // For debugging
+        console.log('JavaScript loaded');
+
+        $(document).on('click', '.close-ticket:not(.disabled)', function(e) {
+            e.preventDefault();
+            console.log('Close button clicked');
+            const ticketId = $(this).data('id');
+            if (ticketId) {
+                closeTicket(ticketId);
+            } else {
+                console.error('No ticket ID found on button');
             }
         });
     });
-});
+
+    function closeTicket(ticketId) {
+        Swal.fire({
+            title: 'Close Ticket',
+            text: 'Are you sure you want to close this ticket?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, close it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // Show loading state
+                Swal.fire({
+                    title: 'Processing...',
+                    text: 'Please wait',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                // Make the AJAX request to close the ticket
+                $.ajax({
+                        url: '<?= \yii\helpers\Url::to(['/ticket/close']) ?>',
+                        type: 'POST',
+                        data: {
+                            id: ticketId,
+                            _csrf: '<?= Yii::$app->request->csrfToken ?>'
+                        },
+                        dataType: 'json'
+                    })
+                    .done(function(response) {
+                        console.log('Server response:', response);
+
+                        if (response.success) {
+                            Swal.fire({
+                                icon: 'success',
+                                title: 'Success!',
+                                text: response.message,
+                                showConfirmButton: false,
+                                timer: 1500
+                            }).then(() => {
+                                location.reload();
+                            });
+                        } else {
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: response.message || 'Failed to close ticket'
+                            });
+                        }
+                    })
+                    .fail(function(jqXHR, textStatus, errorThrown) {
+                        let errorMessage = 'An error occurred while closing the ticket.';
+                        try {
+                            const response = JSON.parse(jqXHR.responseText);
+                            if (response.message) {
+                                errorMessage = response.message;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing response:', e);
+                        }
+
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Error',
+                            text: errorMessage
+                        });
+                    });
+            }
+        });
+    }
+
+    // Add this to your existing JavaScript
+    $(document).on('click', '.view-escalation', function() {
+        const comment = $(this).data('comment');
+        const ticketId = $(this).data('ticket-id');
+
+        $('#escalationModal .escalation-message').html(comment);
+        $('#escalationModal .ticket-id').text('Ticket ID: ' + ticketId);
+        $('#escalationModal').modal('show');
+    });
+
+    $('body').on('click', '[data-toggle="modal"]', function(e) {
+        e.preventDefault();
+        var comment = $(this).data('comment');
+        bootbox.dialog({
+            message: comment,
+            title: 'Escalation Comment',
+            buttons: {
+                close: {
+                    label: 'Close',
+                    className: 'btn-default'
+                }
+            }
+        });
+    });
+
+    function showComment(button) {
+        bootbox.dialog({
+            title: 'Escalation Comment',
+            message: $(button).data('comment'),
+            size: 'medium',
+            buttons: {
+                close: {
+                    label: 'Close',
+                    className: 'btn-secondary'
+                }
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        // Handle escalation target change
+        $('#escalationTarget').change(function() {
+            const selectedValue = $(this).val();
+            if (selectedValue === 'developer') {
+                $('#developerSelection').show();
+                $('#adminSelection').hide();
+                fetchDevelopers();
+            } else if (selectedValue === 'admin') {
+                $('#developerSelection').hide();
+                $('#adminSelection').hide(); // Hide admin selection as it's not needed
+                // No need to fetch admins since we're just escalating to admin status
+            }
+        });
+
+        // Handle escalation submission
+        $('#submitEscalation').on('click', function() {
+            const comment = $('#escalationComment').val().trim();
+            const targetType = $('#escalationTarget').val();
+            let targetId = null;
+
+            // Only get targetId if it's a developer escalation
+            if (targetType === 'developer') {
+                targetId = $('#developerSelect').val();
+            }
+
+            // Validate inputs
+            if (!comment) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Comment Required',
+                    text: 'Please provide a comment for the escalation.'
+                });
+                return;
+            }
+
+            // Only validate developer selection if escalating to developer
+            if (targetType === 'developer' && !targetId) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Developer Required',
+                    text: 'Please select a developer to escalate to.'
+                });
+                return;
+            }
+
+            // Show confirmation dialog
+            Swal.fire({
+                title: 'Confirm Escalation',
+                text: `Are you sure you want to escalate this ticket to ${targetType}?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f0ad4e',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, escalate it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Show loading state
+                    Swal.fire({
+                        title: 'Processing...',
+                        text: 'Please wait',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    // Make the AJAX request
+                    $.ajax({
+                            url: '<?= \yii\helpers\Url::to(['/ticket/escalate']) ?>',
+                            type: 'POST',
+                            data: {
+                                id: currentTicketId,
+                                comment: comment,
+                                targetId: targetId,
+                                targetType: targetType,
+                                _csrf: '<?= Yii::$app->request->csrfToken ?>'
+                            },
+                            dataType: 'json'
+                        })
+                        .done(function(response) {
+                            $('#escalateModal').modal('hide');
+
+                            if (response.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Success!',
+                                    text: response.message,
+                                    showConfirmButton: false,
+                                    timer: 1500
+                                }).then(() => {
+                                    location.reload();
+                                });
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Error',
+                                    text: response.message || 'Failed to escalate ticket'
+                                });
+                            }
+                        })
+                        .fail(function(jqXHR, textStatus, errorThrown) {
+                            $('#escalateModal').modal('hide');
+
+                            let errorMessage = 'An error occurred while escalating the ticket.';
+                            try {
+                                const response = JSON.parse(jqXHR.responseText);
+                                if (response.message) {
+                                    errorMessage = response.message;
+                                }
+                            } catch (e) {
+                                console.error('Error parsing response:', e);
+                            }
+
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: errorMessage
+                            });
+                        });
+                }
+            });
+        });
+    });
+
+    function fetchDevelopers() {
+        $.ajax({
+            url: '<?= \yii\helpers\Url::to(['/user/get-developers']) ?>', // Adjust the URL as needed
+            type: 'GET',
+            dataType: 'json',
+            success: function(data) {
+                var developerSelect = $('#developerSelect');
+                developerSelect.empty(); // Clear existing options
+                developerSelect.append('<option value="">Select a Developer</option>'); // Default option
+                $.each(data, function(index, developer) {
+                    developerSelect.append('<option value="' + developer.id + '">' + developer.name + '</option>');
+                });
+            },
+            error: function() {
+                console.error('Failed to fetch developers.');
+            }
+        });
+    }
+
+    $(document).ready(function() {
+        // Show developer selection when the modal is opened
+        $('#escalateModal').on('show.bs.modal', function() {
+            $('#developerSelect').val(''); // Reset the developer selection
+            fetchDevelopers(); // Fetch developers when the modal is opened
+        });
+
+        // Function to fetch developers
+        function fetchDevelopers() {
+            $.ajax({
+                url: '<?= \yii\helpers\Url::to(['/user/get-developers']) ?>', // Adjust the URL as needed
+                type: 'GET',
+                dataType: 'json',
+                success: function(data) {
+                    var developerSelect = $('#developerSelect');
+                    developerSelect.empty(); // Clear existing options
+                    developerSelect.append('<option value="">Select a Developer</option>'); // Default option
+                    $.each(data, function(index, developer) {
+                        developerSelect.append('<option value="' + developer.id + '">' + developer.name + '</option>');
+                    });
+                },
+                error: function() {
+                    console.error('Failed to fetch developers.');
+                }
+            });
+        }
+
+        // Handle escalation submission
+        $('#submitEscalation').on('click', function() {
+            const comment = $('#escalationComment').val().trim();
+            const targetType = $('#escalationTarget').val();
+            const targetId = targetType === 'developer' ? $('#developerSelect').val() : null;
+
+            // Validate inputs
+            if (!comment) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Comment Required',
+                    text: 'Please provide a comment for the escalation.'
+                });
+                return;
+            }
+
+            if (targetType === 'developer' && !targetId) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Developer Required',
+                    text: 'Please select a developer to escalate to.'
+                });
+                return;
+            }
+
+            // Show confirmation dialog
+            Swal.fire({
+                title: 'Confirm Escalation',
+                text: `Are you sure you want to escalate this ticket to ${targetType}?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#f0ad4e',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'Yes, escalate it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Show loading state
+                    Swal.fire({
+                        title: 'Processing...',
+                        text: 'Please wait',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+
+                    // Make the AJAX request
+                    $.ajax({
+                            url: '<?= \yii\helpers\Url::to(['/ticket/escalate']) ?>',
+                            type: 'POST',
+                            data: {
+                                id: currentTicketId,
+                                comment: comment,
+                                targetId: targetId,
+                                targetType: targetType,
+                                _csrf: '<?= Yii::$app->request->csrfToken ?>'
+                            },
+                            dataType: 'json'
+                        })
+                        .done(function(response) {
+                            $('#escalateModal').modal('hide');
+
+                            if (response.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Success!',
+                                    text: response.message,
+                                    showConfirmButton: false,
+                                    timer: 1500
+                                }).then(() => {
+                                    location.reload();
+                                });
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Error',
+                                    text: response.message || 'Failed to escalate ticket'
+                                });
+                            }
+                        })
+                        .fail(function(jqXHR, textStatus, errorThrown) {
+                            $('#escalateModal').modal('hide');
+
+                            let errorMessage = 'An error occurred while escalating the ticket.';
+                            try {
+                                const response = JSON.parse(jqXHR.responseText);
+                                if (response.message) {
+                                    errorMessage = response.message;
+                                }
+                            } catch (e) {
+                                console.error('Error parsing response:', e);
+                            }
+
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: errorMessage
+                            });
+                        });
+                }
+            });
+        });
+    });
 </script>
 
 <?php
@@ -965,7 +966,7 @@ $js = <<<JS
                 close: {
                     label: 'Close',
                     className: 'btn-secondary'
-                }
+                }    
             }
         });
     }

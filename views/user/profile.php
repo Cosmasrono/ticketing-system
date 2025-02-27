@@ -67,7 +67,7 @@ $currentUserRole = Yii::$app->user->identity->role;
 $isCEO = $currentUserRole === 4;
 ?>
 
-<div class="company-profile" style="margin-top:30px;">
+<div class="company-profile container" style="margin-top:30px;">
     <?php
     $this->title = "Profile : <span style='color: #EA5626; font-weight: normal;'>" . Html::encode($companyDetails['company_name']) . "</span> ";
     ?>
@@ -400,3 +400,23 @@ $isCEO = $currentUserRole === 4;
         </div>
     <?php endif; ?>
 </div>
+
+<style>
+    body {
+        font-family: 'Roboto', sans-serif;
+        background-color: #f8f9fa;
+        margin: 0;
+        padding: 40px;
+        color: #343a40;
+        margin-top: 40px;
+    }
+
+    /* Container Styling */
+    .container {
+        max-width: 100%;
+        padding: 0px;
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
+    
+</style>

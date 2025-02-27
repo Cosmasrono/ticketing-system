@@ -31,7 +31,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
 }
 ?>
 
-<div class="" style="">
+<div class="" >
     <h1><?= Html::encode($this->title) ?></h1>
 
     <!-- Action Buttons Section -->
@@ -807,15 +807,16 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
         font-family: 'Roboto', sans-serif;
         background-color: #f8f9fa;
         margin: 0;
-        padding: 0;
+        padding: 40px;
         color: #343a40;
+        margin-top: 80px;
     }
 
     /* Container Styling */
     .container {
         max-width: 100%;
+        padding: 0px;
         /* Allow full width */
-        padding: 15px;
         /* Add padding for mobile */
     }
 

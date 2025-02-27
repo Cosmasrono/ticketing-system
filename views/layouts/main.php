@@ -43,13 +43,14 @@ JqueryAsset::register($this);
     <?php $this->head() ?>
     <style>
         /* Navbar Styling */
+
         .navbar {
-            background: rgba(40, 58, 90, 0.85) !important;
+            background: #1B1D4E !important;
             backdrop-filter: blur(10px);
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-            padding: 0.6rem 1rem;
+            padding: 15px 15px;
             transition: all 0.4s ease-in-out;
-            margin-bottom: 20px;
+            
+            /* margin-bottom: 20px; */
         }
 
         .navbar-nav {
@@ -89,11 +90,23 @@ JqueryAsset::register($this);
             color: #E85720;
         }
 
+        
+
+        /* Index Page Header on Scroll
+
+        .body.scrolled .header {
+            --background-color: rgba(40, 58, 90, 0.9);
+        }
+
+        .header {
+            background-color: #3d4d6a;
+        }
+
         /* Brand Logo Styling */
         .navbar-logo {
-            max-height: 55px;
-            margin-right: 10px;
-            border-radius: 10px;
+            max-height: 50px;
+            margin-right: 8px;
+            border-radius: 50%
         }
 
         @media (max-width: 768px) {
@@ -106,7 +119,7 @@ JqueryAsset::register($this);
         }
 
         body {
-            padding-top:70px;
+            padding-top: 70px;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -151,7 +164,7 @@ JqueryAsset::register($this);
             NavBar::begin([
                 'brandLabel' => Html::img('https://www.iansoftltd.com/assets/img/logo.jpg', ['alt' => 'Logo', 'class' => 'navbar-logo']),
                 'brandUrl' => Yii::$app->homeUrl,
-                'options' => ['class' => 'navbar-expand-md navbar-dark bg-dark fixed-top']
+                'options' => ['class' => 'navbar-expand-md navbar-dark  fixed-top']
             ]);
 
             $menuItems = [
@@ -212,7 +225,7 @@ JqueryAsset::register($this);
     <main id="main" class="flex-shrink-0" role="main">
         <?php if (!(Yii::$app->user->isGuest) && Yii::$app->controller->action->id !== 'index'): ?>
             <div class="container">
-                 <!--?= Alert::widget() ?> -->
+                <!--?= Alert::widget() ?> -->
                 <?= $content ?>
             </div>
         <?php else: ?>

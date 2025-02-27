@@ -1,5 +1,6 @@
 main > .container {
-    padding: 70px 15px 20px;
+    /* padding: 70px 15px 10px; */
+   
 }
 
 .footer {
@@ -9,8 +10,8 @@ main > .container {
 }
 
 .footer > .container {
-    padding-right: 15px;
-    padding-left: 15px;
+    /* padding-right: 15px;
+    padding-left: 15px; */
 }
 
 .not-set {

@@ -8,7 +8,7 @@ use app\models\Ticket;
 $this->title = 'Create Ticket';
 ?>
 
-<div class="container py-4">
+<div class="container py-4 ticket-create">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card border-0 shadow">
@@ -373,7 +373,7 @@ $this->registerJs($script);
 
 
     .ticket-create {
-        margin-top: 30px;
+        margin-top: 40px;
     }
 
     .voice-note-section {

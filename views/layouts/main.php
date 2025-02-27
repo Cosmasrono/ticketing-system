@@ -243,10 +243,10 @@ JqueryAsset::register($this);
         </header>
     <?php endif; ?>
 
-    <main id="main" class="flex-shrink-0" role="main">
+    <main id="main" class="flex-shrink-0 " role="main">
         <?php if (!(Yii::$app->user->isGuest) && Yii::$app->controller->action->id !== 'index'): ?>
             <div class="container">
-                <!--?= Alert::widget() ?> -->
+                <?= Alert::widget() ?>
                 <?= $content ?>
             </div>
         <?php else: ?>

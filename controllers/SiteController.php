@@ -3946,7 +3946,7 @@ public function actionCreateUserForCompany($company_id)
     if (!$company) {
         Yii::error("Company not found with ID: $company_id");
         Yii::$app->session->setFlash('error', 'Company not found.');
-        return $this->redirect(['index']);
+        return $this->redirect(['site/admin']);
     }
 
     // Check for existing active user
@@ -3957,7 +3957,7 @@ public function actionCreateUserForCompany($company_id)
 
     if ($existingUser && $existingUser->status === User::STATUS_ACTIVE) {
         Yii::$app->session->setFlash('error', 'An active user already exists for this company.');
-        return $this->redirect(['index']);
+        return $this->redirect(['site/admin']);
     }
 
     try {
@@ -4067,7 +4067,7 @@ public function actionCreateUserForCompany($company_id)
         Yii::$app->session->setFlash('error', 'Error creating user: ' . $e->getMessage());
     }
 
-    return $this->redirect(['index']);
+    return $this->redirect(['site/admin']);
 }
 
 }

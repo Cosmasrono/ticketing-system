@@ -30,13 +30,7 @@ $companiesJson = Json::encode($companiesForJs);
             <div class="card-body">
                 <?php $form = ActiveForm::begin(['id' => 'create-user-form']); ?>
 
-                <?= $form->field($model, 'name')->textInput([
-                    'id' => 'name',
-                    'class' => 'form-control',
-                    'maxlength' => true,
-                    'readonly' => true  // Make it readonly since it will be autofilled
-                ]) ?>
-
+                
                 <?= $form->field($model, 'company_name')->dropDownList(
                     $companyList,
                     [
@@ -45,6 +39,14 @@ $companiesJson = Json::encode($companiesForJs);
                         'class' => 'form-control'
                     ]
                 ) ?>
+                <?= $form->field($model, 'name')->textInput([
+                    'id' => 'name',
+                    'class' => 'form-control',
+                    'maxlength' => true,
+                    'readonly' => true  // Make it readonly since it will be autofilled
+                ]) ?>
+
+                
 
                 <?= $form->field($model, 'company_email')->textInput([
                     'id' => 'company-email',

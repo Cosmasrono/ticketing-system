@@ -16,6 +16,17 @@ const ROLE_ADMIN = 1;
 const ROLE_DEVELOPER = 3;
 const ROLE_SUPER_ADMIN = 4;
 ?>
+<?php if (Yii::$app->session->hasFlash('error')): ?>
+    <div class="alert alert-danger">
+        <?= Yii::$app->session->getFlash('error') ?>
+    </div>
+<?php endif; ?>
+
+<?php if (Yii::$app->session->hasFlash('success')): ?>
+    <div class="alert alert-success">
+        <?= Yii::$app->session->getFlash('success') ?>
+    </div>
+<?php endif; ?>
 
 <div class="create-user-container" style="margin-top: 30px;">
     <div class="card">

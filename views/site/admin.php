@@ -31,7 +31,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
 }
 ?>
 
-<div class="container" style="margin-top: 30px;">
+<div class="" style="">
     <h1><?= Html::encode($this->title) ?></h1>
 
     <!-- Action Buttons Section -->
@@ -61,79 +61,122 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
             </div>
         </div>
     </div>
+
     <style>
-        .icon-circle {
-            display: inline-flex;
-            align-items: center;
+        .ticket-cards {
+            display: flex;
+            flex-wrap: nowrap;
+            /* Prevents wrapping */
             justify-content: center;
-            width: 70px;
-            /* Adjust size as needed */
-            height: 70px;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            /* Semi-transparent white */
-            color: white;
-            font-size: 2rem;
-            margin-bottom: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .custom-reassigned {
-            background-color: #17a2b8 !important;
-        }
-
-        /* Teal for reassigned */
-        .custom-escalated {
-            background-color: #ff5733 !important;
-        }
-
-        /* Bright Orange-Red for escalated */
-        .modern-card {
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            gap: 40px;
+            /* Adjust spacing between cards */
+            overflow-x: auto;
+            /* Ensures scrolling if needed */
             padding: 20px;
-            transition: transform 0.3s ease-in-out;
+        }
+
+        .modern-card {
+            flex: 1 1 120px;
+            /* Fixed width for all cards */
+            max-width: 120px;
+            height: 110px;
+            background-color: #fff;
+            color: #333;
+            border-radius: 0%;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            padding: 4px;
+            text-align: center;
+            transition: transform 0.2s ease-in-out;
         }
 
         .modern-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-3px);
         }
 
-        .modern-icon {
-            font-size: 3rem;
-            margin-bottom: 10px;
+        .icon-circle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            /* border-radius: 50%; */
+            /* background: rgba(255, 255, 255, 0.2); */
+            color: white;
+            font-size: 1.2rem;
+            margin: 0 auto 5px auto;
+            /* box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1); */
+        }
+
+        .modern-card h2 {
+            font-size: 1.4rem;
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        .modern-card p {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 0;
+        }
+
+        /* Custom colors */
+        .bg-primary {
+            background-color: #EA5626 !important;
+        }
+
+        .bg-success {
+            background-color: #28a745 !important;
+        }
+
+        .bg-danger {
+            background-color: #dc3545 !important;
+        }
+
+        .bg-warning {
+            background-color: #ffc107 !important;
+            color: #333;
+        }
+
+        .bg-info {
+            background-color: #17a2b8 !important;
+        }
+
+        .bg-secondary {
+            background-color: #6c757d !important;
+        }
+
+        .bg-dark {
+            background-color: #343a40 !important;
         }
     </style>
 
     <!-- Ticket Count Cards -->
-    <div class="row text-center mb-4">
-    <?php
-    $statuses = [
-        ['title' => 'Pending Tickets', 'count' => $ticketCounts['pending'] ?? 0, 'bg' => 'primary', 'icon' => 'fa-clock'],
-        ['title' => 'Approved Tickets', 'count' => $ticketCounts['approved'] ?? 0, 'bg' => 'success', 'icon' => 'fa-check-circle'],
-        ['title' => 'Cancelled Tickets', 'count' => $ticketCounts['cancelled'] ?? 0, 'bg' => 'danger', 'icon' => 'fa-times-circle'],
-        ['title' => 'Assigned Tickets', 'count' => $ticketCounts['assigned'] ?? 0, 'bg' => 'info', 'icon' => 'fa-user-check'],
-        ['title' => 'Not Assigned Tickets', 'count' => $ticketCounts['notAssigned'] ?? 0, 'bg' => 'warning', 'icon' => 'fa-user-times'],
-        ['title' => 'Closed Tickets', 'count' => $ticketCounts['closed'] ?? 0, 'bg' => 'secondary', 'icon' => 'fa-lock'],
-        ['title' => 'Reopen Tickets', 'count' => $ticketCounts['reopen'] ?? 0, 'bg' => 'info', 'icon' => 'fa-redo'],
-        ['title' => 'Reassigned Tickets', 'count' => $ticketCounts['reassigned'] ?? 0, 'bg' => 'dark', 'icon' => 'fa-exchange-alt'], /* Custom color */
-        ['title' => 'Escalated Tickets', 'count' => $ticketCounts['escalated'] ?? 0, 'bg' => 'danger', 'icon' => 'fa-exclamation-triangle'], /* Custom color */
-    ];
+    <div class="ticket-cards">
+        <?php
+        $statuses = [
+            ['title' => 'Pending', 'count' => $ticketCounts['pending'] ?? 0, 'bg' => 'primary', 'icon' => 'fa-clock'],
+            ['title' => 'Approved', 'count' => $ticketCounts['approved'] ?? 0, 'bg' => 'success', 'icon' => 'fa-check-circle'],
+            ['title' => 'Cancelled', 'count' => $ticketCounts['cancelled'] ?? 0, 'bg' => 'danger', 'icon' => 'fa-times-circle'],
+            ['title' => 'Assigned', 'count' => $ticketCounts['assigned'] ?? 0, 'bg' => 'info', 'icon' => 'fa-user-check'],
+            ['title' => 'Not Assigned', 'count' => $ticketCounts['notAssigned'] ?? 0, 'bg' => 'warning', 'icon' => 'fa-user-times'],
+            ['title' => 'Closed', 'count' => $ticketCounts['closed'] ?? 0, 'bg' => 'secondary', 'icon' => 'fa-lock'],
+            ['title' => 'Reopen', 'count' => $ticketCounts['reopen'] ?? 0, 'bg' => 'info', 'icon' => 'fa-redo'],
+            ['title' => 'Reassigned', 'count' => $ticketCounts['reassigned'] ?? 0, 'bg' => 'dark', 'icon' => 'fa-exchange-alt'],
+            ['title' => 'Escalated', 'count' => $ticketCounts['escalated'] ?? 0, 'bg' => 'danger', 'icon' => 'fa-exclamation-triangle'],
+        ];
 
-    foreach ($statuses as $status): ?>
-        <div class="col-lg-2 col-md-4 col-sm-6 mb-4">
-            <div class="card text-white bg-<?= $status['bg'] ?> shadow-lg rounded-lg p-3">
-                <div class="card-body text-center">
-                    <div class="icon-circle">
-                        <i class="fas <?= $status['icon'] ?>"></i>
-                    </div>
-                    <h2 class="card-title font-weight-bold"><?= $status['count'] ?></h2>
-                    <p class="card-text h5"><?= $status['title'] ?></p>
+        foreach ($statuses as $status): ?>
+            <div class="modern-card text-white bg-<?= $status['bg'] ?>" style="border-radius:4%">
+                <div class="icon-circle">
+                    <i class="fas <?= $status['icon'] ?>"></i>
                 </div>
+                <h2><?= $status['count'] ?></h2>
+                <p><?= $status['title'] ?></p>
             </div>
-        </div>
-    <?php endforeach; ?>
-</div>
+        <?php endforeach; ?>
+    </div>
+
 
     <!-- Include Font Awesome -->
 

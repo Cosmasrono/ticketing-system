@@ -809,7 +809,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
         margin: 0;
         padding: 40px;
         color: #343a40;
-        margin-top: 80px;
+        margin-top: 50px;
     }
 
     /* Container Styling */

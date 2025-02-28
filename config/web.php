@@ -50,7 +50,12 @@ $config = [
             'viewPath' => '@app/mail',
             'useFileTransport' => false,
             'transport' => [
-                'dsn' => 'sendinblue+api://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@default',
+                'scheme' => 'smtp',
+                'host' => 'smtp-relay.brevo.com', // Updated from Sendinblue
+                'username' => 'apikey', // Always use 'apikey' as the username
+                'password' => 'xsmtpsib-7e266b474b373f6eefd62e7d1c64ac5585abe034bb90aa53f681b19797829d7d-QYV84rXJ7P2v3MIK', // Replace with your actual Brevo API key
+                'port' => 587, // Use 465 for SSL, 25 as an alternative
+                'encryption' => 'tls', // Use 'ssl' if on port 465
             ],
         ],
         'log' => [

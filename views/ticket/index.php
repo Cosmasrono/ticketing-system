@@ -10,7 +10,22 @@ use yii\widgets\Pjax;
 $this->title = 'My Tickets';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
-<div class="container ticket-index">
+<style>
+    /* Container Styling */
+    .container {
+        max-width: 100%;
+        padding: 0px;
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
+
+    .finefooter {
+        padding: 0px 80px;
+        margin-bottom: -20px;
+
+    }
+</style>
+<div class="container ticket-index" style="padding:80px; margin-top:-40px;">
 
     <h1 class="fw-semibold"> <?= Html::encode($this->title) ?> </h1>
 
@@ -126,8 +141,8 @@ $this->params['breadcrumbs'][] = $this->title;
     }
 
     .ticket-index {
-        margin-top: 30px;
-        padding: 20px;
+   
+     
         border-radius: 8px;
     }
 

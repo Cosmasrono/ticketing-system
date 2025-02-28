@@ -4,12 +4,27 @@ use yii\widgets\ActiveForm;
 
 $this->title = 'Request Contract Renewal for ' . $company->company_name;
 ?>
+<style>
+    /* Container Styling */
+    .container {
+        max-width: 100%;
+        padding: 0px;
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
 
-<div class="renew-contract">
+    .finefooter {
+        padding: 0px 60px;
+        margin-bottom: -20px;
+
+    }
+</style>
+
+<div class="renew-contract " style="padding-top: 20px;">
     <div class="row">
         <div class="col-lg-6 offset-lg-3">
             <div class="card shadow">
-                <div class="card-header bg-warning">
+                <div class="card-header">
                     <h3 class="card-title mb-0">Request Contract Renewal for <?= Html::encode($company->company_name) ?></h3>
                 </div>
                 
@@ -84,11 +99,14 @@ $this->title = 'Request Contract Renewal for ' . $company->company_name;
                     </div>
 
                     <div class="form-group text-center">
-                        <?= Html::submitButton('Submit Renewal Request', [
-                            'class' => 'btn btn-warning btn-lg'
+                    <?= Html::submitButton('Submit Renewal Request', [
+                            'class' => 'btn custom-btn text-white p-2.5 ',
+                            'style' => 'background-color: ; max-width: 300px;',
+                            'id' => 'submit-button'
                         ]) ?>
                         <?= Html::a('Cancel', ['profile', 'id' => Yii::$app->user->id], [
-                            'class' => 'btn btn-secondary btn-lg ms-2'
+                            'class' => 'btn btn-secondary ms-2 p-2.5',
+                            'style' => 'max-width: 300px;',
                         ]) ?>
                     </div>
 
@@ -100,6 +118,13 @@ $this->title = 'Request Contract Renewal for ' . $company->company_name;
 </div>
 
 <style>
+        /* ... your existing styles ... */
+        .custom-btn {
+        background-color: #EA5626;
+        color: white;
+        border: none;
+       
+    }
 .card-header {
     color: #000;
 }

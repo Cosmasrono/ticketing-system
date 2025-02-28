@@ -13,7 +13,22 @@ use app\models\User;
 $this->title = 'Developer Dashboard';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
-<div class="developer-dashboard container-fluid" style="margin-top: 30px;">
+<style>
+    /* Container Styling */
+    .container {
+        max-width: 100%;
+        padding: 0px;
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
+
+    .finefooter {
+        padding: 0px 80px;
+        margin-bottom: -20px;
+
+    }
+</style>
+<div class="developer-dashboard container-fluid" style="margin-top:-40px; padding:80px;">
 
     <h1><?= Html::encode($this->title) ?></h1>
   

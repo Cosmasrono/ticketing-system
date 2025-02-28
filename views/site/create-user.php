@@ -28,7 +28,23 @@ const ROLE_SUPER_ADMIN = 4;
     </div>
 <?php endif; ?>
 
-<div class="create-user-container" style="margin-top: 30px;">
+<style>
+        /* Container Styling */
+        .container {
+        max-width: 100%;
+        padding: 0px;
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
+
+    .finefooter{
+        padding: 0px 60px;
+        margin-bottom: -20px;
+        
+    }
+</style>
+
+<div class="create-user-container" style="margin-top:-20px; padding:80px;">
     <div class="card">
         <div class="card-header">
             <h3>Companies List</h3>

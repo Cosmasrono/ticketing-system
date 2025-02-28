@@ -1,11 +1,27 @@
 <?php
+
 use yii\helpers\Html;
 use yii\bootstrap5\ActiveForm;
 ?>
+<style>
+    /* Container Styling */
+    .container {
+        max-width: 100%;
+        padding: 0px;
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
+
+    .finefooter {
+        padding: 0px 60px;
+        margin-bottom: -20px;
+
+    }
+</style>
 
 <div class="create-developer" style="margin-top: 30px;">
     <div class="row justify-content-center">
-        <div class="col-lg-8">
+        <div class="col-lg-6">
             <div class="card">
                 <div class="card-header text-white">
                     <h2 class="text-center mb-0 text-black">Create Developer</h2>
@@ -44,12 +60,13 @@ use yii\bootstrap5\ActiveForm;
                         'required' => true,
                         'value' => date('Y-m-d', strtotime('+1 year'))
                     ])->label('End Date *') ?>
-                    
+
                     <?= $form->field($model, 'role')->hiddenInput(['value' => 'developer'])->label(false) ?>
 
                     <div class="form-group text-center">
                         <?= Html::submitButton('Create Developer', [
-                            'class' => 'btn  w-100 p-2 mt-3', 'style' => 'background-color: #EA5626; color:white; max-width: 200px;',
+                            'class' => 'btn  w-100 p-2 mt-3',
+                            'style' => 'background-color: #EA5626; color:white; max-width: 200px;',
                             'data' => ['confirm' => 'Are you sure you want to create this developer?']
                         ]) ?>
                     </div>
@@ -59,4 +76,4 @@ use yii\bootstrap5\ActiveForm;
             </div>
         </div>
     </div>
-</div> 
+</div>

@@ -10,7 +10,7 @@ $this->title = 'Create Ticket';
 
 <div class="container py-4 ticket-create">
     <div class="row justify-content-center">
-        <div class="col-md-8">
+        <div class="col-md-7">
             <div class="card border-0 shadow">
                 <div class="card-header text-white text-center" style="background-color: ;">
                     <h3 class="mb-0"><?= Html::encode($this->title) ?></h3>
@@ -349,7 +349,21 @@ EOT;
 
 $this->registerJs($script);
 ?>
+<style>
+    /* Container Styling */
+    .container {
+        max-width: 100%;
+        padding: 0px;
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
 
+    .finefooter {
+        padding: 0px 60px;
+        margin-bottom: -20px;
+
+    }
+</style>
 <style>
     .btn-str {
         background-color: #748386;
@@ -373,7 +387,7 @@ $this->registerJs($script);
 
 
     .ticket-create {
-        margin-top: 40px;
+        margin-top: 10px;
     }
 
     .voice-note-section {

@@ -21,8 +21,25 @@ foreach ($clientCompanies as $company) {
 }
 $companiesJson = Json::encode($companiesForJs);
 ?>
-<div class="row justify-content-center" style="margin-top: 30px;">
-    <div class=" col-lg-8">
+
+
+<style>
+        /* Container Styling */
+        .container {
+        max-width: 100%;
+        padding: 0px;
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
+
+    .finefooter{
+        padding: 0px 60px;
+        margin-bottom: -20px;
+        
+    }
+</style>
+<div class="row justify-content-center" style="margin-top: 30px; ">
+    <div class=" col-lg-6">
         <div class="card">
             <div class="card-header">
                 <h2 class="text-black text-center"><?= Html::encode($this->title) ?></h2>
@@ -42,6 +59,7 @@ $companiesJson = Json::encode($companiesForJs);
                 <?= $form->field($model, 'name')->textInput([
                     'id' => 'name',
                     'class' => 'form-control',
+                    'placeholder' => 'Enter Name',
                     'maxlength' => true,
                     'readonly' => true  // Make it readonly since it will be autofilled
                 ]) ?>
@@ -50,6 +68,7 @@ $companiesJson = Json::encode($companiesForJs);
 
                 <?= $form->field($model, 'company_email')->textInput([
                     'id' => 'company-email',
+                    'placeholder' => 'Enter Company Email',
                     'readonly' => true
                 ]) ?>
 

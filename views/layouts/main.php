@@ -44,26 +44,21 @@ JqueryAsset::register($this);
     <?php $this->head() ?>
     <style>
         /* Navbar Styling */
-
-        
-        .user-header {
-            margin: 0;
-
-        }
-
         .navbar {
             background: #1B1D4E !important;
+            /* background: orange !important; */
             backdrop-filter: blur(10px);
-            padding: 15px 15px;
             transition: all 0.4s ease-in-out;
-            margin: 0;
-            /* margin-bottom: 20px; */
+            max-width: 100%;
+            margin-bottom: 20px;
         }
 
         .navbar-nav {
             display: flex;
             gap: 18px;
-            margin-bottom: 20px;
+            /* margin-bottom: 20px; */
+            /* background-color: orange !important; */
+            margin-right: 20px;
         }
 
         /* User Icon Dropdown */
@@ -97,23 +92,11 @@ JqueryAsset::register($this);
             color: #E85720;
         }
 
-
-
-        /* Index Page Header on Scroll
-
-        .body.scrolled .header {
-            --background-color: rgba(40, 58, 90, 0.9);
-        }
-
-        .header {
-            background-color: #3d4d6a;
-        }
-
         /* Brand Logo Styling */
         .navbar-logo {
             max-height: 50px;
-            margin-right: 8px;
-            border-radius: 50%
+            margin-left: 20px;
+            border-radius: 50%;
         }
 
         @media (max-width: 768px) {
@@ -134,7 +117,9 @@ JqueryAsset::register($this);
 
         main {
             flex: 1;
+            max-width: 100%;
         }
+        
     </style>
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 </head>
@@ -166,6 +151,7 @@ JqueryAsset::register($this);
         <!-- No header displayed for login, register, and superadmin registration -->
     <?php else: ?>
         <!-- Regular Header for Authenticated Users -->
+
         <header id="header">
             <?php
             NavBar::begin([
@@ -226,9 +212,9 @@ JqueryAsset::register($this);
         </header>
     <?php endif; ?>
 
-    <main id="main" class="flex-shrink-0 " role="main">
+    <main id="main" class="flex-shrink-0" role="main">
         <?php if (!(Yii::$app->user->isGuest) && Yii::$app->controller->action->id !== 'index'): ?>
-            <div class="container">
+            <div class="container" style="">
                 <?= Alert::widget() ?>
                 <?= $content ?>
             </div>

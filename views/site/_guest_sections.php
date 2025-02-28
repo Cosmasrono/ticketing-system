@@ -1,13 +1,27 @@
 <?php
+
 use yii\helpers\Html;
 use yii\helpers\Url;
 
 $this->title = 'Iansoft - Help Desk Solutions';
-?>    
+?>
+<style>
+    .container {
+        max-width: 100%;
 
-<main class="main">
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
+
+    .container section {
+        padding: 70px 40px;
+        max-width: 100%;
+    }
+</style>
+
+<div class="index-container">
     <!-- Hero Section -->
-    <section id="hero" class="hero section dark-background">
+    <section id="hero" class="hero section dark-background" style="padding-left:10px; padding-right:10px;">
         <div class="container">
             <div class="row gy-4">
                 <div class="col-lg-6 order-2 order-lg-1 d-flex flex-column justify-content-center" data-aos="zoom-out">
@@ -28,15 +42,15 @@ $this->title = 'Iansoft - Help Desk Solutions';
     </section>
 
     <!-- About Section -->
-    <section id="about" class="about section">
+    <section id="about" class="about section" style="padding-left:10px; padding-right:10px;">
         <div class="container section-title" data-aos="fade-up">
             <h2>About Us</h2>
         </div>
         <div class="container">
             <div class="row gy-4">
                 <div class="col-lg-5 order-2 order-lg-1 why-us-img">
-                    <img src="<?= Yii::getAlias('@web/assets/img/tickett.png') ?>" class="img-fluid" alt="" 
-                         data-aos="zoom-in" data-aos-delay="100" style="width: 400px; height: 300px; object-fit: contain;">
+                    <img src="<?= Yii::getAlias('@web/assets/img/tickett.png') ?>" class="img-fluid" alt=""
+                        data-aos="zoom-in" data-aos-delay="100" style="width: 400px; height: 300px; object-fit: contain;">
                 </div>
                 <div class="col-lg-7 content order-1 order-lg-2" data-aos="fade-up" data-aos-delay="100">
                     <p>
@@ -55,7 +69,7 @@ $this->title = 'Iansoft - Help Desk Solutions';
     </section>
 
     <!-- How it works Section -->
-    <section id="howitworks" class="section why-us light-background">
+    <section id="howitworks" class="section why-us light-background" style="padding-left:10px; padding-right:10px;">
         <div class="container-fluid">
             <div class="row gy-4">
                 <div class="col-lg-7 d-flex flex-column justify-content-center order-2 order-lg-1">
@@ -104,7 +118,7 @@ $this->title = 'Iansoft - Help Desk Solutions';
     </section>
 
     <!-- Key Features Section -->
-    <section id="features" class="services section light-background">
+    <section id="features" class="services section light-background" style="padding-left:10px; padding-right:10px;">
         <div class="container section-title" data-aos="fade-up">
             <h2>Key Features</h2>
             <p>Powerful, intuitive, and designed to enhance your experience with seamless functionality.</p>
@@ -139,7 +153,7 @@ $this->title = 'Iansoft - Help Desk Solutions';
     </section>
 
     <!-- Call To Action Section -->
-    <section id="call-to-action" class="call-to-action section dark-background">
+    <section id="call-to-action" class="call-to-action section dark-background" style="padding-left:10px; padding-right:10px;">
         <img src="<?= Yii::getAlias('@web/assets/img/cta-bg.jpg') ?>" alt="">
         <div class="container">
             <div class="row" data-aos="zoom-in" data-aos-delay="100">
@@ -156,7 +170,7 @@ $this->title = 'Iansoft - Help Desk Solutions';
     </section>
 
     <!-- Enterprise Solution Section -->
-    <section id="enterprisesol" class="team section">
+    <section id="enterprisesol" class="team section" style="padding-left:10px; padding-right:10px;">
         <div class="container section-title" data-aos="fade-up">
             <h2>Enterprise Solutions</h2>
         </div>
@@ -272,12 +286,13 @@ $this->title = 'Iansoft - Help Desk Solutions';
             </div>
         </div>
     </section>
-</main>
+</div>
+
 </body>
 
 <style>
-   
 
- 
-    
+
+
+
 </style>

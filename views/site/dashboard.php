@@ -80,6 +80,22 @@ $this->registerJs("
 ?>
 
 <style>
+        /* Container Styling */
+        .container {
+        max-width: 100%;
+        padding: 0px;
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
+
+    .finefooter{
+        padding: 0px 60px;
+        margin-bottom: -20px;
+        
+    }
+</style>
+
+<style>
     /* Fixed dash-Navigation Styles */
     .dashboard-dash-nav {
         justify-items: center;
@@ -410,9 +426,9 @@ $this->registerJs("
     </ul>
 </div>
 
-<div class="dashboard-container">
+<div class="dashboard-container" style=" padding:80px;">
     <!-- Users Section -->
-    <div id="users" class="content-section p-4" style="margin-top: 100px;">
+    <div id="users" class="content-section p-4" style="margin-top: 20px;">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2 class=" fw-bold mb-0" style="color: #1B1D4E; padding:10px 0;">
                 <i class="fas fa-users me-2"></i>User Management

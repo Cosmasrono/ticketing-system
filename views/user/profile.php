@@ -67,11 +67,11 @@ $currentUserRole = Yii::$app->user->identity->role;
 $isCEO = $currentUserRole === 4;
 ?>
 
-<div class="company-profile container" style="margin-top:30px;">
+<div class="company-profile container" style=" padding:30px;">
     <?php
     $this->title = "Profile : <span style='color: #EA5626; font-weight: normal;'>" . Html::encode($companyDetails['company_name']) . "</span> ";
     ?>
-    <h1><?= $this->title ?></h1>
+    <h1 style="margin-bottom: 15px;"><?= $this->title ?></h1>
 
     <?= DetailView::widget([
         'model' => (object)$companyDetails,
@@ -419,4 +419,14 @@ $isCEO = $currentUserRole === 4;
         /* Add padding for mobile */
     }
     
+</style>
+<style>
+    /* Container Styling */
+
+
+    .finefooter {
+        padding: 0px 60px;
+        margin-bottom: -20px;
+
+    }
 </style>

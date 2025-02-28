@@ -4,13 +4,27 @@ use app\models\User;
 use yii\helpers\Html;
 use yii\widgets\ActiveForm;
 ?>
+<style>
+    /* Container Styling */
+    .container {
+        max-width: 100%;
+        padding: 0px;
+        /* Allow full width */
+        /* Add padding for mobile */
+    }
 
+    .finefooter {
+        padding: 0px 60px;
+        margin-bottom: -20px;
+
+    }
+</style>
 <style>
 .assign-form {
     padding: 25px;
     border-radius: 8px;
-    background: #fff8f3;  /* Light orange background */
-    border: 1px solid #ffd3b6;
+    background: #ffffff;  /* Light orange background */
+ 
 }
 
 .form-control {
@@ -93,8 +107,8 @@ select.form-control {
     -moz-appearance: none;
 }
 </style>
-
-<div class="assign-form">
+<div class="row col-lg-6 offset-lg-3 " style="margin-top:30px;">
+<div class="assign-form" style="">
     <?php $form = ActiveForm::begin([
         'id' => 'assign-form',
         'enableAjaxValidation' => false,
@@ -113,7 +127,7 @@ select.form-control {
         ),
         [
             'prompt' => 'Select Developer',
-            'class' => 'form-control',
+            'class' => 'form-control ',
             'required' => true
         ]
     ) ?>
@@ -138,7 +152,7 @@ select.form-control {
 
     <?php ActiveForm::end(); ?>
 </div>
-
+        </div>
 <?php
 $js = <<<JS
 $('#assign-form').on('submit', function(e) {

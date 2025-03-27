@@ -246,20 +246,23 @@ class TicketController extends Controller
     public function actionIndex()
     {
         $query = Ticket::find()
-            ->select(['ticket.*', 'user.company_name'])
-            ->leftJoin('user', 'user.id = ticket.user_id')
-            ->where(['ticket.user_id' => Yii::$app->user->id]);
+            ->alias('t')  // Give alias to main table
+            ->leftJoin('users u', 'u.id = t.user_id');  // Changed 'user' to 'users'
+
+        if (!Yii::$app->user->can('admin')) {
+            $query->where(['t.user_id' => Yii::$app->user->id]);
+        }
 
         $dataProvider = new ActiveDataProvider([
             'query' => $query,
+            'pagination' => [
+                'pageSize' => 10,
+            ],
             'sort' => [
                 'defaultOrder' => [
                     'created_at' => SORT_DESC,
                 ]
-            ],
-            'pagination' => [
-                'pageSize' => 10,
-            ],
+            ]
         ]);
 
         return $this->render('index', [

@@ -105,7 +105,7 @@ class UserController extends Controller
                 'COUNT(t.id) as total_tickets',
                 'SUM(CASE WHEN t.sla_status = "breached" THEN 1 ELSE 0 END) as breached_tickets'
             ])
-            ->from(['u' => 'user'])
+            ->from(['u' => 'users'])
             ->leftJoin(['t' => 'ticket'], 't.developer_id = u.id')
             ->where(['u.role' => 3])
             ->groupBy('u.id')

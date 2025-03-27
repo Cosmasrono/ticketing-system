@@ -2,7 +2,7 @@
 
 use yii\db\Migration;
 
-class m240915_234890_create_contract_renewals_table extends Migration
+class m240115_234890_create_contract_renewals_table extends Migration
 {
     public function up()
     {
@@ -28,12 +28,12 @@ class m240915_234890_create_contract_renewals_table extends Migration
         );
 
         $this->addForeignKey(
-            'fk-contract_renewals-company_id',
-            'contract_renewals',
-            'company_id',
-            'company',
-            'id',
-            'CASCADE'
+            // 'fk-contract_renewals-company_id',
+            // 'contract_renewals',
+            // 'company_id',
+            // 'company',
+            // 'id',
+            // 'CASCADE'
         );
 
         $this->addForeignKey(

@@ -4,6 +4,8 @@ use app\models\User;
 use yii\helpers\Html;
 use yii\widgets\ActiveForm;
 ?>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 <style>
     /* Container Styling */
     .container {
@@ -155,24 +157,42 @@ select.form-control {
         </div>
 <?php
 $js = <<<JS
-$('#assign-form').on('submit', function(e) {
+$('#assign-form').off('submit').on('submit', function(e) {
     e.preventDefault();
     
     var form = $(this);
     var developerId = $('#ticket-assigned_to').val();
+    var csrfToken = $('meta[name="csrf-token"]').attr("content");
     
     if (!developerId) {
-        alert('Please select a developer');
+        Swal.fire({
+            title: 'Error!',
+            text: 'Please select a developer',
+            icon: 'error'
+        });
         return false;
     }
+
+    // Show loading state
+    Swal.fire({
+        title: 'Processing...',
+        text: 'Assigning ticket to developer',
+        didOpen: () => {
+            Swal.showLoading();
+        },
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false
+    });
 
     $.ajax({
         url: form.attr('action'),
         type: 'POST',
         data: form.serialize(),
         dataType: 'json',
-        beforeSend: function() {
-            $('.btn-primary').prop('disabled', true).text('Processing...');
+        timeout: 30000,
+        headers: {
+            'X-CSRF-Token': csrfToken
         },
         success: function(response) {
             if (response.success) {
@@ -183,34 +203,35 @@ $('#assign-form').on('submit', function(e) {
                     confirmButtonText: 'OK'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        // Close modal if it exists
-                        if ($('#assignModal').length) {
-                            $('#assignModal').modal('hide');
-                        }
-                        // Redirect to admin page
-                        window.location.href = '/site/admin';  // Update this URL to match your admin route
+                        window.location.href = '/site/admin';
                     }
                 });
             } else {
                 Swal.fire({
                     title: 'Error!',
                     text: response.message || 'Failed to assign developer',
-                    icon: 'error',
-                    confirmButtonText: 'OK'
+                    icon: 'error'
                 });
-                $('.btn-primary').prop('disabled', false)
-                    .text('{$ticket->status}' === 'escalated' ? 'Reassign' : 'Assign');
             }
         },
         error: function(xhr, status, error) {
+            console.error('AJAX Error:', status, error);
+            let errorMessage = 'An error occurred while processing your request';
+            
+            if (status === 'timeout') {
+                errorMessage = 'Request timed out. Please try again.';
+            } else if (xhr.responseJSON && xhr.responseJSON.message) {
+                errorMessage = xhr.responseJSON.message;
+            }
+            
             Swal.fire({
                 title: 'Error!',
-                text: 'An error occurred while processing your request',
-                icon: 'error',
-                confirmButtonText: 'OK'
+                text: errorMessage,
+                icon: 'error'
             });
-            $('.btn-primary').prop('disabled', false)
-                .text('{$ticket->status}' === 'escalated' ? 'Reassign' : 'Assign');
+        },
+        complete: function() {
+            // Optional: Add any cleanup code here
         }
     });
     

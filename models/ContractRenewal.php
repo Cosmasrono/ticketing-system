@@ -21,7 +21,7 @@ class ContractRenewal extends ActiveRecord
             [['renewal_status'], 'string'],
             [['renewal_status'], 'default', 'value' => 'pending'],
             [['company_id'], 'exist', 'skipOnError' => true, 'targetClass' => Company::class, 'targetAttribute' => ['company_id' => 'id']],
-
+            [['renewal_duration'], 'in', 'range' => [3, 6, 12, 24]],
         ];
     }
 
@@ -30,7 +30,7 @@ class ContractRenewal extends ActiveRecord
         return [
             'id' => 'ID',
             'company_id' => 'Company',
-            'renewal_duration' => 'Duration (Months)',
+            'renewal_duration' => 'Renewal Duration',
             'requested_by' => 'Requested By',
             'extension_period' => 'Extension Period',
             'notes' => 'Notes',

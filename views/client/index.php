@@ -150,7 +150,7 @@ $this->title = 'Client Management';
                                 </td>
                                 <td>
                                     <?php
-                                    $modules = explode(',', $client->module);
+                                    $modules = !empty($client->module) ? explode(',', $client->module) : [];
                                     foreach ($modules as $module):
                                         if (trim($module)):
                                     ?>

@@ -75,7 +75,7 @@ $config = [
             'class' => 'yii\web\UrlManager',
             'enablePrettyUrl' => true,
             'showScriptName' => false,
-            'baseUrl' => 'http://localhost:8080',
+            'baseUrl' => '',
             'rules' => [
                 'site/first-login' => 'site/first-login',
                 'admin/<id:\d+>' => 'site/admin',
@@ -111,6 +111,7 @@ $config = [
             'class' => 'yii\web\Session',
             'cookieParams' => ['httponly' => true],
             'timeout' => 2400, // 40 minutes in seconds
+            'savePath' => dirname(__DIR__) . '/runtime/sessions'
         ],
         'authManager' => [
             'class' => 'yii\rbac\DbManager',

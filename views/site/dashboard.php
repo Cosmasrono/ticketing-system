@@ -77,6 +77,11 @@ $this->registerJs("
         });
     };
 ", \yii\web\View::POS_HEAD);
+
+// Helper function to convert status to text
+function getStatusText($status) {
+    return $status == User::STATUS_ACTIVE ? 'Active' : 'Inactive';
+}
 ?>
 
 <style>
@@ -490,7 +495,7 @@ $this->registerJs("
                                         <span class="badge <?= $user->status == 10
                                                                 ? 'bg-success-subtle text-success'
                                                                 : 'bg-danger-subtle text-danger' ?> px-3 py-2 status-badge">
-                                            <?= $user->status == 10 ? 'Active' : 'Inactive' ?>
+                                            <?= getStatusText($user->status) ?>
                                         </span>
                                     </td>
                                     <td>

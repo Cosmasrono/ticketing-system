@@ -9,7 +9,7 @@ use yii\web\IdentityInterface;
 use app\models\Admin;
 use app\models\Client;
 use app\models\Company;
- 
+use yii\behaviors\TimestampBehavior;
 
 class User extends ActiveRecord implements IdentityInterface
 {
@@ -20,7 +20,7 @@ class User extends ActiveRecord implements IdentityInterface
     // updated at
     public $updated_at;
     // token created at
-    public $token_created_at;
+    public $token_created_at_unix;
 
     public $password; // This will hold the plain text password temporarily
     public $module;
@@ -49,6 +49,14 @@ class User extends ActiveRecord implements IdentityInterface
 
     const SCENARIO_SIGNUP = 'signup';
 
+    // Define status constants
+    const STATUS_INACTIVE = 0;
+    const STATUS_ACTIVE = 1;
+    const STATUS_DELETED = 9;
+    const STATUS_UNVERIFIED = 20;
+
+    public $password_reset_token;
+
     public function scenarios()
     {
         $scenarios = parent::scenarios();
@@ -75,10 +83,7 @@ public function isUser()
 // }
 
     // Status constants
-    const STATUS_INACTIVE = 0;
-    const STATUS_ACTIVE = 10;
-    const STATUS_DELETED = 9;
-    const STATUS_UNVERIFIED = 20;
+    
 
     /**
      * {@inheritdoc}
@@ -94,12 +99,16 @@ public function isUser()
     public function behaviors()
     {
         return [
-            'timestamp' => [
-                'class' => 'yii\behaviors\TimestampBehavior',
-                'value' => function() { return date('Y-m-d H:i:s'); }
+            [
+                'class' => TimestampBehavior::class,
+                'createdAtAttribute' => 'created_at_unix',
+                'updatedAtAttribute' => 'updated_at_unix',
+                'value' => time(),
             ],
         ];
     }
+    
+    // Then your beforeSave would only need to handle the other logic
 
     /**
      * {@inheritdoc}
@@ -111,10 +120,11 @@ public function isUser()
             [['company_email'], 'email', 'skipOnEmpty' => true],
             [['company_email'], 'unique', 'skipOnEmpty' => true],
             [['company_email'], 'default', 'value' => null], // Set default value to null
-            [['role', 'status', 'company_id', 'created_at', 'updated_at'], 'integer'],
+            [['role', 'status', 'company_id', 'created_at_unix', 'updated_at_unix'], 'integer'],
             [['name', 'company_name', 'company_email', 'password_hash', 'auth_key'], 'string', 'max' => 255],
             [['verification_token'], 'string', 'max' => 255], // Allow null
             [['email_verified'], 'boolean'],
+            [['password_reset_token', 'token_created_at'], 'safe'],
             [['email_verified'], 'default', 'value' => false], // Set default value to false
             [['is_verified', 'first_login'], 'integer'], // Changed from boolean to integer
             [['modules'], 'safe'],
@@ -123,6 +133,10 @@ public function isUser()
             [['subscription_level'], 'string'], // Add this rule
             [['subscription_level'], 'default', 'value' => null], // Sets default value to null
             // subscription_id
+            // [['created_at', 'updated_at'], 'safe'],
+            [['company_id'], 'integer'],
+            [['created_at_unix', 'updated_at_unix'], 'safe'],
+            ['password_reset_token', 'string'],
         ];
     }
 
@@ -143,8 +157,8 @@ public function isUser()
             'role' => 'Role',
             'status' => 'Status',
             'company_id' => 'Company ID',
-            'created_at' => 'Created At',
-            'updated_at' => 'Updated At',
+            'created_at_unix'=>'created_at_unix',
+            'updated_at_unix'=>'updated_at_unix',
             'is_verified' => 'Is Verified',
             'first_login' => 'First Login',
             'verification_token' => 'Verification Token',
@@ -171,25 +185,42 @@ public function isUser()
          if (!parent::beforeSave($insert)) {
              return false;
          }
-
+     
          if ($this->isNewRecord) {
              $this->auth_key = Yii::$app->security->generateRandomString();
-             $this->created_at = time();
-             $this->updated_at = time();
+             $this->created_at_unix = time(); // Set current Unix timestamp
+             $this->updated_at_unix = time(); // Set current Unix timestamp
              $this->is_verified = false;
              $this->first_login = true;
              $this->email_verified = false;
              
-             // Generate verification token only if company_email is not null
              if (!empty($this->company_email)) {
                  $this->verification_token = Yii::$app->security->generateRandomString(32);
              } else {
                  $this->verification_token = null;
              }
+         } else {
+             // For updates, set updated_at_unix to the current Unix timestamp
+             $this->updated_at_unix = time();
          }
-
+         
          return true;
      }
+
+     
+    // Add this method to handle datetime conversion when retrieving data
+    public function afterFind()
+    {
+        parent::afterFind();
+        
+        // Convert Unix timestamp to datetime if needed
+        if ($this->created_at_unix) {
+            $this->created_at = date('Y-m-d H:i:s', $this->created_at_unix);
+        }
+        if ($this->updated_at_unix) {
+            $this->updated_at = date('Y-m-d H:i:s', $this->updated_at_unix);
+        }
+    }
  
     //  public function afterSave($insert, $changedAttributes)
     //  {
@@ -376,12 +407,18 @@ public function isUser()
             'company_email',
             'password_hash',
             'auth_key',
+            'verification_token',
+            'email_verified',
             'role',
             'status',
-            'password_reset_token',
-            'verification_token',
-            'token_created_at',
-            'email_verified'
+            'company_id',
+            'created_at_unix',
+            'updated_at_unix',
+            'token_created_at_unix',
+            'modules',
+            'is_verified',
+            'first_login',
+            'subscription_level'
         ];
     }
 
@@ -437,37 +474,37 @@ public function isUser()
         }
     
         Yii::debug("User found with status: " . $user->status);
-        Yii::debug("Token created at: " . $user->token_created_at);
+        Yii::debug("Token created at: " . $user->token_created_at_unix);
         
         // If you have token expiration logic:
         $expire = Yii::$app->params['user.passwordResetTokenExpire'] ?? 3600; // 1 hour default
-        $isValid = $user->token_created_at + $expire >= time();
+        $isValid = $user->token_created_at_unix + $expire >= time();
         
         Yii::debug("Token is " . ($isValid ? "valid" : "expired"));
         
         return $isValid;
     }
     
-    public static function findByPasswordResetToken($token)
-    {
-        if (!static::isPasswordResetTokenValid($token)) {
-            Yii::error('Token validation failed: ' . $token);
-            return null;
-        }
+    // public static function findByPasswordResetToken($token)
+    // {
+    //     if (!static::isPasswordResetTokenValid($token)) {
+    //         Yii::error('Token validation failed: ' . $token);
+    //         return null;
+    //     }
     
-        $user = static::findOne([
-            'password_reset_token' => $token,
-            'status' => [self::STATUS_ACTIVE, self::STATUS_UNVERIFIED],
-        ]);
+    //     $user = static::findOne([
+    //         'password_reset_token' => $token,
+    //         'status' => [self::STATUS_ACTIVE, self::STATUS_UNVERIFIED],
+    //     ]);
     
-        if (!$user) {
-            Yii::debug("User not found or has invalid status");
-        } else {
-            Yii::debug("User found with status: " . $user->status);
-        }
+    //     if (!$user) {
+    //         Yii::debug("User not found or has invalid status");
+    //     } else {
+    //         Yii::debug("User found with status: " . $user->status);
+    //     }
     
-        return $user;
-    }
+    //     return $user;
+    // }
     
     public function removePasswordResetToken()
     {
@@ -651,7 +688,7 @@ public function verify()
     {
         $this->password_hash = Yii::$app->security->generatePasswordHash($password);
         $this->password_reset_token = null;
-        $this->password_reset_token_created_at = null;
+        $this->password_reset_token_created_at_unix = null;
         return $this->save(false);
     }
 
@@ -921,9 +958,9 @@ public function verify()
             'role',
             'status',
             'verification_token',
-            'created_at',
-            'updated_at',
-            'token_created_at',
+            'created_at_unix',
+            'updated_at_unix',
+            'token_created_at_unix',
             'modules',
             'is_verified',
             'first_login',
@@ -937,27 +974,21 @@ public function verify()
         return !empty($this->company_email) && !$this->email_verified;
     }
 
-    // public function generatePasswordResetToken()
-    // {
-    //     try {
-    //         $this->password_reset_token = Yii::$app->security->generateRandomString() . '_' . time();
-    //         return true;
-    //     } catch (\Exception $e) {
-    //         Yii::error("Error generating reset token: " . $e->getMessage());
-    //         return false;
-    //     }
-    // }
+     
 
-    // public static function isPasswordResetTokenValid($token)
-    // {
-    //     if (empty($token)) {
-    //         return false;
-    //     }
+    public static function findByPasswordResetToken($token)
+    {
+        if (!static::isPasswordResetTokenValid($token)) {
+            return null;
+        }
 
-    //     $timestamp = (int) substr($token, strrpos($token, '_') + 1);
-    //     $expire = Yii::$app->params['user.passwordResetTokenExpire'] ?? 3600;
-    //     return $timestamp + $expire >= time();
-    // }
+        return static::findOne([
+            'password_reset_token' => $token,
+            'status' => [self::STATUS_UNVERIFIED, self::STATUS_ACTIVE]
+        ]);
+    }
+
+
 
     public static function isPasswordResetTokenExpired($token)
     {

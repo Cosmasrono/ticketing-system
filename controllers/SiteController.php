@@ -154,16 +154,18 @@ class SiteController extends Controller
 
                     // Insert into company table
                     $result = Yii::$app->db->createCommand()->insert('company', [
-                        'name' => $post['name'],
+                        'name' => $post['name'] ?? $post['company_name'],
                         'company_name' => $post['company_name'],
                         'company_email' => $post['company_email'],
-                        'start_date' => $post['start_date'],
-                        'end_date' => $post['end_date'],
+                        'company_type' => $post['company_type'] ?? 'default',  // Add this line with appropriate default
+                        'subscription_level' => $post['subscription_level'] ?? 'basic',  // Add this line with appropriate default
+                        'start_date' => date('Y-m-d', strtotime($post['start_date'])),
+                        'end_date' => date('Y-m-d', strtotime($post['end_date'])),
                         'role' => 'user',
                         'status' => 1,
-                        'modules' => $modules,
-                        'created_at' => new \yii\db\Expression('NOW()'),
-                        'updated_at' => new \yii\db\Expression('NOW()')
+                        'modules' => isset($post['modules']) ? implode(',', $post['modules']) : '',
+                        'created_at' => new \yii\db\Expression('GETDATE()'),
+                        'updated_at' => new \yii\db\Expression('GETDATE()')
                     ])->execute();
 
                     $transaction->commit();
@@ -347,8 +349,8 @@ class SiteController extends Controller
                 $company = new Company();
                 $company->name = $model->company_name;
                 $company->company_email = $model->company_email;
-                $company->created_at = time();
-                $company->updated_at = time();
+                $company->created_at_unix = time();
+                $company->updated_at_unix = time();
 
                 if ($company->save()) {
                     Yii::info("Company created with ID: " . $company->id);
@@ -368,8 +370,8 @@ class SiteController extends Controller
                     $user->role = User::ROLE_SUPERADMIN;
                     $user->status = User::STATUS_INACTIVE; // Set to inactive until email verification
                     $user->company_id = (int)$company->id;
-                    $user->created_at = time();
-                    $user->updated_at = time();
+                    $user->created_at_unix = time();
+                    $user->updated_at_unix = time();
 
                     Yii::info("Attempting to save user with company_id: " . $user->company_id);
 
@@ -893,15 +895,19 @@ class SiteController extends Controller
     {
         try {
             $model = new ResetPasswordForm($token);
+            
+            if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+                if ($model->resetPassword()) {
+                    Yii::$app->session->setFlash('success', 'New password saved.');
+                    return $this->goHome();
+                } else {
+                    Yii::$app->session->setFlash('error', 'Failed to reset password.');
+                }
+            }
         } catch (InvalidArgumentException $e) {
-            throw new BadRequestHttpException($e->getMessage());
+            Yii::$app->session->setFlash('error', $e->getMessage());
         }
-
-        if ($model->load(Yii::$app->request->post()) && $model->validate() && $model->resetPassword()) {
-            Yii::$app->session->setFlash('success', 'New password saved.');
-            return $this->goHome();
-        }
-
+    
         return $this->render('resetPassword', [
             'model' => $model,
         ]);
@@ -1960,7 +1966,7 @@ class SiteController extends Controller
             // Update password
             $user->password_hash = Yii::$app->security->generatePasswordHash($model->newPassword);
             $user->first_login = 0;
-            $user->updated_at = time();
+            $user->updated_at_unix = time();
 
             if ($user->save()) {
                 Yii::$app->session->setFlash('success', 'Password has been set successfully. Please login with your new password.');
@@ -2244,10 +2250,10 @@ class SiteController extends Controller
         $totalUsers = User::find()->count(); // Assuming you have a User model
 
         // Fetch active users count
-        $activeCount = User::find()->where(['status' => 'active'])->count(); // Assuming 'status' is a column in your users table
+        $activeCount = User::find()->where(['status' => User::STATUS_ACTIVE])->count(); // Use the constant instead of the string 'active'
 
         // Fetch inactive users count
-        $inactiveCount = User::find()->where(['status' => 'inactive'])->count(); // Assuming 'status' is a column in your users table
+        $inactiveCount = User::find()->where(['status' => User::STATUS_INACTIVE])->count(); // Use the constant instead of the string 'inactive'
 
         // Fetch all users
         $allUsers = User::find()->all(); // Retrieve all users
@@ -2411,8 +2417,8 @@ class SiteController extends Controller
                 role, 
                 status, 
                 company_name,
-                created_at, 
-                updated_at
+                created_at_unix, 
+                updated_at_unix
             ) VALUES (
                 :name,
                 :email,
@@ -2421,8 +2427,8 @@ class SiteController extends Controller
                 :role,
                 :status,
                 :company_name,
-                NOW(),
-                NOW()
+                GETDATE(),
+                GETDATE()
             )";
 
                 $result = Yii::$app->db->createCommand($sql)
@@ -2517,8 +2523,8 @@ class SiteController extends Controller
                 :status,
                 :company_type,
                 'basic',  -- Set a default value instead of NULL
-                NOW(),
-                NOW()
+                GETDATE(),
+                GETDATE()
             )";
 
                 $result = Yii::$app->db->createCommand($sql)
@@ -2890,44 +2896,44 @@ class SiteController extends Controller
     }
 
     public function actionAddClient()
-    {
-        $model = new Client();
-
-        if ($model->load(Yii::$app->request->post())) {
-            try {
-                $post = Yii::$app->request->post('Client');
-
-                // Get the selected modules and convert to string
-                $modules = isset($post['modules']) ? implode(', ', $post['modules']) : '';
-
-                // Convert GETDATE() to Unix timestamp using DATEDIFF
-                $timestampExpression = new \yii\db\Expression('UNIX_TIMESTAMP()');
-
-                // Direct insert into client table - now including the name field
-                $result = Yii::$app->db->createCommand()->insert('client', [
-                    'name' => $post['name'] ?? $post['company_name'], // Use name if provided, otherwise use company_name
-                    'company_name' => $post['company_name'],
-                    'company_email' => $post['company_email'],
-                    'module' => $modules,
-                    'created_at' => $timestampExpression,
-                    'updated_at' => $timestampExpression
-                ])->execute();
-
-                if ($result) {
-                    Yii::$app->session->setFlash('success', 'Client added successfully to client table.');
-                    return $this->redirect(['admin']);
-                }
-            } catch (\Exception $e) {
-                Yii::error("Error adding client: " . $e->getMessage());
-                Yii::error("Posted data: " . json_encode($post));
-                Yii::$app->session->setFlash('error', 'Error adding client: ' . $e->getMessage());
+{
+    $model = new Client();
+    
+    if ($model->load(Yii::$app->request->post())) {
+        try {
+            $post = Yii::$app->request->post('Client');
+            
+            // Get the selected modules and convert to string
+            $modules = isset($post['modules']) ? implode(', ', $post['modules']) : '';
+            
+            // Use PHP's time() function instead of UNIX_TIMESTAMP()
+            $timestamp = time();
+            
+            // Direct insert into client table - now including the name field
+            $result = Yii::$app->db->createCommand()->insert('client', [
+                'name' => $post['name'] ?? $post['company_name'], // Use name if provided, otherwise use company_name
+                'company_name' => $post['company_name'],
+                'company_email' => $post['company_email'],
+                'module' => $modules,
+                'created_at' => $timestamp,  // Changed from Expression to direct value
+                'updated_at' => $timestamp   // Changed from Expression to direct value
+            ])->execute();
+            
+            if ($result) {
+                Yii::$app->session->setFlash('success', 'Client added successfully to client table.');
+                return $this->redirect(['admin']);
             }
+        } catch (\Exception $e) {
+            Yii::error("Error adding client: " . $e->getMessage());
+            Yii::error("Posted data: " . json_encode($post));
+            Yii::$app->session->setFlash('error', 'Error adding client: ' . $e->getMessage());
         }
-
-        return $this->render('add-client', [
-            'model' => $model,
-        ]);
     }
+    
+    return $this->render('add-client', [
+        'model' => $model,
+    ]);
+}
 
     // public function actionAddClientDirect()
     // {
@@ -3253,7 +3259,9 @@ class SiteController extends Controller
                     $authKey = Yii::$app->security->generateRandomString();
                     $timestamp = time();
 
-                    // Direct SQL insert for user
+                    // Generate a unique password reset token or set to NULL
+                    $passwordResetToken = null; // Or generate a unique token if needed
+
                     $sql = "INSERT INTO users (
                     name,
                     company_name,
@@ -3265,8 +3273,9 @@ class SiteController extends Controller
                     role,
                     status,
                     company_id,
-                    created_at,
-                    updated_at
+                    created_at_unix,
+                    updated_at_unix,
+                    password_reset_token
                 ) VALUES (
                     :name,
                     :company_name,
@@ -3278,8 +3287,9 @@ class SiteController extends Controller
                     :role,
                     :status,
                     :company_id,
-                    :created_at,
-                    :updated_at
+                    :created_at_unix,
+                    :updated_at_unix,
+                    :password_reset_token
                 )";
 
                     $result = $connection->createCommand($sql)
@@ -3290,19 +3300,20 @@ class SiteController extends Controller
                             ':password_hash' => $passwordHash,
                             ':auth_key' => $authKey,
                             ':verification_token' => $verificationToken,
-                            ':role' => User::ROLE_SUPER_ADMIN, // Using the constant from User model
+                            ':role' => User::ROLE_SUPER_ADMIN,
                             ':status' => User::STATUS_INACTIVE,
-                            ':company_id' => time(), // Using timestamp as company_id
-                            ':created_at' => $timestamp,
-                            ':updated_at' => $timestamp
+                            ':company_id' => $timestamp,
+                            ':created_at_unix' => $timestamp,
+                            ':updated_at_unix' => $timestamp,
+                            ':password_reset_token' => $passwordResetToken
                         ])
                         ->execute();
 
+                    // Rest of your code remains the same
                     if ($result) {
-                        // Get the new user's ID
                         $userId = $connection->getLastInsertID();
-
-                        // Send verification email
+                        
+                        // Email verification code...
                         $verificationLink = Yii::$app->urlManager->createAbsoluteUrl([
                             'site/verify-email',
                             'token' => $verificationToken
@@ -3343,62 +3354,32 @@ class SiteController extends Controller
         ]);
     }
 
-    // protected function sendVerificationEmail($user) {
-    //     try {
-    //         // Double check the token exists
-    //         if (empty($user->verification_token)) {
-    //             $user->verification_token = Yii::$app->security->generateRandomString(32);
-    //             $user->save(false);
-    //         }
-
-    //         $verificationLink = Yii::$app->urlManager->createAbsoluteUrl([
-    //             'site/verify-email',
-    //             'token' => $user->verification_token
-    //         ]);
-
-    //         // Log the verification link for debugging
-    //         Yii::debug("Verification link generated: $verificationLink");
-
-    //         return Yii::$app->mailer->compose()
-    //             ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name])
-    //             ->setTo($user->company_email)
-    //             ->setSubject('Email Verification - ' . Yii::$app->name)
-    //             ->setHtmlBody("
-    //                 <p>Hello {$user->name},</p>
-    //                 <p>Please click the following link to verify your email address:</p>
-    //                 <p><a href='{$verificationLink}'>{$verificationLink}</a></p>
-    //                 <p>If you didn't create an account, you can ignore this email.</p>
-    //             ")
-    //             ->send();
-
-    //     } catch (\Exception $e) {
-    //         Yii::error('Error sending verification email: ' . $e->getMessage());
-    //         return false;
-    //     }
-    // }
-
     public function actionVerifyEmail($token)
     {
         try {
             Yii::debug("Verification attempt with token: $token");
-
+            
             if (empty($token)) {
                 throw new \Exception('Empty verification token');
             }
-
+            
             $user = User::findOne(['verification_token' => $token]);
-
+            
             if (!$user) {
                 Yii::error("No user found with token: $token");
                 throw new \Exception('Invalid verification token');
             }
-
+            
+            $timestamp = time();
             $user->email_verified = true;
             $user->status = User::STATUS_ACTIVE;
-            // Keep the verification_token for now (optional)
-            // $user->verification_token = null;
-
-            if ($user->save(false)) {
+            $user->updated_at_unix = $timestamp;
+            
+            // Disable automatic timestamp behavior for this save
+            $user->detachBehavior('timestamp');
+            
+            // Only update specific attributes and skip validation
+            if ($user->update(false, ['email_verified', 'status', 'updated_at_unix', 'verification_token'])) {
                 Yii::$app->session->setFlash('success', 'Your email has been verified successfully. You can now log in.');
                 return $this->redirect(['site/login']);
             } else {
@@ -3515,124 +3496,6 @@ class SiteController extends Controller
             'message' => 'Failed to update user status'
         ];
     }
-    // In your controller (e.g., CompanyController.php or SiteController.php)
-    // public function actionRenewContract($id)
-    // {
-    //     // Find the company
-    //     $company = Company::findOne($id);
-    //     if ($company === null) {
-    //         throw new NotFoundHttpException('The requested company does not exist.');
-    //     }
-
-    //     // Handle the POST request for renewal
-    //     if (Yii::$app->request->isPost) {
-    //         // Start a transaction
-    //         $transaction = Yii::$app->db->beginTransaction();
-
-    //         try {
-    //             // Get current end date
-    //             $currentEndDate = new DateTime($company->end_date);
-
-    //             // Store old end date before modification
-    //             $oldEndDate = $company->end_date;
-
-    //             // Add 1 year to the current end date
-    //             $newEndDate = $currentEndDate->modify('+1 year');
-
-    //             // Update company end date
-    //             $company->end_date = $newEndDate->format('Y-m-d');
-
-    //             // Create renewal record
-    //             $renewal = new ContractRenewal();
-    //             $renewal->company_id = $company->id;
-    //             $renewal->old_end_date = $oldEndDate;
-    //             $renewal->new_end_date = $company->end_date;
-    //             $renewal->renewed_at = date('Y-m-d H:i:s');
-    //             $renewal->status = 'completed';
-
-    //             // Save both records
-    //             if ($company->save() && $renewal->save()) {
-    //                 $transaction->commit();
-    //                 Yii::$app->session->setFlash('success', 'Contract has been successfully renewed until ' . 
-    //                     Yii::$app->formatter->asDate($company->end_date));
-
-    //                 // Redirect to profile page
-    //                 return $this->redirect(['/user/profile', 'id' => Yii::$app->user->id]);
-    //             } else {
-    //                 $transaction->rollBack();
-    //                 Yii::$app->session->setFlash('error', 'Failed to renew contract. Please try again.');
-    //             }
-    //         } catch (\Exception $e) {
-    //             $transaction->rollBack();
-    //             Yii::error('Contract renewal failed: ' . $e->getMessage());
-    //             Yii::$app->session->setFlash('error', 'An error occurred while renewing the contract.');
-    //         }
-    //     }
-
-    //     // Render the renewal confirmation form
-    //     return $this->render('renew-contract', [
-    //         'company' => $company,
-    //     ]);
-    // }
-
-
-    // In SiteController.php
-    // public function actionRenewContract($id)
-    // {
-    //     $companyDetails = Company::findOne($id);
-    //     if (!$companyDetails) {
-    //         throw new NotFoundHttpException("Company not found.");
-    //     }
-
-    //     $model = new \app\models\ContractRenewal();
-
-    //     // Set initial values
-    //     $model->company_id = $companyDetails->id;
-    //     $model->current_end_date = $companyDetails->end_date;
-
-    //     // Check if it's an AJAX request
-    //     if (Yii::$app->request->isAjax) {
-    //         Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
-
-    //         if ($model->load(Yii::$app->request->post())) {
-    //             // Make sure current_end_date is set
-    //             if (empty($model->current_end_date)) {
-    //                 $model->current_end_date = $companyDetails->end_date;
-    //             }
-
-    //             // Set additional fields
-    //             $model->requested_by = Yii::$app->user->id;
-    //             $model->created_at = date('Y-m-d H:i:s');
-    //             $model->updated_at = date('Y-m-d H:i:s');
-    //             $model->renewal_status = 0; // pending status
-
-    //             if ($model->save()) {
-    //                 return [
-    //                     'success' => true,
-    //                     'message' => 'Contract renewal submitted successfully'
-    //                 ];
-    //             } else {
-    //                 return [
-    //                     'success' => false,
-    //                     'errors' => $model->getErrors(),
-    //                     'message' => 'Failed to save contract renewal'
-    //                 ];
-    //             }
-    //         } else {
-    //             return [
-    //                 'success' => false,
-    //                 'errors' => $model->getErrors(),
-    //                 'message' => 'Failed to load form data'
-    //             ];
-    //         }
-    //     }
-
-    //     // If not AJAX, render the form
-    //     return $this->render('renew-contract', [
-    //         'model' => $model,
-    //         'company' => $companyDetails,
-    //     ]);
-    // }
 
 
     public function actionRenewContract($id)
@@ -3726,20 +3589,15 @@ class SiteController extends Controller
             } catch (\Exception $e) {
                 $transaction->rollBack();
 
-                // Enhanced error logging
+                // Enhanced error logging with PDO error info if available
                 Yii::error('Contract renewal failed: ' . $e->getMessage());
                 Yii::error('Contract renewal attempt details: ' . json_encode([
                     'company_id' => $company->id,
                     'current_end_date' => $currentEndDate,
                     'attempted_new_date' => isset($newEndDate) ? $newEndDate : null,
-                    'renewal_data' => $renewal->attributes
+                    'renewal_data' => $renewal->attributes,
+                    'pdo_error' => Yii::$app->db->pdo->errorInfo() // Use PDO's errorInfo instead of getLastError
                 ]));
-
-                // Log database errors
-                $lastError = Yii::$app->db->getLastError();
-                if ($lastError) {
-                    Yii::error('Database error details: ' . json_encode($lastError));
-                }
 
                 Yii::$app->session->setFlash('error', 'Failed to submit contract renewal: ' . $e->getMessage());
             }
@@ -3751,155 +3609,6 @@ class SiteController extends Controller
             'currentEndDate' => $currentEndDate,
         ]);
     }
-
-    // public function actionCreateUserForCompany($company_id)
-    // {
-    //     // Debug current user status and role
-    //     Yii::debug('User status: ' . (Yii::$app->user->isGuest ? 'Guest' : 'Logged in'));
-    //     if (!Yii::$app->user->isGuest) {
-    //         Yii::debug('User role: ' . Yii::$app->user->identity->role);
-    //     }
-
-    //     // More permissive role check - adjust these values based on your actual role system
-    //     if (Yii::$app->user->isGuest || !in_array(Yii::$app->user->identity->role, ['admin', 'superadmin', 1, 4])) {
-    //         Yii::error('Access denied. User role: ' . (Yii::$app->user->isGuest ? 'Guest' : Yii::$app->user->identity->role));
-    //         throw new \yii\web\ForbiddenHttpException('You are not allowed to perform this action. Required role: admin or superadmin');
-    //     }
-
-    //     // Find the company
-    //     $company = Company::findOne($company_id);
-    //     if (!$company) {
-    //         throw new \yii\web\NotFoundHttpException('Company not found.');
-    //     }
-
-    //     try {
-    //         $transaction = Yii::$app->db->beginTransaction();
-
-    //         // Generate credentials
-    //         $clearPassword = Yii::$app->security->generateRandomString(8);
-    //         $token = Yii::$app->security->generateRandomString(32) . '_' . time();
-
-    //         // Create username from company name - with null check and fallback
-    //         $userName = $company->company_name;
-    //         if (!empty($userName) && strpos($userName, '-') !== false) {
-    //             $nameParts = explode('-', $userName);
-    //             $userName = ucfirst(trim($nameParts[0]));
-    //         } else {
-    //             // Fallback if company_name is null or doesn't contain a hyphen
-    //             $userName = 'User_' . time();
-    //         }
-
-    //         // Debug the values
-    //         Yii::debug('Company data: ' . json_encode([
-    //             'id' => $company->id,
-    //             'name' => $company->company_name,
-    //             'email' => $company->company_email,
-    //             'generated_username' => $userName
-    //         ]));
-
-    //         // Prepare user data
-    //         $user = new User();
-    //         $user->name = $userName;
-    //         $user->company_name = $company->company_name ?? 'Unknown Company';
-    //         $user->company_email = $company->company_email;
-    //         $user->company_id = (int)$company_id; // Explicitly set company_id
-    //         $user->setPassword($clearPassword);
-    //         $user->generateAuthKey();
-    //         $user->password_reset_token = $token;
-    //         $user->status = User::STATUS_INACTIVE;
-    //         $user->role = (int)($company->role ?? 2); // Convert role to integer with fallback
-    //         $user->created_at = time();
-    //         $user->updated_at = time();
-    //         $user->modules = $company->modules ?? '';
-
-    //         // Debug user data before saving
-    //         Yii::debug('User data before save: ' . json_encode($user->attributes));
-
-    //         if (!$user->save()) {
-    //             throw new \Exception('Failed to save user: ' . json_encode($user->errors));
-    //         }
-
-    //         // Create reset URL
-    //         $resetUrl = Yii::$app->urlManager->createAbsoluteUrl([
-    //             'site/set-initial-password',
-    //             'token' => $token
-    //         ]);
-
-    //         // Debug data being passed to email template
-    //         Yii::debug('Email template data:', 'email');
-    //         Yii::debug([
-    //             'company' => $company->attributes,
-    //             'user' => $user->attributes,
-    //             'password' => $clearPassword,
-    //             'token' => $token,
-    //             'resetUrl' => $resetUrl
-    //         ], 'email');
-
-    //         // Debug the values
-    //         Yii::debug('Company data before email:', 'email');
-    //         Yii::debug([
-    //             'company_id' => $company->id,
-    //             'name' => $company->company_name,
-    //             'email' => $company->company_email,
-    //             'modules' => $company->modules
-    //         ], 'email');
-
-    //         try {
-    //             // Ensure company has all required attributes
-    //             if (!$company->modules) {
-    //                 $company->modules = ''; // or set default modules if needed
-    //             }
-
-    //             // Send welcome email with explicit data structure and null checks
-    //             $emailSent = Yii::$app->mailer->compose('@app/views/site/_email_credentials', [
-    //                 'company' => [
-    //                     'company_name' => $company->company_name ?? 'Unknown Company',
-    //                     'company_email' => $company->company_email ?? '',
-    //                     'modules' => is_string($company->modules) ? array_filter(explode(',', $company->modules)) : ['default'],
-    //                     'start_date' => $company->start_date ?? date('Y-m-d'),
-    //                     'end_date' => $company->end_date ?? date('Y-m-d', strtotime('+1 year')),
-    //                     // Add any other required fields with null coalescing
-    //                 ],
-    //                 'user' => [
-    //                     'name' => $user->name ?? 'User',
-    //                     'company_email' => $user->company_email ?? '',
-    //                     'status' => $user->status ?? User::STATUS_INACTIVE,
-    //                     // Add any other required fields with null coalescing
-    //                 ],
-    //                 'password' => $clearPassword,
-    //                 'token' => $token,
-    //                 'resetUrl' => $resetUrl
-    //             ])
-    //             ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name])
-    //             ->setTo($user->company_email)
-    //             ->setSubject('Welcome to ' . Yii::$app->name)
-    //             ->send();
-
-    //             if (!$emailSent) {
-    //                 throw new \Exception('Failed to send welcome email');
-    //             }
-
-    //         } catch (\Exception $e) {
-    //             Yii::error('Email error: ' . $e->getMessage());
-    //             Yii::error('Company data: ' . print_r($company->attributes, true));
-    //             Yii::error('User data: ' . print_r($user->attributes, true));
-    //             throw new \Exception('Failed to send welcome email: ' . $e->getMessage());
-    //         }
-
-    //         $transaction->commit();
-    //         Yii::$app->session->setFlash('success', 'User account created successfully. Login credentials have been sent to ' . $user->company_email);
-    //         return $this->redirect(['admin']);
-
-    //     } catch (\Exception $e) {
-    //         if (isset($transaction)) {
-    //             $transaction->rollBack();
-    //         }
-    //         Yii::error('Error creating user: ' . $e->getMessage());
-    //         Yii::$app->session->setFlash('error', 'Failed to create user: ' . $e->getMessage());
-    //         return $this->redirect(['admin']);
-    //     }
-    // }
-
 
     public function actionSetInitialPassword($token)
     {
@@ -3945,111 +3654,139 @@ class SiteController extends Controller
      * @return mixed
      */
     public function actionCreateUserForCompany($company_id)
-{
-    // Find company and validate existence
-    $company = Company::findOne($company_id);
+    {
+        // Find company and validate existence
+        $company = Company::findOne($company_id);
+        // echo($company);
 
-    if (!$company) {
-        Yii::error("Company not found with ID: $company_id");
-        Yii::$app->session->setFlash('error', 'Company not found.');
+        if (!$company) {
+            Yii::error("Company not found with ID: $company_id");
+            Yii::$app->session->setFlash('error', 'Company not found.');
+            return $this->redirect(['site/admin']);
+        }
+
+        // Check for existing active user
+        $existingUser = User::find()
+            ->where(['company_name' => $company->company_name])
+            ->andWhere(['status' => User::STATUS_ACTIVE])
+            ->one();
+
+        if ($existingUser && $existingUser->status === User::STATUS_ACTIVE) {
+            Yii::$app->session->setFlash('error', 'An active user already exists for this company.');
+            return $this->redirect(['site/admin']);
+        }
+
+        try {
+            $connection = Yii::$app->db;
+            $transaction = $connection->beginTransaction();
+
+            // Generate credentials
+            $clearPassword = Yii::$app->security->generateRandomString(8);
+
+            // Generate token with timestamp
+            $timestamp = time();
+            $randomPart = Yii::$app->security->generateRandomString(32);
+            $token = $randomPart . '_' . $timestamp;
+
+            // Debug log the token
+            Yii::debug("Generated token: " . $token);
+
+            // Get company name parts for the user's name
+            $nameParts = explode('-', $company->company_name);
+            $userName = ucfirst(trim(end($nameParts))); // Take the last part after hyphen, trim and capitalize
+
+            // Properly fetch and validate the role from company
+            $role = null;
+            if (isset($company->role) && is_numeric($company->role)) {
+                $role = intval($company->role);
+            } else {
+                Yii::debug("Company role not found or invalid. Company data: " . json_encode($company->attributes));
+                $role = 2; // Default role if not set
+            }
+
+            // Prepare user data with timestamp-based token
+            $userData = [
+                'company_id' => $company->id,
+                'name' => $userName,
+                'company_name' => $company->company_name,
+                'company_email' => $company->company_email,
+                'role' => $role,
+                'password_hash' => Yii::$app->security->generatePasswordHash($clearPassword),
+                'auth_key' => Yii::$app->security->generateRandomString(),
+                'password_reset_token' => $token,
+                'token_created_at' => $timestamp,
+                'status' => User::STATUS_UNVERIFIED,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+                'is_verified' => 0,
+                'first_login' => 1,
+                'modules' => is_array($company->modules) ? implode(',', $company->modules) : $company->modules,
+                'verification_token' => null,
+                'email_verified' => 0
+            ];
+
+            // Debug log
+            Yii::debug("Creating user with data: " . json_encode($userData));
+
+            // Insert using Query Builder with correct table name 'users'
+            $success = $connection->createCommand()->insert('users', $userData)->execute();
+
+            if (!$success) {
+                throw new \Exception('Failed to insert user data');
+            }
+
+            // Get the newly created user ID
+            $userId = $connection->getLastInsertID();
+
+            // Verify the user was created with correct table name
+            $createdUser = User::findOne($userId);
+            if (!$createdUser) {
+                throw new \Exception('User was not found after creation');
+            }
+
+            // Create reset URL
+            $resetUrl = Yii::$app->urlManager->createAbsoluteUrl([
+                '/site/set-initial-password',
+                'token' => $token
+            ]);
+
+            // Debug log the URL
+            Yii::debug("Reset URL: " . $resetUrl);
+
+            // Send welcome email
+            $emailSent = Yii::$app->mailer->compose('@app/views/site/_email_credentials', [
+                'company' => $company,
+                'password' => $clearPassword,
+                'token' => $token,
+                'resetUrl' => $resetUrl
+            ])
+                ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name])
+                ->setTo($company->company_email)
+                ->setSubject('Welcome to ' . Yii::$app->name . ' - Set Your Password')
+                ->send();
+            if (!$emailSent) {
+                Yii::error('Email sending failed. Check mailer settings.', __METHOD__);
+                throw new \Exception('Failed to send email');
+            }
+            // if ($emailSent) {
+            //     $transaction->commit();
+            //     Yii::$app->session->setFlash('success', 
+            //         'User account created and instructions sent to ' . $company->company_email 
+            //     );
+            // } else {
+            //     throw new \Exception('Failed to send email');
+            // }
+
+
+        } catch (\Exception $e) {
+            if (isset($transaction)) {
+                $transaction->rollBack();
+            }
+            Yii::error("Error in user creation: " . $e->getMessage());
+            Yii::error("Stack trace: " . $e->getTraceAsString());
+            Yii::$app->session->setFlash('error', 'Error creating user: ' . $e->getMessage());
+        }
+
         return $this->redirect(['site/admin']);
     }
-
-    // Check for existing ACTIVE user
-    $existingActiveUser = User::find()
-        ->where(['company_email' => $company->company_email])
-        ->andWhere(['status' => User::STATUS_ACTIVE]) // Only check for active users
-        ->one();
-
-    if ($existingActiveUser) {
-        Yii::$app->session->setFlash('error', 'An active user already exists for this company.');
-        return $this->redirect(['site/admin']);
-    }
-
-    // Declare variables before the try block
-    $token = null;
-    $clearPassword = null;
-    $transaction = null;
-
-    try {
-        $connection = Yii::$app->db;
-        $transaction = $connection->beginTransaction();
-
-        // Generate simpler token without timestamp
-        $token = Yii::$app->security->generateRandomString(32);
-        // Generate a random password
-        $clearPassword = Yii::$app->security->generateRandomString(8);
-
-        // Debug log the token
-        Yii::debug("Generated token: " . $token);
-
-        $userData = [
-            'company_id' => $company->id,
-            'name' => $company->company_name,
-            'company_name' => $company->company_name,
-            'company_email' => $company->company_email,
-            'role' => $company->role ?? 2,
-            'password_hash' => Yii::$app->security->generatePasswordHash($clearPassword),
-            'auth_key' => Yii::$app->security->generateRandomString(),
-            'password_reset_token' => $token, // Use simple token
-            'token_created_at' => time(),
-            'status' => User::STATUS_UNVERIFIED,
-            'created_at' => time(),
-            'updated_at' => time(),
-            'is_verified' => 0,
-            'first_login' => 1,
-            'modules' => is_array($company->modules) ? implode(',', $company->modules) : $company->modules,
-            'verification_token' => null,
-            'email_verified' => 0
-        ];
-
-        // Insert user
-        $success = $connection->createCommand()->insert('users', $userData)->execute();
-
-        if (!$success) {
-            throw new \Exception('Failed to insert user data');
-        }
-
-        // Get the newly created user ID
-        $userId = $connection->getLastInsertID();
-
-        // Create reset URL with the simple token
-        $resetUrl = Yii::$app->urlManager->createAbsoluteUrl([
-            'site/set-initial-password',
-            'token' => $token
-        ]);
-
-        // Send welcome email
-        $emailSent = Yii::$app->mailer->compose('@app/views/site/_email_credentials', [
-            'company' => $company,
-            'password' => $clearPassword,
-            'token' => $token,
-            'resetUrl' => $resetUrl
-        ])
-            ->setFrom([Yii::$app->params['supportEmail'] => Yii::$app->name])
-            ->setTo($company->company_email)
-            ->setSubject('Welcome to ' . Yii::$app->name . ' - Set Your Password')
-            ->send();
-
-        if (!$emailSent) {
-            Yii::error('Email sending failed. Check mailer settings.', __METHOD__);
-            throw new \Exception('Failed to send email');
-        }
-
-        $transaction->commit();
-        Yii::$app->session->setFlash('success', 
-            'User account created and instructions sent to ' . $company->company_email 
-        );
-
-    } catch (\Exception $e) {
-        if (isset($transaction)) {
-            $transaction->rollBack();
-        }
-        Yii::error("Error in user creation: " . $e->getMessage());
-        Yii::error("Stack trace: " . $e->getTraceAsString());
-        Yii::$app->session->setFlash('error', 'Error creating user: ' . $e->getMessage());
-    }
-
-    return $this->redirect(['site/admin']);
-}
 }

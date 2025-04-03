@@ -1,5 +1,6 @@
 <?php
 
+
 use yii\helpers\Html;
 use yii\bootstrap5\ActiveForm;
 
@@ -7,24 +8,47 @@ $this->title = 'Set Your Password';
 $this->params['breadcrumbs'][] = $this->title;
 ?>
 
-<div class="site-reset-password">
-    <h1><?= Html::encode($this->title) ?></h1>
-
-    <div class="row">
-        <div class="col-lg-5">
-            <?php $form = ActiveForm::begin(['id' => 'reset-password-form']); ?>
-
-                <?= $form->field($model, 'current_password')->passwordInput(['placeholder' => 'Enter temporary password'])->label('Temporary Password') ?>
-
-                <?= $form->field($model, 'password')->passwordInput(['placeholder' => 'Enter new password'])->label('New Password') ?>
-
-                <?= $form->field($model, 'confirm_password')->passwordInput(['placeholder' => 'Confirm new password']) ?>
-
-                <div class="form-group">
-                    <?= Html::submitButton('Save', ['class' => 'btn btn-primary']) ?>
+<div class="site-login d-flex align-items-center justify-content-center">
+    <div class="col-lg-4">
+        <div class="card shadow-lg border-0 rounded-0">
+            <div class="card-body p-5">
+                <div class="text-center mb-2">
+                    <a href="<?= Yii::$app->homeUrl ?>">
+                        <img src="https://www.iansoftltd.com/assets/img/logo.jpg" alt="Reset Password" class="img-fluid" style="max-width: 100px;">
+                    </a>
                 </div>
+                <h2 class="text-center mb-3 fw-semibold">
+                    <?= Html::encode($this->title) ?>
+                </h2>
+                <p class="text-center text-muted">Please choose your new password:</p>
 
-            <?php ActiveForm::end(); ?>
+                <div class="row">
+                    <div class="col-lg-12">
+                        <?php $form = ActiveForm::begin(['id' => 'reset-password-form']); ?>
+
+                        <?= $form->field($model, 'password', [
+                            'inputOptions' => [
+                                'class' => 'form-control rounded-sm',
+                                'placeholder' => 'New Password',
+                                'autofocus' => true,
+                            ],
+                        ])->passwordInput()->label(false) ?>
+
+                        <?= $form->field($model, 'confirmPassword', [
+                            'inputOptions' => [
+                                'class' => 'form-control rounded-sm',
+                                'placeholder' => 'Confirm Password',
+                            ],
+                        ])->passwordInput()->label(false) ?>
+
+                        <div class="text-center mt-4">
+                            <?= Html::submitButton('Save', ['class' => 'btn btn-primary rounded-sm w-100 py-2']) ?>
+                        </div>
+
+                        <?php ActiveForm::end(); ?>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

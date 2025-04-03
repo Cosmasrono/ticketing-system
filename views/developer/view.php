@@ -686,14 +686,10 @@ $this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/boo
         // Handle escalation target change
         $('#escalationTarget').change(function() {
             const selectedValue = $(this).val();
+            $('#developerSelection, #adminSelection').hide(); // Hide both initially
+            
             if (selectedValue === 'developer') {
-                $('#developerSelection').show();
-                $('#adminSelection').hide();
-                fetchDevelopers();
-            } else if (selectedValue === 'admin') {
-                $('#developerSelection').hide();
-                $('#adminSelection').hide(); // Hide admin selection as it's not needed
-                // No need to fetch admins since we're just escalating to admin status
+                fetchDevelopers(); // This will show the developer selection after fetching
             }
         });
 
@@ -809,152 +805,46 @@ $this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/boo
 
     function fetchDevelopers() {
         $.ajax({
-            url: '<?= \yii\helpers\Url::to(['/user/get-developers']) ?>', // Adjust the URL as needed
+            url: '<?= \yii\helpers\Url::to(['/user/get-developers']) ?>',
             type: 'GET',
             dataType: 'json',
-            success: function(data) {
-                var developerSelect = $('#developerSelect');
-                developerSelect.empty(); // Clear existing options
-                developerSelect.append('<option value="">Select a Developer</option>'); // Default option
-                $.each(data, function(index, developer) {
-                    developerSelect.append('<option value="' + developer.id + '">' + developer.name + '</option>');
-                });
+            success: function(response) {
+                console.log('Developers:', response); // For debugging
+                const developerSelect = $('#developerSelect');
+                developerSelect.empty();
+                developerSelect.append('<option value="">Select a Developer</option>');
+                
+                if (Array.isArray(response)) {
+                    response.forEach(function(developer) {
+                        developerSelect.append(
+                            `<option value="${developer.id}">${developer.name}</option>`
+                        );
+                    });
+                    $('#developerSelection').show();
+                } else {
+                    console.error('Invalid response format');
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: 'Failed to load developers list'
+                    });
+                }
             },
-            error: function() {
-                console.error('Failed to fetch developers.');
+            error: function(xhr, status, error) {
+                console.error('Error fetching developers:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Failed to load developers list'
+                });
             }
         });
     }
 
-    $(document).ready(function() {
-        // Show developer selection when the modal is opened
-        $('#escalateModal').on('show.bs.modal', function() {
-            $('#developerSelect').val(''); // Reset the developer selection
-            fetchDevelopers(); // Fetch developers when the modal is opened
-        });
-
-        // Function to fetch developers
-        function fetchDevelopers() {
-            $.ajax({
-                url: '<?= \yii\helpers\Url::to(['/user/get-developers']) ?>', // Adjust the URL as needed
-                type: 'GET',
-                dataType: 'json',
-                success: function(data) {
-                    var developerSelect = $('#developerSelect');
-                    developerSelect.empty(); // Clear existing options
-                    developerSelect.append('<option value="">Select a Developer</option>'); // Default option
-                    $.each(data, function(index, developer) {
-                        developerSelect.append('<option value="' + developer.id + '">' + developer.name + '</option>');
-                    });
-                },
-                error: function() {
-                    console.error('Failed to fetch developers.');
-                }
-            });
-        }
-
-        // Handle escalation submission
-        $('#submitEscalation').on('click', function() {
-            const comment = $('#escalationComment').val().trim();
-            const targetType = $('#escalationTarget').val();
-            const targetId = targetType === 'developer' ? $('#developerSelect').val() : null;
-
-            // Validate inputs
-            if (!comment) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Comment Required',
-                    text: 'Please provide a comment for the escalation.'
-                });
-                return;
-            }
-
-            if (targetType === 'developer' && !targetId) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Developer Required',
-                    text: 'Please select a developer to escalate to.'
-                });
-                return;
-            }
-
-            // Show confirmation dialog
-            Swal.fire({
-                title: 'Confirm Escalation',
-                text: `Are you sure you want to escalate this ticket to ${targetType}?`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#f0ad4e',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, escalate it!'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    // Show loading state
-                    Swal.fire({
-                        title: 'Processing...',
-                        text: 'Please wait',
-                        allowOutsideClick: false,
-                        didOpen: () => {
-                            Swal.showLoading();
-                        }
-                    });
-
-                    // Make the AJAX request
-                    $.ajax({
-                            url: '<?= \yii\helpers\Url::to(['/ticket/escalate']) ?>',
-                            type: 'POST',
-                            data: {
-                                id: currentTicketId,
-                                comment: comment,
-                                targetId: targetId,
-                                targetType: targetType,
-                                _csrf: '<?= Yii::$app->request->csrfToken ?>'
-                            },
-                            dataType: 'json'
-                        })
-                        .done(function(response) {
-                            $('#escalateModal').modal('hide');
-
-                            if (response.success) {
-                                Swal.fire({
-                                    icon: 'success',
-                                    title: 'Success!',
-                                    text: response.message,
-                                    showConfirmButton: false,
-                                    timer: 1500
-                                }).then(() => {
-                                    location.reload();
-                                });
-                            } else {
-                                Swal.fire({
-                                    icon: 'error',
-                                    title: 'Error',
-                                    text: response.message || 'Failed to escalate ticket'
-                                });
-                            }
-                        })
-                        .fail(function(jqXHR, textStatus, errorThrown) {
-                            $('#escalateModal').modal('hide');
-
-                            let errorMessage = 'An error occurred while escalating the ticket.';
-                            try {
-                                const response = JSON.parse(jqXHR.responseText);
-                                if (response.message) {
-                                    errorMessage = response.message;
-                                }
-                            } catch (e) {
-                                console.error('Error parsing response:', e);
-                            }
-
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                text: errorMessage
-                            });
-                        });
-                }
-            });
-        });
+    // Make sure the modal is properly initialized
+    $('#escalateModal').on('show.bs.modal', function() {
+        $('#escalationComment').val(''); // Clear previous comment
+        $('#escalationTarget').val('developer').trigger('change'); // Default to developer and trigger change
     });
 </script>
 

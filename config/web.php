@@ -46,17 +46,19 @@ $config = [
             'errorAction' => 'site/error',
         ],
         'mailer' => [
-            'class' => 'yii\symfonymailer\Mailer',
+            'class' => 'yii\swiftmailer\Mailer',
             'viewPath' => '@app/mail',
-            'useFileTransport' => false,
+            'useFileTransport' => false, // Set to false to send real emails
             'transport' => [
-                'scheme' => 'smtp',
-                'host' => 'smtp-relay.brevo.com', // Updated from Sendinblue
-                'username' => 'apikey', // Always use 'apikey' as the username
-                'password' => 'xsmtpsib-7e266b474b373f6eefd62e7d1c64ac5585abe034bb90aa53f681b19797829d7d-QYV84rXJ7P2v3MIK', // Replace with your actual Brevo API key
+                // 'scheme' => 'smtp',
+                'class' => 'Swift_SmtpTransport',
+                'host' => 'smtp.gmail.com', // Brevo's SMTP relay
+                'username' => 'abby.wairi@gmail.com', // Always use 'apikey' as the username
+                'password' => 'mgjnsigzwttosnys', // Fetch API key from environment variables
                 'port' => 587, // Use 465 for SSL, 25 as an alternative
-                'encryption' => 'tls', // Use 'ssl' if on port 465
+                'encryption' => 'tls', // Use 'ssl' if using port 465
             ],
+        
         ],
         'log' => [
             'traceLevel' => YII_DEBUG ? 3 : 0,
@@ -73,7 +75,7 @@ $config = [
             'class' => 'yii\web\UrlManager',
             'enablePrettyUrl' => true,
             'showScriptName' => false,
-            'baseUrl' => 'http://localhost:8080',
+            'baseUrl' => '',
             'rules' => [
                 'site/first-login' => 'site/first-login',
                 'admin/<id:\d+>' => 'site/admin',
@@ -109,6 +111,7 @@ $config = [
             'class' => 'yii\web\Session',
             'cookieParams' => ['httponly' => true],
             'timeout' => 2400, // 40 minutes in seconds
+            'savePath' => dirname(__DIR__) . '/runtime/sessions'
         ],
         'authManager' => [
             'class' => 'yii\rbac\DbManager',
@@ -183,5 +186,7 @@ if (YII_ENV_DEV) {
         //'allowedIPs' => ['127.0.0.1', '::1', 'your.ip.address.here'],
     ];
 }
+
+
 
 return $config;

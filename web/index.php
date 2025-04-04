@@ -1,5 +1,6 @@
 <?php
-
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 // comment out the following two lines when deployed to production
 defined('YII_DEBUG') or define('YII_DEBUG', true);
 defined('YII_ENV') or define('YII_ENV', 'dev');
@@ -16,11 +17,14 @@ stream_context_set_default([
 require __DIR__ . '/../vendor/autoload.php';
 
 // Load environment variables
+require __DIR__ . '/../config/helpers.php';
+
 try {
     $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
     $dotenv->load();
 } catch (\Exception $e) {
-    die('Error loading .env file. Please ensure it exists and is readable.');
+    // Handle error if .env file is not found
+    error_log('Error loading .env file: ' . $e->getMessage());
 }
 
 require __DIR__ . '/../vendor/yiisoft/yii2/Yii.php';

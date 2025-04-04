@@ -16,7 +16,8 @@ foreach ($clientCompanies as $company) {
     $companiesForJs[$company['company_name']] = [
         'email' => $company['company_email'],
         'name' => $company['name'] ?? str_replace(' Sacco', '', $company['company_name']),
-        'modules' => array_filter(array_map('trim', explode(',', $company['module'])))
+       'modules' => array_filter(array_map('trim', explode(',', $company['module'] ?? '')))
+        // 'modules' => array_filter(array_map('trim', explode(',', $company['module'])))
     ];
 }
 $companiesJson = Json::encode($companiesForJs);

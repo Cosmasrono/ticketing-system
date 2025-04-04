@@ -30,9 +30,40 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
     $dataProvider->query->andFilterWhere(['like', 'issue', $ticketName]);
 }
 ?>
+<!-- alert -->
+
+<?php if (Yii::$app->session->hasFlash('success')): ?>
+    <div class="alert alert-success">
+        <?= Yii::$app->session->getFlash('success') ?>
+    </div>
+<?php endif; ?>
+
+<?php if (Yii::$app->session->hasFlash('error')): ?>
+    <div class="alert alert-danger">
+        <?= Yii::$app->session->getFlash('error') ?>
+    </div>
+<?php endif; ?>
 
 <div class="" >
     <h1><?= Html::encode($this->title) ?></h1>
+    <?php if (Yii::$app->session->hasFlash('success')): ?>
+        <div class="alert alert-success">
+            <?= Yii::$app->session->getFlash('success') ?>
+        </div>
+    <?php elseif (Yii::$app->session->hasFlash('error')): ?>
+        <div class="alert alert-danger">
+            <?= Yii::$app->session->getFlash('error') ?>
+        </div>
+    <?php endif; ?>
+    <?php if (Yii::$app->session->hasFlash('success')): ?>
+        <div class="alert alert-success">
+            <?= Yii::$app->session->getFlash('success') ?>
+        </div>
+    <?php elseif (Yii::$app->session->hasFlash('error')): ?>
+        <div class="alert alert-danger">
+            <?= Yii::$app->session->getFlash('error') ?>
+        </div>
+    <?php endif; ?>
 
     <!-- Action Buttons Section -->
     <div class="action-buttons-container mb-4">
@@ -355,8 +386,13 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                 'attribute' => 'time_taken',
                 'value' => function ($model) {
                     if ($model->status === 'closed' && $model->created_at && $model->closed_at) {
-                        $created = new DateTime($model->created_at);
-                        $closed = new DateTime($model->closed_at);
+                        // Convert timestamps to DateTime objects properly
+                        $created = new DateTime();
+                        $created->setTimestamp($model->created_at);
+                        
+                        $closed = new DateTime();
+                        $closed->setTimestamp($model->closed_at);
+                        
                         $interval = $created->diff($closed);
 
                         if ($interval->d > 0) {

@@ -77,6 +77,11 @@ $this->registerJs("
         });
     };
 ", \yii\web\View::POS_HEAD);
+
+// Helper function to convert status to text
+function getStatusText($status) {
+    return $status == User::STATUS_ACTIVE ? 'Active' : 'Inactive';
+}
 ?>
 
 <style>
@@ -490,7 +495,7 @@ $this->registerJs("
                                         <span class="badge <?= $user->status == 10
                                                                 ? 'bg-success-subtle text-success'
                                                                 : 'bg-danger-subtle text-danger' ?> px-3 py-2 status-badge">
-                                            <?= $user->status == 10 ? 'Active' : 'Inactive' ?>
+                                            <?= getStatusText($user->status) ?>
                                         </span>
                                     </td>
                                     <td>
@@ -678,21 +683,25 @@ $this->registerJs("
                                 if ($model->renewal_status === 'approved') {
                                     return '<button class="btn btn-success btn-sm" disabled>Approved</button>';
                                 }
-                                return Html::a('Approve', '#', [
-                                    'class' => 'btn btn-success btn-sm update-status-btn',
-                                    'data-id' => $model->id,
-                                    'data-status' => 'approved',
-                                ]);
+                                return '<button type="button" 
+                                                class="btn btn-success btn-sm update-status-btn" 
+                                                data-id="' . $model->id . '" 
+                                                data-status="approved"
+                                                onclick="console.log(\'Button clicked directly\')">
+                                            Approve
+                                        </button>';
                             },
                             'reject' => function ($url, $model) {
                                 if ($model->renewal_status === 'approved') {
-                                    return '';  // Hide reject button if approved
+                                    return '';
                                 }
-                                return Html::a('Reject', '#', [
-                                    'class' => 'btn btn-danger btn-sm update-status-btn',
-                                    'data-id' => $model->id,
-                                    'data-status' => 'rejected',
-                                ]);
+                                return '<button type="button" 
+                                                class="btn btn-danger btn-sm update-status-btn" 
+                                                data-id="' . $model->id . '" 
+                                                data-status="rejected"
+                                                onclick="console.log(\'Button clicked directly\')">
+                                            Reject
+                                        </button>';
                             },
                         ],
                     ],
@@ -708,43 +717,71 @@ $this->registerJs("
     $csrfToken = Yii::$app->request->csrfToken;
 
     $js = <<<JS
-    $(document).on('click', '.update-status-btn', function(e) {
-        e.preventDefault();
-        
-        var btn = $(this);
-        var id = btn.data('id');
-        var status = btn.data('status');
-        
-        if (!confirm('Are you sure you want to ' + status + ' this renewal request?')) {
-            return false;
-        }
-        
-        $.ajax({
-            url: '$updateStatusUrl',
-            type: 'POST',
-            data: {
-                id: id,
-                status: status,
-                _csrf: '$csrfToken'
-            },
-            success: function(response) {
-                if (response.success) {
-                    // Show success message
-                    alert(response.message);
-                    // Reload the page to show updated data
-                    location.reload();
-                } else {
-                    alert(response.message || 'Failed to update status');
-                }
-            },
-            error: function() {
-                alert('An error occurred while processing your request');
-            }
+    // First, verify jQuery is loaded
+    if (typeof jQuery === 'undefined') {
+        console.error('jQuery is not loaded!');
+    } else {
+        console.log('jQuery is loaded');
+    }
+
+    // Simple click handler
+    $('.update-status-btn').click(function(e) {
+            e.preventDefault();
+        console.log('Button clicked');
+            
+            var btn = $(this);
+            var id = btn.data('id');
+            var status = btn.data('status');
+            
+        console.log({
+            'Button clicked': true,
+            'Button ID': id,
+            'Status': status,
+            'URL': '$updateStatusUrl',
+            'CSRF': '$csrfToken'
         });
+            
+            if (confirm('Are you sure you want to ' + status + ' this renewal request?')) {
+                $.ajax({
+                    url: '$updateStatusUrl',
+                    type: 'POST',
+                    dataType: 'json',
+                    data: {
+                        id: id,
+                        status: status,
+                        _csrf: '$csrfToken'
+                    },
+                    beforeSend: function() {
+                    console.log('Sending request...');
+                        btn.prop('disabled', true);
+                    },
+                    success: function(response) {
+                    console.log('Success response:', response);
+                        if (response.success) {
+                            alert(response.message);
+                        location.reload();
+                        } else {
+                            alert(response.message || 'Failed to update status');
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                    console.error('Error details:', {
+                        error: error,
+                        status: status,
+                        response: xhr.responseText
+                    });
+                    alert('Error occurred: ' + error);
+                    },
+                    complete: function() {
+                        btn.prop('disabled', false);
+                    }
+                });
+            }
     });
 JS;
 
-    $this->registerJs($js);
+    // Register the JavaScript in POS_END to ensure DOM is loaded
+    $this->registerJs($js, \yii\web\View::POS_END);
     ?>
 
     <div id="clients" class="body-client content-section">

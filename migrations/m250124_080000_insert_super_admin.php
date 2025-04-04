@@ -6,6 +6,14 @@ class m250124_080000_insert_super_admin extends Migration
 {
     public function safeUp()
     {
+        // First check if the table exists
+        if ($this->db->schema->getTableSchema('company') === null) {
+            // Create the company table first if it doesn't exist
+            $this->createTable('company', [
+                // ... company table columns ...
+            ]);
+        }
+
         // First check if the user already exists
         $existingUser = (new \yii\db\Query())
             ->from('users')
@@ -28,11 +36,11 @@ class m250124_080000_insert_super_admin extends Migration
             'company_type' => 'Admin',
             'subscription_level' => 'Enterprise',
             'modules' => null,
-            'created_at' => $currentTimestamp,
-            'updated_at' => $currentTimestamp,
+            'created_at' => new \yii\db\Expression('CURRENT_TIMESTAMP'),
+            'updated_at' => new \yii\db\Expression('CURRENT_TIMESTAMP'),
             'status' => 1,
-            'start_date' => $currentDate,
-            'end_date' => date('Y-m-d H:i:s', strtotime('+1 year')),
+            'start_date' => '2025-03-31',
+            'end_date' => '2026-03-31',
         ]);
 
         // Get the company ID

@@ -14,14 +14,14 @@ class ContractRenewal extends ActiveRecord
     public function rules()
     {
         return [
-            [['company_id', 'current_end_date', 'extension_period', 'renewal_duration', 'requested_by'], 'required'],
-            [['company_id', 'renewal_duration', 'requested_by'], 'integer'],
-            [['current_end_date', 'extension_period'], 'safe'],
+            [['company_id', 'current_end_date', 'extension_period', 'renewal_duration', 'requested_by', 'renewal_status'], 'required'],
+            [['company_id', 'renewal_duration', 'requested_by', 'contract_id'], 'integer'],
+            [['current_end_date', 'extension_period', 'new_end_date'], 'safe'],
             [['notes'], 'string'],
             [['renewal_status'], 'string'],
             [['renewal_status'], 'default', 'value' => 'pending'],
             [['company_id'], 'exist', 'skipOnError' => true, 'targetClass' => Company::class, 'targetAttribute' => ['company_id' => 'id']],
-
+            [['renewal_duration'], 'in', 'range' => [3, 6, 12, 24]],
         ];
     }
 
@@ -30,7 +30,7 @@ class ContractRenewal extends ActiveRecord
         return [
             'id' => 'ID',
             'company_id' => 'Company',
-            'renewal_duration' => 'Duration (Months)',
+            'renewal_duration' => 'Renewal Duration',
             'requested_by' => 'Requested By',
             'extension_period' => 'Extension Period',
             'notes' => 'Notes',
@@ -40,6 +40,7 @@ class ContractRenewal extends ActiveRecord
             'renewed_at' => 'Renewed At',
             'created_at' => 'Created At',
             'updated_at' => 'Updated At',
+            'contract_id' => 'Contract ID',
         ];
     }
 
@@ -72,6 +73,9 @@ class ContractRenewal extends ActiveRecord
         if (parent::beforeSave($insert)) {
             if ($insert) {
                 $this->renewal_status = 'pending';
+                if (empty($this->contract_id)) {
+                    $this->contract_id = 0;
+                }
             }
             if ($this->isNewRecord) {
                 $this->created_at = date('Y-m-d H:i:s');

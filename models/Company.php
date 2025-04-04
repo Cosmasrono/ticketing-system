@@ -66,6 +66,16 @@ class Company extends ActiveRecord
         ];
     }
 
+    public function behaviors()
+    {
+        return [
+            [
+                'class' => \yii\behaviors\TimestampBehavior::class,
+                'value' => new \yii\db\Expression('GETDATE()'),  // Use GETDATE() for SQL Server
+            ],
+        ];
+    }
+
     public function beforeSave($insert)
     {
         if (parent::beforeSave($insert)) {

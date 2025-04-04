@@ -3775,10 +3775,13 @@ class SiteController extends Controller
                 ]));
 
                 // Log database errors
-                $lastError = Yii::$app->db->getLastError();
-                if ($lastError) {
-                    Yii::error('Database error details: ' . json_encode($lastError));
-                }
+                Yii::error([
+                    'message' => 'Failed to submit contract renewal',
+                    'exception' => $e->getMessage(),
+                    'current_end_date' => $currentEndDate,
+                    'attempted_new_date' => isset($newEndDate) ? $newEndDate : null,
+                    'renewal_data' => $renewal->attributes
+                ]);
 
                 Yii::$app->session->setFlash('error', 'Failed to submit contract renewal: ' . $e->getMessage());
             }

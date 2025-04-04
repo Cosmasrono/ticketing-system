@@ -12,7 +12,14 @@ class m240210_084500_add_renewal_duration_to_contract_renewal extends Migration
      */
     public function safeUp()
     {
-        $this->addColumn('contract_renewal', 'renewal_duration', $this->integer()->notNull()->after('company_id')->comment('Duration in months'));
+        // Check if column exists first
+        $table = 'contract_renewal';
+        $column = 'renewal_duration';
+        
+        // Only add the column if it doesn't exist
+        if (!$this->db->getTableSchema($table)->getColumn($column)) {
+            $this->addColumn($table, $column, $this->integer()->notNull()->after('company_id')->comment('Duration in months'));
+        }
         
         // Create an index for better performance
         $this->createIndex(

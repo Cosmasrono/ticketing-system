@@ -40,8 +40,10 @@ class m240915_234890_create_contract_renewals_table extends Migration
             'fk-contract_renewals-requested_by',
             'contract_renewals',
             'requested_by',
-            'user',
-            'id'
+            'users',
+            'id',
+            'CASCADE',
+            'CASCADE'
         );
     }
 

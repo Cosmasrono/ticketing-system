@@ -61,11 +61,11 @@ class SignupForm extends Model
             $sql = "INSERT INTO users (
                 name, company_name, company_email, role, status, 
                 company_id, password_hash, auth_key,
-                created_at, updated_at, is_verified, first_login
+                created_at_unix, updated_at_unix, is_verified, first_login
             ) VALUES (
                 :name, :company_name, :company_email, :role, :status,
                 :company_id, :password_hash, :auth_key,
-                :created_at, :updated_at, :is_verified, :first_login
+                :created_at_unix, :updated_at_unix, :is_verified, :first_login
             )";
 
             // Execute the query with parameters
@@ -79,8 +79,8 @@ class SignupForm extends Model
                     ':company_id' => 0,
                     ':password_hash' => Yii::$app->security->generatePasswordHash($this->password),
                     ':auth_key' => Yii::$app->security->generateRandomString(),
-                    ':created_at' => $now,
-                    ':updated_at' => $now,
+                    ':created_at_unix' => $now,
+                    ':updated_at_unix' => $now,
                     ':is_verified' => 1, // Set as verified by default
                     ':first_login' => 1
                 ])

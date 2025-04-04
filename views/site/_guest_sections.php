@@ -17,9 +17,39 @@ $this->title = 'Iansoft - Help Desk Solutions';
         padding: 70px 40px;
         max-width: 100%;
     }
+
+    /* Floating WhatsApp Icon Styles */
+    .whatsapp-icon {
+        position: fixed;
+        bottom: 60px; /* Distance from the bottom */
+        right: 20px; /* Distance from the right */
+        width: 60px; /* Width of the icon */
+        height: 60px; /* Height of the icon */
+        background-color: #25D366; /* WhatsApp green color */
+        border-radius: 50%; /* Circular shape */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        z-index: 1000; /* Ensure it appears above other elements */
+    }
+
+    .whatsapp-icon img {
+        width: 30px; /* Width of the WhatsApp logo */
+        height: 30px; /* Height of the WhatsApp logo */
+    }
 </style>
 
 <div class="index-container">
+<?php if (Yii::$app->session->hasFlash('success')): ?>
+        <div class="alert alert-success">
+            <?= Yii::$app->session->getFlash('success') ?>
+        </div>
+    <?php elseif (Yii::$app->session->hasFlash('error')): ?>
+        <div class="alert alert-danger">
+            <?= Yii::$app->session->getFlash('error') ?>
+        </div>
+    <?php endif; ?>
     <!-- Hero Section -->
     <section id="hero" class="hero section dark-background" style="padding-left:10px; padding-right:10px;">
         <div class="container">
@@ -69,7 +99,7 @@ $this->title = 'Iansoft - Help Desk Solutions';
     </section>
 
     <!-- How it works Section -->
-    <section id="howitworks" class="section why-us light-background" style="padding-left:10px; padding-right:10px;">
+    <section id="howitworks" class="section why-us light-background" style="padding-left:50px; padding-right:50px;">
         <div class="container-fluid">
             <div class="row gy-4">
                 <div class="col-lg-7 d-flex flex-column justify-content-center order-2 order-lg-1">
@@ -211,6 +241,9 @@ $this->title = 'Iansoft - Help Desk Solutions';
                         </div>
                     </div>
                 </div>
+                <p>
+        
+    </p>
 
                 <!-- Custom Software -->
                 <div class="col-lg-4 col-md-6">
@@ -287,6 +320,11 @@ $this->title = 'Iansoft - Help Desk Solutions';
         </div>
     </section>
 </div>
+
+<!-- Floating WhatsApp Icon -->
+<a href="https://wa.me/254757450716" class="whatsapp-icon" target="_blank">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="WhatsApp" />
+</a>
 
 </body>
 

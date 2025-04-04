@@ -1,5 +1,14 @@
 <?php
 
+// Load environment variables
+require __DIR__ . '/helpers.php';
+try {
+    $dotenv = Dotenv\Dotenv::createImmutable(dirname(__DIR__));
+    $dotenv->load();
+} catch (\Exception $e) {
+    error_log('Error loading .env file: ' . $e->getMessage());
+}
+
 $params = require __DIR__ . '/params.php';
 $db = require __DIR__ . '/db.php';
 

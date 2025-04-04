@@ -124,7 +124,7 @@ JqueryAsset::register($this);
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 </head>
 
-<body class="guest-index-page <?= Yii::$app->user->isGuest && in_array(Yii::$app->controller->action->id, ['login', 'request-password-reset', 'super-admin-signup']) ? 'guest-index-page' : '' ?>">
+<body class="guest-index-page <?= Yii::$app->user->isGuest && in_array(Yii::$app->controller->action->id, ['login', 'request-password-reset', 'super-admin-signup', 'reset-password']) ? 'guest-index-page' : '' ?>">
 
     <?php if (Yii::$app->user->isGuest && Yii::$app->controller->action->id === 'index'): ?>
         <!-- Guest Landing Page Header -->
@@ -147,65 +147,60 @@ JqueryAsset::register($this);
                 <div><a class="btn-getstarted" href="/site/login">Login</a></div>
             </div>
         </header>
-    <?php elseif (Yii::$app->user->isGuest && in_array(Yii::$app->controller->action->id, ['login', 'request-password-reset', 'super-admin-signup'])): ?>
+    <?php elseif (Yii::$app->user->isGuest && in_array(Yii::$app->controller->action->id, ['login', 'request-password-reset', 'super-admin-signup', 'reset-password'])): ?>
         <!-- No header displayed for login, register, and superadmin registration -->
     <?php else: ?>
         <!-- Regular Header for Authenticated Users -->
 
         <header id="header">
             <?php
-            NavBar::begin([
-                'brandLabel' => Html::img('https://www.iansoftltd.com/assets/img/logo.jpg', ['alt' => 'Logo', 'class' => 'navbar-logo']),
-                'brandUrl' => Yii::$app->homeUrl,
-                'options' => ['class' => 'navbar-expand-md navbar-dark fixed-top']
-            ]);
-
-            $menuItems = [
-                ['label' => 'Home', 'url' => ['/site/index']],
-            ];
-
-            if (!Yii::$app->user->isGuest) {
-                $user = Yii::$app->user->identity;
-                $userRole = $user->role;
-
-                if ($userRole == 1 || $userRole == 4) {
-                    $menuItems[] = ['label' => '<i class="fas fa-cog"></i> Admin Panel', 'url' => ['/site/admin'], 'encode' => false];
-                } elseif ($userRole == 3) {
-                    $menuItems[] = ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 'url' => ['/developer/view'], 'encode' => false];
-                } elseif ($userRole == 2) {
-                    $menuItems[] = ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 'url' => ['/ticket/create'], 'encode' => false];
-                    $menuItems[] = ['label' => '<i class="fas fa-list"></i> View Tickets', 'url' => ['/ticket/index'], 'encode' => false];
-                }
-
-                $menuItems[] = [
-                    'label' => '<i class="fas fa-user"></i> ' . Html::encode($user->company_name),
-                    'encode' => false,
-                    'options' => ['class' => 'nav-item dropdown'], // Ensure proper dropdown class
-                    'linkOptions' => [
-                        'class' => 'nav-link dropdown-toggle',
-                        'data-bs-toggle' => 'dropdown',
-                        'aria-expanded' => 'false'
-                    ],
-                    'items' => Dropdown::widget([
-                        'items' => [
-                            ['label' => '<i class="fas fa-user-circle" style="margin-right:8px;"></i> Profile', 'url' => ['/user/profile', 'id' => Yii::$app->user->id], 'encode' => false],
-                            '<div class="dropdown-divider"></div>',
-                            ['label' => '<i class="fas fa-sign-out-alt" style="margin-right:8px;"></i> Logout', 'url' => ['/site/logout'], 'linkOptions' => ['data-method' => 'post'], 'encode' => false],
-                        ],
-                        'options' => ['class' => 'dropdown-menu dropdown-menu-end'], // Align dropdown properly
-                    ]),
-                ];
-            } else {
-                $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
+           NavBar::begin([
+            'brandLabel' => Html::img('https://www.iansoftltd.com/assets/img/logo.jpg', ['alt' => 'Logo', 'class' => 'navbar-logo']),
+            'brandUrl' => Yii::$app->homeUrl,
+            'options' => ['class' => 'navbar-expand-md navbar-dark fixed-top']
+        ]);
+        
+        $menuItems = [
+            ['label' => 'Home', 'url' => ['/site/index']],
+        ];
+        
+        if (!Yii::$app->user->isGuest) {
+            $user = Yii::$app->user->identity;
+            $userRole = $user->role;
+        
+            // Add role-specific menu items directly to the main menu
+            if ($userRole == 1 || $userRole == 4) {
+                $menuItems[] = ['label' => '<i class="fas fa-cog"></i> Admin Panel', 'url' => ['/site/admin'], 'encode' => false];
+            } elseif ($userRole == 3) {
+                $menuItems[] = ['label' => '<i class="fas fa-code"></i> Developer Dashboard', 'url' => ['/developer/view'], 'encode' => false];
+            } elseif ($userRole == 2 || $userRole == 'user') {
+                // Check for either role 2 or 'user' string value
+                $menuItems[] = ['label' => '<i class="fas fa-plus-circle"></i> Create Ticket', 'url' => ['/ticket/create'], 'encode' => false];
+                $menuItems[] = ['label' => '<i class="fas fa-list"></i> View Tickets', 'url' => ['/ticket/index'], 'encode' => false];
             }
-
-            echo Nav::widget([
-                'options' => ['class' => 'navbar-nav ms-auto mb-2 mb-md-0'],
-                'items' => $menuItems,
-                'encodeLabels' => false,
-            ]);
-
-            NavBar::end();
+        
+            // User profile dropdown (separate from role-specific menu items)
+            $menuItems[] = [
+                'label' => '<i class="fas fa-user"></i> ' . Html::encode($user->company_name),
+                'encode' => false,
+                'items' => [
+                    ['label' => '<i class="fas fa-user-circle" style="margin-right:8px;"></i> Profile', 'url' => ['/user/profile', 'id' => Yii::$app->user->id], 'encode' => false],
+                    '<div class="dropdown-divider"></div>',
+                    ['label' => '<i class="fas fa-sign-out-alt" style="margin-right:8px;"></i> Logout', 'url' => ['/site/logout'], 'linkOptions' => ['data-method' => 'post'], 'encode' => false],
+                ],
+            ];
+        }
+        else {
+            $menuItems[] = ['label' => 'Login', 'url' => ['/site/login']];
+        }
+        
+        echo Nav::widget([
+            'options' => ['class' => 'navbar-nav ms-auto mb-2 mb-md-0'],
+            'items' => $menuItems,
+            'encodeLabels' => false,
+        ]);
+        
+        NavBar::end();
 
             ?>
             <i class="mobile-nav-toggle d-xl-none bi bi-list"></i>
@@ -223,7 +218,7 @@ JqueryAsset::register($this);
         <?php endif; ?>
     </main>
 
-    <?php if (!(Yii::$app->user->isGuest && in_array(Yii::$app->controller->action->id, ['login', 'request-password-reset', 'super-admin-signup']))): ?>
+    <?php if (!(Yii::$app->user->isGuest && in_array(Yii::$app->controller->action->id, ['login', 'request-password-reset', 'super-admin-signup', 'reset-password']))): ?>
         <footer id="finefooter" class="finefooter">
             <div class="container footer-bottom">
                 <div class="row gy-4">

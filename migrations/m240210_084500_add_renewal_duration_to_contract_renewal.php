@@ -24,7 +24,7 @@ class m240210_084500_add_renewal_duration_to_contract_renewal extends Migration
         // Create an index for better performance
         $this->createIndex(
             'idx-contract_renewal-renewal_duration',
-            'contract_renewal',
+            'contract_renewals',
             'renewal_duration'
         );
     }
@@ -35,9 +35,9 @@ class m240210_084500_add_renewal_duration_to_contract_renewal extends Migration
     public function safeDown()
     {
         // Drop the index first
-        $this->dropIndex('idx-contract_renewal-renewal_duration', 'contract_renewal');
+        $this->dropIndex('idx-contract_renewal-renewal_duration', 'contract_renewals');
         
         // Then drop the column
-        $this->dropColumn('contract_renewal', 'renewal_duration');
+        $this->dropColumn('contract_renewals', 'renewal_duration');
     }
 } 

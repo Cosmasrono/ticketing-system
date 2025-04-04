@@ -11,6 +11,7 @@ use \DateTimeZone;  // Add this import too
 use yii\web\UploadedFile;
 use yii\helpers\FileHelper;
 use app\models\TicketEscalation; // Ensure this import is present
+use Cloudinary\Cloudinary;
 
 class Ticket extends ActiveRecord
 {
@@ -81,6 +82,41 @@ class Ticket extends ActiveRecord
     public function rules()
     {
         return [
+            // Basic validation
+            [['module', 'issue', 'description', ], 'required'], // Added title as required
+            [['module', 'issue'], 'string', 'max' => 255],  // Added title validation
+            [['description'], 'string'],
+
+            // User and company details
+            [['user_id', 'created_by'], 'integer'],
+            [['company_name', 'company_email'], 'string', 'max' => 255],
+
+            // Timestamp validations
+            [['created_at', 'last_update_at', 'resolution_deadline', 'next_update_due'], 'integer'],
+
+            // Status and severity validations
+            ['status', 'string'],
+            ['sla_status', 'string'],
+            ['sla_status', 'in', 'range' => [
+                'pending', 'in_progress', 'completed', 'breached', 
+                'pending_reassigned'
+            ]],
+            ['status', 'in', 'range' => [
+                self::STATUS_PENDING,
+                self::STATUS_APPROVED,
+                self::STATUS_CANCELLED,
+                self::STATUS_ASSIGNED,
+                self::STATUS_CLOSED,
+                self::STATUS_ESCALATED,
+                self::STATUS_REOPEN,
+                self::STATUS_DELETED,
+                self::STATUS_REASSIGNED,
+                self::STATUS_OPEN
+            ]],
+
+            // URLs
+            [['screenshot_url', 'voice_note_url'], 'string', 'max' => 255],
+
             // Core required fields
             [['user_id', 'module', 'issue', 'description', 'severity'], 'required'],
             
@@ -105,14 +141,7 @@ class Ticket extends ActiveRecord
             ['voice_note_url', 'string'],
             
             // Specific validations
-            ['severity', 'in', 'range' => [
-                self::SEVERITY_LOW,
-                self::SEVERITY_MEDIUM, 
-                self::SEVERITY_HIGH,
-                self::SEVERITY_CRITICAL
-            ]],
             ['renewal_date', 'date', 'format' => 'php:Y-m-d H:i:s'],
-            ['sla_status', 'string'],
             ['developer_name', 'safe'],
             
             // Custom module validation
@@ -125,14 +154,41 @@ class Ticket extends ActiveRecord
             }, 'whenClient' => "function (attribute, value) {
                 return $('#ticket-status').val() === 'reassigned';
             }"],
-            [['screenshot_url'], 'string', 'max' => 255],
-            [['screenshot_url'], 'safe'],
             [['assigned_at', 'closed_at'], 'safe'],
             [['time_taken'], 'number'],
             [['closed_by', 'comments'], 'string'],
             [['status'], 'string'],
             [['screenshot_url', 'voice_note_url'], 'string', 'max' => 255],
             [['screenshot_url', 'voice_note_url'], 'safe'],
+            ['imageFile', 'file', 'skipOnEmpty' => true, 'extensions' => 'png, jpg, jpeg'],
+            ['status', 'string'],
+            ['sla_status', 'string'],
+            ['closed_by', 'string'],
+            ['closed_at', 'safe'],
+            ['assigned_to', 'integer'],
+            ['sla_status', 'in', 'range' => [
+                'pending', 
+                'in_progress', 
+                'completed', 
+                'breached', 
+                'pending_reassigned'
+            ]],
+            ['status', 'in', 'range' => [
+                self::STATUS_PENDING,
+                self::STATUS_APPROVED,
+                self::STATUS_CANCELLED,
+                self::STATUS_ASSIGNED,
+                self::STATUS_CLOSED,
+                self::STATUS_ESCALATED,
+                self::STATUS_REOPEN,
+                self::STATUS_DELETED,
+                self::STATUS_REASSIGNED,
+                self::STATUS_OPEN
+            ]],
+            // Add this rule to validate assigned_to when status is being set to closed
+            ['assigned_to', 'required', 'when' => function($model) {
+                return $model->status === 'closed';
+            }, 'message' => 'Cannot close ticket without an assigned developer.'],
         ];
     }
 
@@ -253,37 +309,113 @@ class Ticket extends ActiveRecord
         if (!parent::beforeSave($insert)) {
             return false;
         }
-
+    
         // Map severity to severity_level if needed
         if ($this->severity !== null) {
             $this->severity_level = $this->severity;
         }
-
-        // Log the screenshot data
-        Yii::debug('Screenshot in beforeSave: ' . (empty($this->screenshot) ? 'empty' : 'has data'));
-        if (!empty($this->screenshot)) {
-            Yii::debug('Screenshot length: ' . strlen($this->screenshot));
-            Yii::debug('Screenshot preview: ' . substr($this->screenshot, 0, 100));
+    
+        // Log screenshot data with safer debugging
+        if (Yii::$app->log->targets['debug']->enabled) {
+            Yii::debug('Screenshot in beforeSave: ' . (empty($this->screenshot) ? 'empty' : 'has data'));
+            if (!empty($this->screenshot)) {
+                Yii::debug('Screenshot length: ' . strlen($this->screenshot));
+                Yii::debug('Screenshot preview: ' . substr($this->screenshot, 0, 100));
+            }
         }
-
+    
+        // Calculate SLA deadlines on insert
         if ($insert) {
             $this->calculateSlaDeadlines();
         }
-
+    
+        // Update SLA status
         $this->updateSlaStatus();
-        $this->last_update_at = new Expression('NOW()');
-
+    
+        // Use time() for timestamp to ensure SQL Server compatibility
+        $this->last_update_at = time();
+    
         // Set the company name directly in the existing property
         if ($insert) {
-            $user = User::findOne(Yii::$app->user->id); // Get the current user
-            if ($user && !empty($user->company_name)) {
-                $this->company_name = $user->company_name; // Use the existing property
+            try {
+                $user = User::findOne(Yii::$app->user->id);
+                if ($user && !empty($user->company_name)) {
+                    $this->company_name = $user->company_name;
+                }
+            } catch (\Exception $e) {
+                Yii::error('Error setting company name: ' . $e->getMessage());
             }
         }
-
+    
+        // Ensure sla_status is a string
+        if ($this->sla_status === 0 || $this->sla_status === null) {
+            $this->sla_status = 'not_started';
+        }
+    
+        if ($this->imageFile instanceof UploadedFile) {
+            $cloudinary = new Cloudinary(Yii::$app->params['cloudinary']);
+            
+            try {
+                $result = $cloudinary->uploadApi()->upload(
+                    $this->imageFile->tempName,
+                    [
+                        'folder' => 'tickets',
+                        'public_id' => 'ticket_' . time() . '_' . random_int(1000, 9999),
+                        'resource_type' => 'image'
+                    ]
+                );
+                
+                $this->screenshot_url = $result['secure_url'];
+            } catch (\Exception $e) {
+                Yii::error('Failed to upload image: ' . $e->getMessage());
+                return false;
+            }
+        }
+    
         return true;
     }
-
+    
+    /**
+     * Calculate SLA deadlines
+     */
+    protected function calculateSlaDeadlines()
+    {
+        $currentTime = time();
+    
+        // Set created_at if not already set
+        if (empty($this->created_at)) {
+            $this->created_at = $currentTime;
+        }
+    
+        // Calculate resolution deadline (default 2 days)
+        if (empty($this->resolution_deadline)) {
+            $this->resolution_deadline = $currentTime + (2 * 24 * 60 * 60); // 2 days
+        }
+    
+        // Calculate next update due (default 8 hours)
+        if (empty($this->next_update_due)) {
+            $this->next_update_due = $currentTime + (8 * 60 * 60); // 8 hours
+        }
+    }
+    
+    /**
+     * Update SLA status based on current conditions
+     */
+    protected function updateSlaStatus()
+    {
+        // Default SLA status logic
+        if ($this->status === 'pending') {
+            $this->sla_status = 0; // Not started
+        } elseif ($this->status === 'in_progress') {
+            $this->sla_status = 1; // In progress
+        } elseif ($this->status === 'resolved') {
+            $this->sla_status = 2; // Resolved
+        } elseif ($this->status === 'closed') {
+            $this->sla_status = 3; // Closed
+        } else {
+            $this->sla_status = 0; // Default to not started
+        }
+    }
     public function afterSave($insert, $changedAttributes)
     {
         parent::afterSave($insert, $changedAttributes);
@@ -300,7 +432,7 @@ class Ticket extends ActiveRecord
 
     public function getUser()
     {
-        return $this->hasOne(User::className(), ['id' => 'user_id']);
+        return $this->hasOne(User::class, ['id' => 'user_id'])->from('users');
     }
 
 
@@ -776,41 +908,41 @@ class Ticket extends ActiveRecord
         return $this->screenshot_url; // Assuming this is stored in the database
     }
 
-    protected function calculateSlaDeadlines()
-    {
-        // Define SLA times in minutes for each severity level
-        $slaConfig = [
-            self::SEVERITY_CRITICAL => ['resolution' => 1440, 'update' => 240],  // 24 hours, 4 hours
-            self::SEVERITY_HIGH => ['resolution' => 2880, 'update' => 480],      // 48 hours, 8 hours
-            self::SEVERITY_MEDIUM => ['resolution' => 10080, 'update' => 1440],  // 7 days, 24 hours
-            self::SEVERITY_LOW => ['resolution' => 20160, 'update' => 2880],     // 14 days, 48 hours
-        ];
+    // protected function calculateSlaDeadlines()
+    // {
+    //     // Define SLA times in minutes for each severity level
+    //     $slaConfig = [
+    //         self::SEVERITY_CRITICAL => ['resolution' => 1440, 'update' => 240],  // 24 hours, 4 hours
+    //         self::SEVERITY_HIGH => ['resolution' => 2880, 'update' => 480],      // 48 hours, 8 hours
+    //         self::SEVERITY_MEDIUM => ['resolution' => 10080, 'update' => 1440],  // 7 days, 24 hours
+    //         self::SEVERITY_LOW => ['resolution' => 20160, 'update' => 2880],     // 14 days, 48 hours
+    //     ];
 
-        $config = $slaConfig[$this->severity_level] ?? $slaConfig[self::SEVERITY_LOW];
+    //     $config = $slaConfig[$this->severity_level] ?? $slaConfig[self::SEVERITY_LOW];
         
-        $this->resolution_deadline = new Expression("DATE_ADD(NOW(), INTERVAL {$config['resolution']} MINUTE)");
-        $this->next_update_due = new Expression("DATE_ADD(NOW(), INTERVAL {$config['update']} MINUTE)");
-    }
+    //     $this->resolution_deadline = new Expression("DATE_ADD(NOW(), INTERVAL {$config['resolution']} MINUTE)");
+    //     $this->next_update_due = new Expression("DATE_ADD(NOW(), INTERVAL {$config['update']} MINUTE)");
+    // }
 
-    protected function updateSlaStatus()
-    {
-        if ($this->status === 'closed') {
-            return;
-        }
+    // protected function updateSlaStatus()
+    // {
+    //     if ($this->status === 'closed') {
+    //         return;
+    //     }
 
-        $now = time();
-        $deadline = strtotime($this->resolution_deadline);
+    //     $now = time();
+    //     $deadline = strtotime($this->resolution_deadline);
         
-        // If within 25% of resolution time, mark as at risk
-        if ($now >= ($deadline - ($deadline * 0.25))) {
-            $this->sla_status = self::SLA_STATUS_AT_RISK;
-        }
+    //     // If within 25% of resolution time, mark as at risk
+    //     if ($now >= ($deadline - ($deadline * 0.25))) {
+    //         $this->sla_status = self::SLA_STATUS_AT_RISK;
+    //     }
         
-        // If past deadline, mark as breached
-        if ($now > $deadline) {
-            $this->sla_status = self::SLA_STATUS_BREACHED;
-        }
-    }
+    //     // If past deadline, mark as breached
+    //     if ($now > $deadline) {
+    //         $this->sla_status = self::SLA_STATUS_BREACHED;
+    //     }
+    // }
 
     public function getSeverityLabel()
     {

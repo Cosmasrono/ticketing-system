@@ -80,6 +80,15 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                             <?= Html::a('<i class="fas fa-tachometer-alt me-2"></i>Dashboard', ['site/dashboard'], [
                                 'class' => 'btn btn-gradient-info btn-lg hover-lift me-2'
                             ]) ?>
+                            <?= Html::a(
+                                '<i class="fas fa-comments me-2"></i>Ticket Messages ' . 
+                                ($unreadMessagesCount > 0 ? '<span class="badge bg-danger">' . $unreadMessagesCount . '</span>' : ''),
+                                ['/admin/ticket-messages'], 
+                                [
+                                    'class' => 'btn btn-gradient-warning btn-lg hover-lift me-2',
+                                    'title' => $unreadMessagesCount > 0 ? $unreadMessagesCount . ' unread messages' : 'View all ticket messages',
+                                ]
+                            ) ?>
                             <?= Html::a('<i class="fas fa-users me-2"></i>Create Users', '#', [
                                 'class' => 'btn btn-gradient-primary btn-lg hover-lift',
                                 'id' => 'create-user-btn',

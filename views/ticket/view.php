@@ -11,12 +11,22 @@ $this->title = 'Ticket #' . $model->id;
 $this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
 
-$ticketData = Yii::$app->db->createCommand('SELECT module, issue, screenshot_url, voice_note_url FROM ticket WHERE id = :id')
+// Update the query to use 'screenshot' instead of 'screenshot_url'
+$ticketData = Yii::$app->db->createCommand('
+    SELECT module, issue, screenshot, voice_note_url 
+    FROM ticket 
+    WHERE id = :id
+')
     ->bindValue(':id', $model->id)
     ->queryOne();
 
-Yii::debug('Raw ticket data from DB: ' . print_r($ticketData, true));
-?>
+// Display the screenshot if it exists
+if (!empty($ticketData['screenshot'])): ?>
+    <div class="screenshot-container mt-3">
+        <h5>Screenshot:</h5>
+        <img src="<?= $ticketData['screenshot'] ?>" alt="Ticket Screenshot" class="img-fluid">
+    </div>
+<?php endif; ?>
 
 <div class="ticket-view">
 
@@ -51,24 +61,24 @@ Yii::debug('Raw ticket data from DB: ' . print_r($ticketData, true));
             'id',
             [
                 'attribute' => 'module',
-                'value' => function($model) use ($ticketData) {
-                    return !empty($ticketData['module']) ? $ticketData['module'] : '(not set)';
+                'value' => function($model) {
+                    return !empty($model->module) ? $model->module : '(not set)';
                 },
             ],
             [
                 'attribute' => 'issue',
-                'value' => function($model) use ($ticketData) {
-                    return !empty($ticketData['issue']) ? $ticketData['issue'] : '(not set)';
+                'value' => function($model) {
+                    return !empty($model->issue) ? $model->issue : '(not set)';
                 },
             ],
             'description:ntext',
             'status',
             'created_at:datetime',
             [
-                'attribute' => 'screenshot_url',
+                'attribute' => 'screenshot',
                 'format' => 'raw',
-                'value' => function ($model) use ($ticketData) {
-                    $screenshotUrl = !empty($ticketData['screenshot_url']) ? $ticketData['screenshot_url'] : null;
+                'value' => function ($model) {
+                    $screenshotUrl = !empty($model->screenshot) ? $model->screenshot : null;
                     if ($screenshotUrl) {
                         return Html::button('<i class="fas fa-eye"></i> View', [
                             'class' => 'btn btn-info btn-sm view-screenshot',
@@ -82,8 +92,8 @@ Yii::debug('Raw ticket data from DB: ' . print_r($ticketData, true));
             [
                 'attribute' => 'voice_note_url',
                 'format' => 'raw',
-                'value' => function ($model) use ($ticketData) {
-                    $voiceNoteUrl = !empty($ticketData['voice_note_url']) ? $ticketData['voice_note_url'] : null;
+                'value' => function ($model) {
+                    $voiceNoteUrl = !empty($model->voice_note_url) ? $model->voice_note_url : null;
                     if ($voiceNoteUrl) {
                         return '
                             <div class="voice-note-player">
@@ -244,7 +254,7 @@ $this->registerJs($script);
 echo '<div style="display:none;">';
 echo 'Debug Data:<br>';
 echo 'Ticket ID: ' . $model->id . '<br>';
-echo 'Module: ' . ($ticketData['module'] ?? 'null') . '<br>';
-echo 'Issue: ' . ($ticketData['issue'] ?? 'null') . '<br>';
+echo 'Module: ' . ($model->module ?? 'null') . '<br>';
+echo 'Issue: ' . ($model->issue ?? 'null') . '<br>';
 echo '</div>';
 ?>

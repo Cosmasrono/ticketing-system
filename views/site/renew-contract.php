@@ -98,10 +98,19 @@ $this->title = 'Request Contract Renewal for ' . $company->company_name;
                         ])->label(false) ?>
                     </div>
 
+                    <div class="renewal-status mt-4">
+                        <?php if (isset($renewal->renewal_status) && $renewal->renewal_status === 'pending'): ?>
+                            <div class="alert alert-warning">
+                                <i class="fas fa-clock"></i> Your renewal request is pending admin approval.
+                                Requested end date: <?= Yii::$app->formatter->asDate($renewal->new_end_date) ?>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+
                     <div class="form-group text-center">
-                    <?= Html::submitButton('Submit Renewal Request', [
-                            'class' => 'btn custom-btn text-white p-2.5 ',
-                            'style' => 'background-color: ; max-width: 300px;',
+                    <?= Html::submitButton('Submit Renewal Request for Approval', [
+                            'class' => 'btn custom-btn text-white p-2.5',
+                            'style' => 'background-color: #EA5626; max-width: 300px;',
                             'id' => 'submit-button'
                         ]) ?>
                         <?= Html::a('Cancel', ['profile', 'id' => Yii::$app->user->id], [

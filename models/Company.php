@@ -32,6 +32,8 @@ class Company extends ActiveRecord
             [['role'], 'string', 'max' => 50],
             [['company_type', 'subscription_level'], 'string'],
             ['company_email', 'email'],
+            [['user_id'], 'integer'],
+            [['end_date'], 'safe'],
         ];
     }
 
@@ -63,6 +65,7 @@ class Company extends ActiveRecord
             'subscription_level' => 'Subscription Level',
             'created_at' => 'Created At',
             'updated_at' => 'Updated At',
+            'user_id' => 'User ID',
         ];
     }
 
@@ -181,5 +184,11 @@ class Company extends ActiveRecord
         return $this->getUsers()
             ->andWhere(['status' => 10]) // STATUS_ACTIVE = 10
             ->exists();
+    }
+
+    // Add relation to User model if needed
+    public function getUser()
+    {
+        return $this->hasOne(User::class, ['id' => 'user_id']);
     }
 }

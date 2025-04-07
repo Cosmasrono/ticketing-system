@@ -7,6 +7,8 @@ use yii\web\Controller;
 use yii\web\NotFoundHttpException;
 use app\models\Contract;
 use app\models\ContractRenewal;
+use app\models\Company;
+use app\models\User;
 
 class ContractController extends Controller
 {
@@ -34,6 +36,33 @@ class ContractController extends Controller
         return $this->render('renew-contract', [
             'company' => $contract->company, // Assuming you have a relation to get the company
             'renewalModel' => $renewalModel,
+        ]);
+    }
+
+    public function actionCompany($id)
+    {
+        // Find the company
+        $company = Company::findOne($id);
+        if (!$company) {
+            Yii::$app->session->setFlash('error', 'Company not found');
+            return $this->redirect(['index']);
+        }
+        
+        // Find users belonging to this company
+        $userIds = User::find()
+            ->select('id')
+            ->where(['company_id' => $id])
+            ->column();
+        
+        // Get all renewals for these users
+        $renewals = ContractRenewal::find()
+            ->where(['in', 'requested_by', $userIds])
+            ->orderBy(['created_at' => SORT_DESC])
+            ->all();
+        
+        return $this->render('company', [
+            'company' => $company,
+            'renewals' => $renewals
         ]);
     }
 } 

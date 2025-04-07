@@ -57,6 +57,8 @@ class User extends ActiveRecord implements IdentityInterface
 
     public $password_reset_token;
 
+    public $token_created_at; // Ensure this line exists if you need this property
+
     public function scenarios()
     {
         $scenarios = parent::scenarios();
@@ -99,8 +101,8 @@ public function isUser()
     public function behaviors()
     {
         return [
-            [
-                'class' => TimestampBehavior::class,
+            'timestamp' => [
+                'class' => TimestampBehavior::className(),
                 'createdAtAttribute' => 'created_at_unix',
                 'updatedAtAttribute' => 'updated_at_unix',
                 'value' => time(),
@@ -137,6 +139,12 @@ public function isUser()
             [['company_id'], 'integer'],
             [['created_at_unix', 'updated_at_unix'], 'safe'],
             ['password_reset_token', 'string'],
+            [['company_id', 'name', 'company_name', 'company_email', 'role'], 'required'],
+            [['status', 'created_at_unix', 'updated_at_unix'], 'integer'],
+            [['is_verified', 'first_login', 'email_verified'], 'boolean'],
+            [['token_created_at'], 'safe'], // Allow SQL expression
+            [['modules'], 'string'],
+            [['password_hash', 'password_reset_token', 'auth_key'], 'string', 'max' => 255],
         ];
     }
 
@@ -186,10 +194,16 @@ public function isUser()
              return false;
          }
      
-         if ($this->isNewRecord) {
-             $this->auth_key = Yii::$app->security->generateRandomString();
-             $this->created_at_unix = time(); // Set current Unix timestamp
-             $this->updated_at_unix = time(); // Set current Unix timestamp
+         // Convert Unix timestamp to SQL Server datetime format
+         if ($this->token_created_at) {
+             $this->token_created_at = new \yii\db\Expression('DATEADD(second, ' . $this->token_created_at . ', \'1970-01-01\')');
+         }
+
+         // Set the Unix timestamp fields
+         $timestamp = time();
+         if ($insert) {
+             $this->created_at_unix = $timestamp;
+             $this->updated_at_unix = $timestamp;
              $this->is_verified = false;
              $this->first_login = true;
              $this->email_verified = false;
@@ -200,8 +214,7 @@ public function isUser()
                  $this->verification_token = null;
              }
          } else {
-             // For updates, set updated_at_unix to the current Unix timestamp
-             $this->updated_at_unix = time();
+             $this->updated_at_unix = $timestamp;
          }
          
          return true;

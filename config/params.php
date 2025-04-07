@@ -9,11 +9,17 @@ return [
 
     'user.passwordResetTokenExpire' => 86400, // 24 hours in seconds, adjust as needed
     // Token expires in 1 hour
-    'cloudinary' => [
-        'cloud_name' => 'dscbboswt',
-        'api_key' => '165833264188614',
-        'api_secret' => 'LfgHbl18_gohlTycrjr3OdQvEWE',
+   
+    
+
+    
+        // other params
+        'cloudinary' => [
+                'cloud_name' => 'dscbboswt',
+            'api_key' => '165833264188614',
+                'api_secret' => 'LfgHbl18_gohlTycrjr3OdQvEWE'
     ],
+    // other params
 ];
 // DB_HOST=COSSI
 // DB_NAME=ian

@@ -619,94 +619,145 @@ function getStatusText($status) {
         <div class="d-flex justify-content-between align-items-center">
             <h2 class="fw-bold mb-0" style="color: #1B1D4E; padding:20px 0;">Contract Renewals</h2>
         </div>
-        <p style="mb-2">Total Renewals: <?= Html::encode(count($contractRenewals)) ?></p>
 
         <div>
             <?= Html::a(
-                '<i class="fas fa-eye" style="margin-right: 5px;"></i> View Renewals',
+                '<i class="fas fa-eye" style="margin-right: 5px;"></i> View All Renewals',
                 ['contract/index'],
                 ['class' => 'btn btn-primary mb-2']
             ) ?>
         </div>
 
-
-        <?php if (!empty($contractRenewals)): ?>
-            <?= GridView::widget([
-                'dataProvider' => new ArrayDataProvider([
-                    'allModels' => $contractRenewals,
-                    'pagination' => [
-                        'pageSize' => 10,
-                    ],
-                ]),
-                'columns' => [
-                    ['class' => 'yii\grid\SerialColumn'],
-
-                    [
-                        'attribute' => 'requested_by',
-                        'label' => 'Company Name',
-                        'value' => function ($model) {
-                            if (empty($model->requested_by)) {
-                                return 'Not Set';
-                            }
-                            $user = User::findOne($model->requested_by);
-                            if (!$user) {
-                                return 'User Not Found';
-                            }
-                            // Get company name
-                            $company = Company::findOne($user->company_id);
-                            return $company ? Html::encode($company->name) : 'Company Not Found';
-                        },
-                    ],
-                    [
-                        'attribute' => 'renewal_duration',
-                        'label' => 'Extension Period',
-                        'value' => function ($model) {
-                            return $model->renewal_duration . ' Months';
-                        },
-                    ],
-                    'current_end_date:date',
-                    'new_end_date:date',
-                    'notes',
-                    [
-                        'attribute' => 'renewal_status',
-                        'format' => 'raw',
-                        'value' => function ($model) {
-                            return $model->getStatusLabel();
-                        }
-                    ],
-                    'created_at:datetime',
-                    [
-                        'class' => 'yii\grid\ActionColumn',
-                        'template' => '{approve} {reject}',
-                        'buttons' => [
-                            'approve' => function ($url, $model) {
-                                if ($model->renewal_status === 'approved') {
-                                    return '<button class="btn btn-success btn-sm" disabled>Approved</button>';
-                                }
-                                return '<button type="button" 
+        <?php
+        // Group contract renewals by company
+        $groupedRenewals = [];
+        $companyNames = [];
+        
+        foreach ($contractRenewals as $renewal) {
+            $companyId = null;
+            $companyName = 'Unknown';
+            
+            // Get company information
+            if (!empty($renewal->requested_by)) {
+                $user = User::findOne($renewal->requested_by);
+                if ($user && $user->company_id) {
+                    $company = Company::findOne($user->company_id);
+                    if ($company) {
+                        $companyId = $company->id;
+                        $companyName = $company->name;
+                    }
+                }
+            }
+            
+            // Use company ID as group key
+            $key = $companyId ?: 'unknown-' . $renewal->id;
+            
+            if (!isset($groupedRenewals[$key])) {
+                $groupedRenewals[$key] = [];
+                $companyNames[$key] = $companyName;
+            }
+            
+            $groupedRenewals[$key][] = $renewal;
+        }
+        
+        // Create a new array with one renewal per company (the most recent one)
+        $displayRenewals = [];
+        foreach ($groupedRenewals as $companyId => $renewals) {
+            // Sort renewals by created_at (newest first)
+            usort($renewals, function($a, $b) {
+                return strtotime($b->created_at) - strtotime($a->created_at);
+            });
+            
+            // Add the most recent renewal to display
+            $displayRenewals[] = [
+                'renewal' => $renewals[0],
+                'company_name' => $companyNames[$companyId],
+                'count' => count($renewals),
+                'company_id' => $companyId
+            ];
+        }
+        
+        if (!empty($displayRenewals)):
+        ?>
+            <div class="table-responsive">
+                <table class="table table-hover" id="renewalsTable">
+                    <thead>
+                        <tr>
+                            <th style="color: #1B1D4E;">Company Name</th>
+                            <th style="color: #1B1D4E;">Extension Period</th>
+                            <th style="color: #1B1D4E;">Current End Date</th>
+                            <th style="color: #1B1D4E;">New End Date</th>
+                            <th style="color: #1B1D4E;">Notes</th>
+                            <th style="color: #1B1D4E;">Status</th>
+                            <th style="color: #1B1D4E;">Created At</th>
+                            <th style="color: #1B1D4E;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($displayRenewals as $item): ?>
+                            <?php $renewal = $item['renewal']; ?>
+                            <tr>
+                                <td data-label="Company Name">
+                                    <?= Html::encode($item['company_name']) ?>
+                                    <?php if ($item['count'] > 1): ?>
+                                        <span class="badge bg-info ms-2" title="Multiple renewals">
+                                            <?= $item['count'] ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Extension Period">
+                                    <?= $renewal->renewal_duration ?> Months
+                                </td>
+                                <td data-label="Current End Date">
+                                    <?= Yii::$app->formatter->asDate($renewal->current_end_date) ?>
+                                </td>
+                                <td data-label="New End Date">
+                                    <?= Yii::$app->formatter->asDate($renewal->new_end_date) ?>
+                                </td>
+                                <td data-label="Notes">
+                                    <?= Html::encode($renewal->notes) ?>
+                                </td>
+                                <td data-label="Status">
+                                    <?= $renewal->getStatusLabel() ?>
+                                </td>
+                                <td data-label="Created At">
+                                    <?= Yii::$app->formatter->asDatetime($renewal->created_at) ?>
+                                </td>
+                                <td data-label="Actions">
+                                    <?php if ($renewal->renewal_status !== 'approved'): ?>
+                                        <div class="btn-group">
+                                            <button type="button" 
                                                 class="btn btn-success btn-sm update-status-btn" 
-                                                data-id="' . $model->id . '" 
-                                                data-status="approved"
-                                                onclick="console.log(\'Button clicked directly\')">
+                                                    data-id="<?= $renewal->id ?>" 
+                                                    data-status="approved">
                                             Approve
-                                        </button>';
-                            },
-                            'reject' => function ($url, $model) {
-                                if ($model->renewal_status === 'approved') {
-                                    return '';
-                                }
-                                return '<button type="button" 
+                                            </button>
+                                            <button type="button" 
                                                 class="btn btn-danger btn-sm update-status-btn" 
-                                                data-id="' . $model->id . '" 
-                                                data-status="rejected"
-                                                onclick="console.log(\'Button clicked directly\')">
+                                                    data-id="<?= $renewal->id ?>" 
+                                                    data-status="rejected">
                                             Reject
-                                        </button>';
-                            },
-                        ],
-                    ],
-                ],
-            ]); ?>
+                                            </button>
+                                        </div>
+                                    <?php else: ?>
+                                        <button class="btn btn-success btn-sm" disabled>
+                                            Approved
+                                        </button>
+                                    <?php endif; ?>
+                                    
+                                    <?php if ($item['count'] > 1): ?>
+                                        <?= Html::a(
+                                            '<i class="fas fa-list"></i> View All',
+                                            ['contract/company', 'id' => $item['company_id']],
+                                            ['class' => 'btn btn-info btn-sm ms-2']
+                                        ) ?>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php else: ?>
             <div class="alert alert-info">No contract renewals found.</div>
         <?php endif; ?>

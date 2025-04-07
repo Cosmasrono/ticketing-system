@@ -1,6 +1,5 @@
 <?php
 // models/ResetPasswordForm.php
-
 namespace app\models;
 
 use Yii;
@@ -10,8 +9,8 @@ use yii\base\Model;
 class ResetPasswordForm extends Model
 {
     public $password;
-    public $confirm_password;
-    public $current_password;
+    public $confirmPassword;
+    // Removed current_password as it shouldn't be required during reset
     
     private $_user;
     
@@ -27,22 +26,22 @@ class ResetPasswordForm extends Model
         if (empty($token) || !is_string($token)) {
             throw new InvalidArgumentException('Password reset token cannot be blank.');
         }
-
+        
         Yii::debug("Looking for user with token in ResetPasswordForm: " . $token);
-
+        
         // Find user with exact token match
         $this->_user = User::findOne([
             'password_reset_token' => $token,
             'status' => User::STATUS_UNVERIFIED
         ]);
-
+        
         if (!$this->_user) {
             Yii::error("No user found with token in ResetPasswordForm: $token");
             throw new InvalidArgumentException('Wrong password reset token.');
         }
-
-        Yii::debug("Found user: " . $this->_user->company_email);
         
+        Yii::debug("Found user: " . $this->_user->company_email);
+                
         parent::__construct($config);
     }
     
@@ -52,26 +51,11 @@ class ResetPasswordForm extends Model
     public function rules()
     {
         return [
-            [['password', 'confirm_password', 'current_password'], 'required'],
+            [['password', 'confirmPassword'], 'required'],
             ['password', 'string', 'min' => 6],
-            ['confirm_password', 'compare', 'compareAttribute' => 'password'],
-            ['current_password', 'validateTemporaryPassword'],
+            ['confirmPassword', 'compare', 'compareAttribute' => 'password', 'message' => 'Passwords do not match.'],
+            // Removed validation for current_password
         ];
-    }
-    
-    /**
-     * Validates the temporary password.
-     *
-     * @param string $attribute the attribute currently being validated
-     * @param array $params the additional name-value pairs given in the rule
-     */
-    public function validateTemporaryPassword($attribute, $params)
-    {
-        if (!$this->hasErrors()) {
-            if (!Yii::$app->security->validatePassword($this->current_password, $this->_user->password_hash)) {
-                $this->addError($attribute, 'Incorrect temporary password.');
-            }
-        }
     }
     
     /**
@@ -84,14 +68,14 @@ class ResetPasswordForm extends Model
         if (!$this->validate()) {
             return false;
         }
-
+        
         $user = $this->_user;
         $user->setPassword($this->password);
         $user->removePasswordResetToken();
         $user->status = User::STATUS_ACTIVE;
         $user->is_verified = 1;
         $user->email_verified = 1;
-
+        
         return $user->save(false);
     }
 }

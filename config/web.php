@@ -3,6 +3,8 @@
 defined('YII_DEBUG') or define('YII_DEBUG', true);
 defined('YII_ENV') or define('YII_ENV', 'dev');
 
+ini_set('curl.cainfo', '');
+
 $params = require __DIR__ . '/params.php';
 $db = require __DIR__ . '/db.php';
 
@@ -19,23 +21,24 @@ $config = [
         '@rules' => '@app/rules',
     ],
     'components' => [
-
         'timezone' => 'UTC',
         'request' => [
-            // !!! insert a secret key in the following (if it is empty) - this is required by cookie validation
-            'cookieValidationKey' => 'your-secret-key',
-            'enableCsrfValidation' => true,
-            // 'enableCsrfCookie' => true,
+            'class' => 'yii\web\Request',
+            'cookieValidationKey' => 'your-existing-key',
+            'parsers' => [
+                'multipart/form-data' => 'yii\web\MultipartFormDataParser'
+            ]
         ],
-
-
+        'uploadedFile' => [
+            'class' => 'yii\web\UploadedFile',
+            'tempPath' => __DIR__ . '/../runtime/uploads/temp',
+        ],
         'cloudinary' => [
             'class' => 'app\components\CloudinaryComponent',
             'cloud_name' => 'dscbboswt',
             'api_key' => '165833264188614',
             'api_secret' => 'LfgHbl18_gohlTycrjr3OdQvEWE',
         ],
-
         'cache' => [
             'class' => 'yii\caching\FileCache',
         ],
@@ -105,6 +108,7 @@ $config = [
                 'user/profile/<id:\d+>' => 'user-profile/view',
                 'admin-profile/<id:\d+>' => 'admin-profile/view',
                 'contract-renewal/<action>' => 'contract-renewal/<action>',
+                'site/renew-contract/<id:\d+>' => 'site/renew-contract',
             ],
         ],
         'session' => [

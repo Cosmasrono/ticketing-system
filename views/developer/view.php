@@ -147,8 +147,16 @@ $this->params['breadcrumbs'][] = $this->title;
             ],
             [
                 'class' => 'yii\grid\ActionColumn',
-                'template' => '{escalate} {close}',
+                'template' => '{message} {escalate} {close}',
                 'buttons' => [
+                    'message' => function ($url, $model, $key) {
+                        return Html::button('<i class="fas fa-comment"></i> Message', [
+                            'class' => 'btn btn-info btn-sm',
+                            'onclick' => "messageUser({$model->id})",
+                            'data-id' => $model->id,
+                            'title' => 'Message user who created this ticket',
+                        ]);
+                    },
                     'escalate' => function ($url, $model, $key) {
                         $isDisabled = $model->status === Ticket::STATUS_ESCALATED ||
                             $model->status === 'closed' ||
@@ -274,6 +282,49 @@ $this->params['breadcrumbs'][] = $this->title;
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this right after your other modals -->
+<div class="modal fade" id="messageModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="fas fa-comment text-info"></i>
+                    Message to Ticket Creator
+                </h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="ticket-info mb-3">
+                    <strong>Ticket #<span id="messageTicketId"></span></strong>
+                    <p id="ticketDetails" class="mt-2 p-2 bg-light"></p>
+                </div>
+                <div class="form-group">
+                    <label for="messageSubject">Subject</label>
+                    <input type="text" id="messageSubject" class="form-control" placeholder="Message subject">
+                </div>
+                <div class="form-group">
+                    <label for="messageContent">Message</label>
+                    <textarea id="messageContent" class="form-control" rows="5" placeholder="Enter your message to the ticket creator..."></textarea>
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="updateTicketStatus">
+                    <label class="form-check-label" for="updateTicketStatus">
+                        Also mark ticket as "In Progress"
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="sendMessage">
+                    <i class="fas fa-paper-plane"></i> Send Message
+                </button>
             </div>
         </div>
     </div>
@@ -444,6 +495,7 @@ $this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/boo
 
 <script>
     let currentTicketId = null;
+    let currentTicketDetails = {};
 
     function escalateTicket(ticketId) {
         currentTicketId = ticketId;
@@ -573,12 +625,23 @@ $this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/boo
     function closeTicket(ticketId) {
         Swal.fire({
             title: 'Close Ticket',
-            text: 'Are you sure you want to close this ticket?',
+            html: `
+                <div class="form-group">
+                    <label for="closeMessage" class="text-left">Message (optional)</label>
+                    <textarea id="closeMessage" class="form-control" rows="4" 
+                        placeholder="Add a closing message (will be sent to user and visible to admin)"></textarea>
+                </div>
+            `,
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, close it!'
+            confirmButtonText: 'Yes, close it!',
+            preConfirm: () => {
+                return {
+                    message: document.getElementById('closeMessage').value.trim()
+                }
+            }
         }).then((result) => {
             if (result.isConfirmed) {
                 // Show loading state
@@ -593,52 +656,51 @@ $this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/boo
 
                 // Make the AJAX request to close the ticket
                 $.ajax({
-                        url: '<?= \yii\helpers\Url::to(['/ticket/close']) ?>',
-                        type: 'POST',
-                        data: {
-                            id: ticketId,
-                            _csrf: '<?= Yii::$app->request->csrfToken ?>'
-                        },
-                        dataType: 'json'
-                    })
-                    .done(function(response) {
-                        console.log('Server response:', response);
-
-                        if (response.success) {
-                            Swal.fire({
-                                icon: 'success',
-                                title: 'Success!',
-                                text: response.message,
-                                showConfirmButton: false,
-                                timer: 1500
-                            }).then(() => {
-                                location.reload();
-                            });
-                        } else {
-                            Swal.fire({
-                                icon: 'error',
-                                title: 'Error',
-                                text: response.message || 'Failed to close ticket'
-                            });
-                        }
-                    })
-                    .fail(function(jqXHR, textStatus, errorThrown) {
-                        let errorMessage = 'An error occurred while closing the ticket.';
-                        try {
-                            const response = JSON.parse(jqXHR.responseText);
-                            if (response.message) {
-                                errorMessage = response.message;
-                            }
-                        } catch (e) {
-                            console.error('Error parsing response:', e);
-                        }
-
+                    url: '<?= \yii\helpers\Url::to(['/ticket/close']) ?>',
+                    type: 'POST',
+                    data: {
+                        id: ticketId,
+                        message: result.value.message,
+                        _csrf: '<?= Yii::$app->request->csrfToken ?>'
+                    },
+                    dataType: 'json'
+                })
+                .done(function(response) {
+                    if (response.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Success!',
+                            text: response.message,
+                            showConfirmButton: false,
+                            timer: 1500
+                        }).then(() => {
+                            location.reload();
+                        });
+                    } else {
                         Swal.fire({
                             icon: 'error',
                             title: 'Error',
-                            text: errorMessage
+                            text: response.message || 'Failed to close ticket'
                         });
+                    }
+                })
+                .fail(function(jqXHR, textStatus, errorThrown) {
+                    let errorMessage = 'An error occurred while closing the ticket.';
+                    try {
+                        const response = JSON.parse(jqXHR.responseText);
+                        if (response.message) {
+                            errorMessage = response.message;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing response:', e);
+                    }
+
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: errorMessage
                     });
+                });
             }
         });
     }
@@ -683,13 +745,19 @@ $this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/boo
     }
 
     $(document).ready(function() {
+        // Set admin as the default escalation target
+        $('#escalationTarget').val('admin').trigger('change');
+        
         // Handle escalation target change
         $('#escalationTarget').change(function() {
             const selectedValue = $(this).val();
             $('#developerSelection, #adminSelection').hide(); // Hide both initially
             
             if (selectedValue === 'developer') {
-                fetchDevelopers(); // This will show the developer selection after fetching
+                fetchDevelopers(); // Show developer selection after fetching
+            } else if (selectedValue === 'admin') {
+                // Default to admin, no need to show additional selection
+                // You could fetch admins here if you want to select specific admins
             }
         });
 
@@ -844,7 +912,148 @@ $this->registerJsFile('https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/boo
     // Make sure the modal is properly initialized
     $('#escalateModal').on('show.bs.modal', function() {
         $('#escalationComment').val(''); // Clear previous comment
-        $('#escalationTarget').val('developer').trigger('change'); // Default to developer and trigger change
+        $('#escalationTarget').val('admin').trigger('change'); // Default to admin
+    });
+
+    function messageUser(ticketId) {
+        currentTicketId = ticketId;
+        
+        // Clear previous inputs
+        $('#messageSubject').val('');
+        $('#messageContent').val('');
+        $('#updateTicketStatus').prop('checked', true);
+        
+        // Fetch ticket details to display in the modal
+        $.ajax({
+            url: '<?= \yii\helpers\Url::to(['/ticket/get-details']) ?>',
+            type: 'GET',
+            data: { id: ticketId },
+            dataType: 'json',
+            success: function(response) {
+                if (response.success) {
+                    currentTicketDetails = response.data;
+                    $('#messageTicketId').text(ticketId);
+                    $('#ticketDetails').html(
+                        `<strong>Issue:</strong> ${response.data.issue || 'N/A'}<br>` +
+                        `<strong>Created by:</strong> ${response.data.creator_name || 'N/A'}<br>` +
+                        `<strong>Status:</strong> ${response.data.status || 'N/A'}`
+                    );
+                    
+                    // Prefill the subject
+                    $('#messageSubject').val(`Re: Ticket #${ticketId} - ${response.data.issue || 'Your Request'}`);
+                    
+                    $('#messageModal').modal('show');
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error',
+                        text: response.message || 'Could not load ticket details'
+                    });
+                }
+            },
+            error: function() {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Failed to load ticket details'
+                });
+            }
+        });
+    }
+
+    // Handle message submission
+    $(document).ready(function() {
+        $('#sendMessage').click(function() {
+            const subject = $('#messageSubject').val().trim();
+            const message = $('#messageContent').val().trim();
+            const updateStatus = $('#updateTicketStatus').is(':checked');
+            
+            // Validate inputs
+            if (!subject) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Subject Required',
+                    text: 'Please provide a subject for your message.'
+                });
+                return;
+            }
+            
+            if (!message) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Message Required',
+                    text: 'Please enter a message to send to the user.'
+                });
+                return;
+            }
+            
+            // Show confirmation
+            Swal.fire({
+                title: 'Send Message',
+                text: 'Are you sure you want to send this message to the ticket creator?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Yes, send it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // Show loading
+                    Swal.fire({
+                        title: 'Sending...',
+                        text: 'Please wait',
+                        allowOutsideClick: false,
+                        didOpen: () => {
+                            Swal.showLoading();
+                        }
+                    });
+                    
+                    // Send the message
+                    $.ajax({
+                        url: '<?= \yii\helpers\Url::to(['/ticket/developer-message']) ?>',
+                        type: 'POST',
+                        data: {
+                            ticket_id: currentTicketId,
+                            subject: subject,
+                            message: message,
+                            update_status: updateStatus ? 1 : 0,
+                            _csrf: '<?= Yii::$app->request->csrfToken ?>'
+                        },
+                        dataType: 'json',
+                        success: function(response) {
+                            $('#messageModal').modal('hide');
+                            
+                            if (response.success) {
+                                Swal.fire({
+                                    icon: 'success',
+                                    title: 'Message Sent!',
+                                    text: response.message || 'Your message has been sent to the ticket creator.',
+                                    showConfirmButton: true
+                                }).then(() => {
+                                    if (updateStatus) {
+                                        location.reload(); // Reload if status was updated
+                                    }
+                                });
+                            } else {
+                                Swal.fire({
+                                    icon: 'error',
+                                    title: 'Error',
+                                    text: response.message || 'Failed to send message'
+                                });
+                            }
+                        },
+                        error: function() {
+                            $('#messageModal').modal('hide');
+                            Swal.fire({
+                                icon: 'error',
+                                title: 'Error',
+                                text: 'An error occurred while sending the message'
+                            });
+                        }
+                    });
+                }
+            });
+        });
     });
 </script>
 

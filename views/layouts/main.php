@@ -121,7 +121,6 @@ JqueryAsset::register($this);
         }
         
     </style>
-    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
 </head>
 
 <body class="guest-index-page <?= Yii::$app->user->isGuest && in_array(Yii::$app->controller->action->id, ['login', 'request-password-reset', 'super-admin-signup', 'reset-password']) ? 'guest-index-page' : '' ?>">

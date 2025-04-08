@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "812032ab87fba62955368d5063d48cfe",
+    "content-hash": "73037ecaa68dcd357355e9f05c8e7b55",
     "packages": [
         {
             "name": "bower-asset/bootstrap",
@@ -1298,6 +1298,18 @@
                 }
             ],
             "time": "2025-03-24T10:02:05+00:00"
+        },
+        {
+            "name": "npm-asset/sweetalert2",
+            "version": "11.17.2",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/sweetalert2/-/sweetalert2-11.17.2.tgz"
+            },
+            "type": "npm-asset",
+            "license": [
+                "MIT"
+            ]
         },
         {
             "name": "nyholm/psr7",

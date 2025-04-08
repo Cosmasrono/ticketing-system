@@ -5,9 +5,20 @@ use yii\grid\GridView;
 use yii\widgets\Pjax;
 use app\models\User;
 use app\models\TicketMessage;
+use app\components\NotificationHelper;
 
 /* @var $this yii\web\View */
 /* @var $dataProvider yii\data\ActiveDataProvider */
+
+// Verify user has permission to access this page
+$userRole = Yii::$app->user->identity->role;
+$isAdmin = ($userRole == 1 || $userRole == 4 || $userRole === 'admin' || $userRole === 'superadmin');
+
+if (!$isAdmin) {
+    NotificationHelper::error('You do not have permission to access this page.');
+    echo '<script>window.location.href = "' . \yii\helpers\Url::to(['/site/index']) . '";</script>';
+    return;
+}
 
 $this->title = 'Ticket Messages';
 $this->params['breadcrumbs'][] = $this->title;

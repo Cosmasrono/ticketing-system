@@ -55,15 +55,6 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
             <?= Yii::$app->session->getFlash('error') ?>
         </div>
     <?php endif; ?>
-    <?php if (Yii::$app->session->hasFlash('success')): ?>
-        <div class="alert alert-success">
-            <?= Yii::$app->session->getFlash('success') ?>
-        </div>
-    <?php elseif (Yii::$app->session->hasFlash('error')): ?>
-        <div class="alert alert-danger">
-            <?= Yii::$app->session->getFlash('error') ?>
-        </div>
-    <?php endif; ?>
 
     <!-- Action Buttons Section -->
     <div class="action-buttons-container mb-4">
@@ -80,15 +71,23 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                             <?= Html::a('<i class="fas fa-tachometer-alt me-2"></i>Dashboard', ['site/dashboard'], [
                                 'class' => 'btn btn-gradient-info btn-lg hover-lift me-2'
                             ]) ?>
-                            <?= Html::a(
-                                '<i class="fas fa-comments me-2"></i>Ticket Messages ' . 
-                                ($unreadMessagesCount > 0 ? '<span class="badge bg-danger">' . $unreadMessagesCount . '</span>' : ''),
-                                ['/admin/ticket-messages'], 
-                                [
-                                    'class' => 'btn btn-gradient-warning btn-lg hover-lift me-2',
-                                    'title' => $unreadMessagesCount > 0 ? $unreadMessagesCount . ' unread messages' : 'View all ticket messages',
-                                ]
-                            ) ?>
+                            <?php
+                            // Only show ticket messages button for admin (1) or super-admin (4)
+                            $userRole = Yii::$app->user->identity->role;
+                            $isAdmin = ($userRole == 1 || $userRole == 4 || $userRole === 'admin' || $userRole === 'superadmin');
+                            
+                            if ($isAdmin) {
+                                echo Html::a(
+                                    '<i class="fas fa-comments me-2"></i>Ticket Messages ' . 
+                                    ($unreadMessagesCount > 0 ? '<span class="badge bg-danger">' . $unreadMessagesCount . '</span>' : ''),
+                                    ['/admin/ticket-messages'], 
+                                    [
+                                        'class' => 'btn btn-gradient-warning btn-lg hover-lift me-2',
+                                        'title' => $unreadMessagesCount > 0 ? $unreadMessagesCount . ' unread messages' : 'View all ticket messages',
+                                    ]
+                                );
+                            }
+                            ?>
                             <?= Html::a('<i class="fas fa-users me-2"></i>Create Users', '#', [
                                 'class' => 'btn btn-gradient-primary btn-lg hover-lift',
                                 'id' => 'create-user-btn',
@@ -640,15 +639,10 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                                 .text('Assigned');
 
                             // Optional: Show success message
-                            Swal.fire({
-                                title: 'Success!',
-                                text: 'Ticket has been assigned successfully',
-                                icon: 'success',
-                                timer: 2000,
-                                showConfirmButton: false
-                            }).then(() => {
+                            showAlert('Success!', 'Ticket has been assigned successfully');
+                            setTimeout(() => {
                                 location.reload(); // Reload to update all statuses
-                            });
+                            }, 2000);
                         } else {
                             // Re-enable the button if assignment failed
                             button.prop('disabled', false);
@@ -700,31 +694,18 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                 success: function(response) {
                     hideLoading();
                     if (response.success) {
-                        Swal.fire({
-                            title: 'Success!',
-                            text: response.message,
-                            icon: 'success',
-                            timer: 2000,
-                            showConfirmButton: false
-                        }).then(() => {
+                        showAlert('Success!', response.message);
+                        setTimeout(() => {
                             window.location.reload();
-                        });
+                        }, 2000);
                     } else {
-                        Swal.fire({
-                            title: 'Error!',
-                            text: response.message || 'Failed to cancel ticket',
-                            icon: 'error'
-                        });
+                        showAlert('Error!', response.message || 'Failed to cancel ticket', 'error');
                     }
                 },
                 error: function(xhr, status, error) {
                     hideLoading();
                     console.error('Error:', error);
-                    Swal.fire({
-                        title: 'Error!',
-                        text: 'An error occurred while cancelling the ticket.',
-                        icon: 'error'
-                    });
+                    showAlert('Error!', 'An error occurred while cancelling the ticket.', 'error');
                 }
             });
         }
@@ -772,15 +753,10 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                 success: function(response) {
                     hideLoading();
                     if (response.success) {
-                        Swal.fire({
-                            title: 'Success!',
-                            text: 'Ticket closed successfully.',
-                            icon: 'success',
-                            timer: 2000,
-                            showConfirmButton: false
-                        }).then(() => {
+                        showAlert('Success!', 'Ticket closed successfully.');
+                        setTimeout(() => {
                             location.reload(); // Reload to update the ticket list
-                        });
+                        }, 2000);
                     } else {
                         alert('Failed to close ticket: ' + response.message);
                     }
@@ -1540,4 +1516,3 @@ $this->registerJs("
         window.print();
     });
 ");
-?>

@@ -147,7 +147,7 @@ $this->params['breadcrumbs'][] = $this->title;
             ],
             [
                 'class' => 'yii\grid\ActionColumn',
-                'template' => '{message} {escalate} {close}',
+                'template' => ' {escalate} {close}',
                 'buttons' => [
                     'message' => function ($url, $model, $key) {
                         return Html::button('<i class="fas fa-comment"></i> Message', [

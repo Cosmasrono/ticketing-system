@@ -1829,8 +1829,11 @@ public function actionClose()
                 throw new \Exception('No screenshot data was saved to database');
             }
 
-            $transaction->commit();
-            
+            // Initialize transaction before trying to commit it
+            if (isset($transaction)) {
+                $transaction->commit();
+            }
+
             // Success message indicates where the image was stored
             $successMessage = 'Ticket created successfully';
             if (!empty($savedTicket->screenshot_url)) {

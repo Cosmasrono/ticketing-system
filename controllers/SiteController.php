@@ -826,10 +826,17 @@ class SiteController extends Controller
             'escalated' => Ticket::find()->where(['status' => Ticket::STATUS_ESCALATED])->count(),
         ];
         
-        // Count unread ticket messages
-        $unreadMessagesCount = \app\models\TicketMessage::find()
-            ->where(['admin_viewed' => 0])
-            ->count();
+        // Only calculate unread messages count for admin (1) or super-admin (4)
+        $userRole = Yii::$app->user->identity->role;
+        $isAdmin = ($userRole == 1 || $userRole == 4 || $userRole === 'admin' || $userRole === 'superadmin');
+        
+        $unreadMessagesCount = 0;
+        if ($isAdmin) {
+            // Count unread ticket messages
+            $unreadMessagesCount = \app\models\TicketMessage::find()
+                ->where(['admin_viewed' => 0])
+                ->count();
+        }
 
         return $this->render('admin', [
             'dataProvider' => $dataProvider,
@@ -4038,6 +4045,33 @@ class SiteController extends Controller
         }
     }
 
-   
+    // Add this method after an existing action method
+    
+    /**
+     * Test SweetAlert functionality
+     */
+    public function actionTestAlert()
+    {
+        // Register the SweetAlert2Asset
+        \app\assets\SweetAlert2Asset::register($this->view);
+        
+        // Use the NotificationHelper to set a flash message
+        \app\components\NotificationHelper::success('This is a success message from flash');
+        
+        // Direct display using the show method
+        \app\components\NotificationHelper::show('This is a direct message', 'Direct Alert', 'info');
+        
+        return $this->render('test-alert');
+    }
+    
+    /**
+     * Explains how the SweetAlert2 issue was fixed
+     */
+    public function actionFixSweetAlert()
+    {
+        return $this->render('fix-sweetalert', [
+            'title' => 'SweetAlert2 Fix Information',
+        ]);
+    }
 
 }

@@ -7,6 +7,7 @@ use yii\web\Controller;
 use app\models\Ticket;
 use yii\data\ActiveDataProvider;
 use yii\filters\AccessControl;
+use app\components\NotificationHelper;
 
 class AdminController extends Controller
 {
@@ -23,12 +24,15 @@ class AdminController extends Controller
                         'allow' => true,
                         'roles' => ['@'],
                         'matchCallback' => function ($rule, $action) {
-                            return Yii::$app->user->identity->role === 'admin';
+                            $userRole = Yii::$app->user->identity->role;
+                            // Allow access to users with role 1 (admin) or 4 (super-admin)
+                            return $userRole == 1 || $userRole == 4 || $userRole === 'admin' || $userRole === 'superadmin';
                         }
                     ],
                 ],
                 'denyCallback' => function ($rule, $action) {
-                    throw new \yii\web\ForbiddenHttpException('You are not allowed to access this page');
+                    NotificationHelper::error('You do not have permission to access this page.');
+                    return $this->redirect(['/site/index']);
                 }
             ],
         ];

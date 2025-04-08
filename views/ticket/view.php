@@ -10,52 +10,13 @@ use app\models\User;
 $this->title = 'Ticket #' . $model->id;
 $this->params['breadcrumbs'][] = ['label' => 'Tickets', 'url' => ['index']];
 $this->params['breadcrumbs'][] = $this->title;
-
-// Update the query to use 'screenshot' instead of 'screenshot_url'
-$ticketData = Yii::$app->db->createCommand('
-    SELECT module, issue, screenshot, voice_note_url 
-    FROM ticket 
-    WHERE id = :id
-')
-    ->bindValue(':id', $model->id)
-    ->queryOne();
-
-// Display the screenshot if it exists
-if (!empty($ticketData['screenshot'])): ?>
-    <div class="screenshot-container mt-3">
-        <h5>Screenshot:</h5>
-        <img src="<?= $ticketData['screenshot'] ?>" alt="Ticket Screenshot" class="img-fluid">
-    </div>
-<?php endif; ?>
+?>
 
 <div class="ticket-view">
-
     <h1><?= Html::encode($this->title) ?></h1>
 
-    <?php if (Yii::$app->user->identity->isAdmin()): ?>
-    <p>
-        <?= Html::a('Approve', ['approve', 'id' => $model->id], ['class' => 'btn btn-success']) ?>
-        <?= Html::a('Assign', ['assign', 'id' => $model->id], ['class' => 'btn btn-primary']) ?>
-        <?php if (Yii::$app->user->identity->user_type === 'developer'): ?>
-            <?= Html::button('Close Ticket', [
-                'class' => 'btn btn-danger',
-                'onclick' => 'initiateClose()',
-                'id' => 'closeButton'
-            ]) ?>
-
-            <div id="closeCountdown" style="display: none;" class="alert alert-warning">
-                <div class="text-center">
-                    <h4>Ticket will be closed in:</h4>
-                    <div class="timer-display">
-                        <span id="countdown">60</span> seconds
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
-    </p>
-    <?php endif; ?>
-
-    <?= DetailView::widget([
+<?php
+    echo DetailView::widget([
         'model' => $model,
         'attributes' => [
             'id',
@@ -75,15 +36,16 @@ if (!empty($ticketData['screenshot'])): ?>
             'status',
             'created_at:datetime',
             [
-                'attribute' => 'screenshot',
+                'attribute' => 'screenshot_url',
                 'format' => 'raw',
                 'value' => function ($model) {
-                    $screenshotUrl = !empty($model->screenshot) ? $model->screenshot : null;
+                    $screenshotUrl = !empty($model->screenshot_url) ? $model->screenshot_url : null;
                     if ($screenshotUrl) {
                         return Html::button('<i class="fas fa-eye"></i> View', [
                             'class' => 'btn btn-info btn-sm view-screenshot',
                             'data-src' => $screenshotUrl,
-                            'title' => 'View Screenshot'
+                            'title' => 'View Screenshot',
+                            'onclick' => "showFullImage('$screenshotUrl')"
                         ]);
                     }
                     return '<span class="text-muted">No screenshot available</span>';
@@ -206,11 +168,17 @@ function showFullImage(url) {
     Swal.fire({
         imageUrl: url,
         imageAlt: 'Screenshot',
-        width: '80%',
+        width: '90%',
+        padding: '1em',
         showCloseButton: true,
         showConfirmButton: false,
+        background: '#fff',
+        backdrop: `
+            rgba(0,0,0,0.8)
+        `,
         customClass: {
-            image: 'swal-image-custom'
+            image: 'swal-image-custom',
+            closeButton: 'swal2-close-button'
         }
     });
 }
@@ -223,6 +191,8 @@ $this->registerJs($script);
     max-width: 100%;
     max-height: 80vh;
     object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
 }
 
 .view-screenshot {
@@ -246,6 +216,23 @@ $this->registerJs($script);
 
 .voice-note-player .btn {
     white-space: nowrap;
+}
+
+.thumbnail-container {
+    max-width: 200px;
+    margin: 10px 0;
+}
+
+.thumbnail-image {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+.thumbnail-image:hover {
+    transform: scale(1.05);
 }
 </style>
 

@@ -30,5 +30,6 @@ class LandingAsset extends AssetBundle
     public $depends = [
         'yii\web\YiiAsset',
         'yii\bootstrap5\BootstrapAsset',
+        'app\assets\SweetAlert2Asset',
     ];
 } 

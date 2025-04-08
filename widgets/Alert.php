@@ -44,6 +44,21 @@ class Alert extends \yii\bootstrap5\Widget
      */
     public $closeButton = [];
 
+    /**
+     * @var bool Whether SweetAlert is used
+     */
+    protected $useSweetAlert;
+
+    /**
+     * {@inheritdoc}
+     */
+    public function init()
+    {
+        parent::init();
+        
+        // Check if SweetAlert2Asset is registered
+        $this->useSweetAlert = Yii::$app->view->getAssetManager()->bundles['app\assets\SweetAlert2Asset'] ?? false;
+    }
 
     /**
      * {@inheritdoc}
@@ -52,6 +67,11 @@ class Alert extends \yii\bootstrap5\Widget
     {
         $session = Yii::$app->session;
         $appendClass = isset($this->options['class']) ? ' ' . $this->options['class'] : '';
+
+        // If SweetAlert is in use, don't show standard alerts for the common types
+        if ($this->useSweetAlert) {
+            return;
+        }
 
         foreach (array_keys($this->alertTypes) as $type) {
             $flash = $session->getFlash($type);
@@ -67,7 +87,10 @@ class Alert extends \yii\bootstrap5\Widget
                 ]);
             }
 
-            $session->removeFlash($type);
+            // Don't remove flashes here, let SweetAlert handle them
+            if (!$this->useSweetAlert) {
+                $session->removeFlash($type);
+            }
         }
     }
 }

@@ -6,6 +6,7 @@ use yii\web\JqueryAsset;
 use app\models\ContractRenewal;
 use app\models\User;
 use app\models\Company;
+use app\models\Ticket;
 // grid
 use yii\grid\GridView;
 use yii\data\arrayDataProvider;
@@ -32,6 +33,7 @@ function getStatusColor($status)
 
 // Register jQuery if not already registered
 $this->registerJsFile('https://cdn.jsdelivr.net/npm/sweetalert2@11');
+
 $this->registerJsFile('https://code.jquery.com/jquery-3.6.0.min.js', ['position' => \yii\web\View::POS_HEAD]);
 
 // Register the JavaScript in POS_HEAD to ensure it's available before DOM elements
@@ -82,15 +84,39 @@ $this->registerJs("
 function getStatusText($status) {
     return $status == User::STATUS_ACTIVE ? 'Active' : 'Inactive';
 }
+
+// Calculate ticket statistics using string comparisons
+$openTickets = Ticket::find()->where(['status' => 'open'])->count();
+$inProgressTickets = Ticket::find()->where(['status' => 'in progress'])->count();
+$resolvedTickets = Ticket::find()->where(['status' => 'resolved'])->count();
+$closedTickets = Ticket::find()->where(['status' => 'closed'])->count();
+$totalTickets = $openTickets + $inProgressTickets + $resolvedTickets + $closedTickets;
+
+// Modify the top developers query
+$topDevelopers = Ticket::find()
+    ->select([
+        'users.id',
+        'users.name AS developer_name',
+        'users.company_name',
+        'COUNT(*) as assigned_count',
+        'COUNT(CASE WHEN ticket.status IN (\'closed\', \'resolved\') THEN 1 ELSE NULL END) as resolved_count'
+    ])
+    ->join('LEFT JOIN', 'users', 'ticket.assigned_to = users.id')
+    ->where(['not', ['ticket.assigned_to' => null]])
+    ->andWhere(['not', ['users.name' => null]])
+    ->groupBy(['users.id', 'users.name', 'users.company_name'])
+    ->orderBy(['assigned_count' => SORT_DESC])
+    ->limit(5)
+    ->asArray()
+    ->all();
 ?>
 
 <style>
         /* Container Styling */
         .container {
         max-width: 100%;
-        padding: 0px;
-        /* Allow full width */
-        /* Add padding for mobile */
+        padding: 0;
+        overflow-x: hidden; /* Prevent horizontal scroll */
     }
 
     .finefooter{
@@ -408,10 +434,88 @@ function getStatusText($status) {
     }
 </style>
 
-<div class="dashboard-dash-nav fixed-top " style="margin-top:100px;">
-    <div class="dash-nav-trigger">
-        <i class="fas fa-bars"></i> Dashboard Menu
-    </div>
+<style>
+    /* Mobile Toggle Button Styles */
+    .mobile-toggle {
+        display: none;
+        position: fixed;
+        top: 110px; /* Adjust based on your header height */
+        right: 15px;
+        z-index: 1001;
+        background: #2E4374;
+        color: white;
+        border: none;
+        padding: 10px;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    /* Navigation Styles */
+    .dashboard-dash-nav {
+        transition: all 0.3s ease;
+    }
+
+    /* Mobile Styles */
+    @media (max-width: 768px) {
+        .mobile-toggle {
+            display: block;
+        }
+
+        .dashboard-dash-nav {
+            position: fixed;
+            top: 100px; /* Adjust based on your header height */
+            right: -250px; /* Hide off-screen initially */
+            width: 250px;
+            height: calc(100vh - 100px);
+            background: white;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+            z-index: 1000;
+            transition: right 0.3s ease;
+        }
+
+        .dashboard-dash-nav.active {
+            right: 0;
+        }
+
+        .dash-nav-links {
+            flex-direction: column;
+            padding: 20px 0;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .dash-nav-link {
+            padding: 15px 20px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+            width: 100%;
+        }
+
+        /* Add overlay when menu is open */
+        .menu-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        .menu-overlay.active {
+            display: block;
+        }
+    }
+</style>
+
+<!-- Add the mobile toggle button and overlay -->
+<button class="mobile-toggle" id="mobileToggle">
+    <i class="fas fa-bars"></i>
+</button>
+<div class="menu-overlay" id="menuOverlay"></div>
+
+<!-- Update your existing navigation -->
+<div class="dashboard-dash-nav">
     <ul class="dash-nav-links">
         <li><a href="#overview" class="dash-nav-link active" data-section="overview">
                 <i class="fas fa-chart-line"></i> <span>Overview</span>
@@ -592,6 +696,147 @@ function getStatusText($status) {
                             No tickets with comments found.
                         </div>
                     <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ticket Analytics Summary -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="card-title mb-0">Top 5 Companies by Tickets</h5>
+                    </div>
+                    <div class="card-body">
+                        <?php
+                        // Get top 5 companies by ticket count
+                        $topCompanies = Ticket::find()
+                            ->select(['users.company_name', 'COUNT(*) as ticket_count'])
+                            ->join('LEFT JOIN', 'users', 'ticket.created_by = users.id')
+                            ->groupBy(['users.company_name'])
+                            ->having(['IS NOT', 'users.company_name', null])
+                            ->orderBy(['ticket_count' => SORT_DESC])
+                            ->limit(5)
+                            ->asArray()
+                            ->all();
+
+                        if (!empty($topCompanies)):
+                        ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Company</th>
+                                            <th>Tickets</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php 
+                                        $rank = 1;
+                                        foreach ($topCompanies as $company): 
+                                            if (!empty($company['company_name'])):
+                                        ?>
+                                            <tr>
+                                                <td><?= $rank++ ?></td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="avatar-circle me-2">
+                                                            <?= !empty($company['company_name']) ? strtoupper(substr($company['company_name'], 0, 1)) : '?' ?>
+                                                        </div>
+                                                        <div>
+                                                            <strong><?= Html::encode($company['company_name']) ?></strong>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-primary"><?= $company['ticket_count'] ?></span>
+                                                </td>
+                                            </tr>
+                                        <?php 
+                                            endif;
+                                        endforeach; 
+                                        ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-info">No ticket data available</div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="card-title mb-0">Top 5 Active Developers</h5>
+                    </div>
+                    <div class="card-body">
+                        <?php
+                        if (!empty($topDevelopers)):
+                        ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Developer</th>
+                                            <th>Assigned</th>
+                                            <th>Resolution Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php 
+                                        $rank = 1;
+                                        foreach ($topDevelopers as $developer): 
+                                            if (!empty($developer['developer_name'])):
+                                                $resolutionRate = $developer['assigned_count'] > 0 ? 
+                                                    round(($developer['resolved_count'] / $developer['assigned_count']) * 100) : 0;
+                                        ?>
+                                            <tr>
+                                                <td><?= $rank++ ?></td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="avatar-circle me-2 bg-success-light">
+                                                            <?= strtoupper(substr($developer['developer_name'], 0, 1)) ?>
+                                                        </div>
+                                                        <div>
+                                                            <strong><?= Html::encode($developer['developer_name']) ?></strong>
+                                                            <?php if (!empty($developer['company_name'])): ?>
+                                                                <br>
+                                                                <small class="text-muted"><?= Html::encode($developer['company_name']) ?></small>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-success"><?= $developer['assigned_count'] ?></span>
+                                                </td>
+                                                <td>
+                                                    <div class="progress" style="height: 6px;">
+                                                        <div class="progress-bar bg-success" 
+                                                             role="progressbar" 
+                                                             style="width: <?= $resolutionRate ?>%"
+                                                             aria-valuenow="<?= $resolutionRate ?>" 
+                                                             aria-valuemin="0" 
+                                                             aria-valuemax="100">
+                                                        </div>
+                                                    </div>
+                                                    <small class="text-muted"><?= $resolutionRate ?>%</small>
+                                                </td>
+                                            </tr>
+                                        <?php 
+                                            endif;
+                                        endforeach; 
+                                        ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="alert alert-info">No developer data available</div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1108,54 +1353,31 @@ $this->registerJs("
 $this->registerCssFile('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css');
 $this->registerJsFile('https://cdn.jsdelivr.net/npm/chart.js', ['position' => \yii\web\View::POS_HEAD]);
 
-// Chart configuration
-$chartConfig = [
-    'type' => 'doughnut',
-    'data' => [
-        'labels' => array_keys($ticketStatusData),
-        'datasets' => [[
-            'data' => array_values($ticketStatusData),
-            'backgroundColor' => [
-                '#4e73df',
-                '#1cc88a',
-                '#36b9cc',
-                '#f6c23e',
-                '#e74a3b'
-            ],
-            'hoverBackgroundColor' => [
-                '#2e59d9',
-                '#17a673',
-                '#2c9faf',
-                '#dda20a',
-                '#be2617'
-            ],
-            'hoverBorderColor' => "rgba(234, 236, 244, 1)",
-        ]]
-    ],
-    'options' => [
-        'maintainAspectRatio' => false,
-        'tooltips' => [
-            'backgroundColor' => "rgb(255,255,255)",
-            'bodyFontColor' => "#858796",
-            'borderColor' => '#dddfeb',
-            'borderWidth' => 1,
-            'xPadding' => 15,
-            'yPadding' => 15,
-            'displayColors' => false,
-            'caretPadding' => 10,
-        ],
-        'legend' => [
-            'display' => true,
-            'position' => 'bottom'
-        ],
-        'cutoutPercentage' => 80,
-    ],
+// Prepare data for the chart
+$chartData = [
+    'labels' => ['Open', 'In Progress', 'Resolved', 'Closed'],
+    'datasets' => [[
+        'data' => [$openTickets, $inProgressTickets, $resolvedTickets, $closedTickets],
+        'backgroundColor' => ['#dc3545', '#ffc107', '#28a745', '#17a2b8'],
+    ]],
 ];
 
+// Register the chart initialization script
 $this->registerJs("
-    // Initialize Ticket Status Chart
-    new Chart(document.getElementById('ticketStatusChart'), " . json_encode($chartConfig) . ");
-");
+    new Chart(document.getElementById('ticketStatusChart'), {
+        type: 'doughnut',
+        data: " . json_encode($chartData) . ",
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+", \yii\web\View::POS_READY);
 ?>
 
 <style>
@@ -1392,65 +1614,63 @@ $this->registerJs($js);
 
 <?php
 $this->registerJs("
-    // Mobile menu toggle
-    document.querySelector('.dash-nav-trigger').addEventListener('click', function(e) {
-        e.stopPropagation();
-        document.querySelector('.dash-nav-links').classList.toggle('show');
-    });
+    // Mobile menu functionality
+    const mobileToggle = document.getElementById('mobileToggle');
+    const dashNav = document.querySelector('.dashboard-dash-nav');
+    const menuOverlay = document.getElementById('menuOverlay');
+    const navLinks = document.querySelectorAll('.dash-nav-link');
 
-    // Handle dash-navigation clicks
-    document.querySelectorAll('.dash-nav-link').forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            
-            // Close mobile menu if open
-            if (window.innerWidth <= 768) {
-                document.querySelector('.dash-nav-links').classList.remove('show');
-            }
-            
-            const targetId = this.getAttribute('href');
-            const targetSection = document.querySelector(targetId);
-            
-            if (targetSection) {
-                const dash-navHeight = document.querySelector('.dashboard-dash-nav').offsetHeight;
-                const headerOffset = 100;
-                const elementPosition = targetSection.getBoundingClientRect().top;
-                const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-                
-                window.scrollTo({
-                    top: offsetPosition,
-                    behavior: 'smooth'
-                });
-            }
-            
-            document.querySelectorAll('.dash-nav-link').forEach(l => l.classList.remove('active'));
-            this.classList.add('active');
-        });
-    });
-
-    // Update active section on scroll
-    window.addEventListener('scroll', function() {
-        const scrollPosition = window.pageYOffset;
+    function toggleMenu() {
+        dashNav.classList.toggle('active');
+        menuOverlay.classList.toggle('active');
         
-        document.querySelectorAll('.section').forEach(section => {
-            const sectionTop = section.offsetTop - 150;
-            const sectionBottom = sectionTop + section.offsetHeight;
-            
-            if (scrollPosition >= sectionTop && scrollPosition < sectionBottom) {
-                document.querySelectorAll('.dash-nav-link').forEach(link => {
-                    link.classList.remove('active');
-                    if (link.getAttribute('href') === '#' + section.id) {
-                        link.classList.add('active');
-                    }
-                });
+        // Toggle icon
+        const icon = mobileToggle.querySelector('i');
+        if (dashNav.classList.contains('active')) {
+            icon.classList.remove('fa-bars');
+            icon.classList.add('fa-times');
+        } else {
+            icon.classList.remove('fa-times');
+            icon.classList.add('fa-bars');
+        }
+    }
+
+    // Toggle menu when button is clicked
+    mobileToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleMenu();
+    });
+
+    // Close menu when overlay is clicked
+    menuOverlay.addEventListener('click', toggleMenu);
+
+    // Close menu when a link is clicked
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                toggleMenu();
             }
         });
     });
 
-    // Close mobile menu when clicking outside
-    document.addEventListener('click', function(e) {
-        if (window.innerWidth <= 768 && !e.target.closest('.dashboard-dash-nav')) {
-            document.querySelector('.dash-nav-links').classList.remove('show');
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+        if (window.innerWidth <= 768 && 
+            dashNav.classList.contains('active') && 
+            !dashNav.contains(e.target) && 
+            e.target !== mobileToggle) {
+            toggleMenu();
+        }
+    });
+
+    // Prevent menu from staying open on resize
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768) {
+            dashNav.classList.remove('active');
+            menuOverlay.classList.remove('active');
+            const icon = mobileToggle.querySelector('i');
+            icon.classList.remove('fa-times');
+            icon.classList.add('fa-bars');
         }
     });
 ");
@@ -1588,3 +1808,122 @@ $this->registerJs("
     }
 ", View::POS_END);
 ?>
+
+<style>
+    /* Update existing container styles */
+    .container {
+        max-width: 100%;
+        padding: 0;
+        overflow-x: hidden; /* Prevent horizontal scroll */
+    }
+
+    /* Update dashboard container padding for mobile */
+    .dashboard-container {
+        padding: 20px !important; /* Override inline style */
+    }
+
+    /* Make tables responsive */
+    .table-responsive {
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+    }
+
+    /* Adjust card padding for mobile */
+    .card-body {
+        padding: 15px;
+    }
+
+    /* Make buttons and inputs full width on mobile */
+    @media (max-width: 768px) {
+        .dashboard-container {
+            padding: 10px !important;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            gap: 5px;
+        }
+
+        .btn-group .btn {
+            width: 100%;
+            margin: 0;
+        }
+
+        .input-group {
+            width: 100% !important;
+        }
+
+        /* Adjust table display for mobile */
+        .table td, .table th {
+            min-width: 120px; /* Ensure minimum width for content */
+        }
+
+        /* Stack action buttons vertically */
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .action-buttons .btn {
+            width: 100%;
+            margin: 0;
+        }
+
+        /* Adjust navigation for mobile */
+        .dash-nav-links {
+            flex-direction: column;
+            width: 100%;
+            padding: 0;
+        }
+
+        .dash-nav-link {
+            width: 100%;
+            text-align: left;
+            padding: 15px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        /* Make search inputs full width */
+        #userSearch, #clientSearch {
+            width: 100% !important;
+        }
+
+        /* Adjust header elements */
+        .d-flex.justify-content-between {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .d-flex.justify-content-between > * {
+            width: 100%;
+        }
+
+        /* Adjust modal for mobile */
+        .modal-dialog {
+            margin: 10px;
+        }
+    }
+
+    /* Additional mobile optimizations */
+    @media (max-width: 576px) {
+        h2, h3 {
+            font-size: 1.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            margin: 2px;
+        }
+
+        .table td {
+            padding: 10px;
+        }
+    }
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</style>

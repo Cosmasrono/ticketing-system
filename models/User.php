@@ -59,6 +59,8 @@ class User extends ActiveRecord implements IdentityInterface
 
     public $token_created_at; // Ensure this line exists if you need this property
 
+    const ROLE_SUPER_ADMIN = 4;
+
     public function scenarios()
     {
         $scenarios = parent::scenarios();
@@ -70,7 +72,6 @@ class User extends ActiveRecord implements IdentityInterface
 const ROLE_USER = 2;
 const ROLE_ADMIN = 1; 
 const ROLE_DEVELOPER = 3;
-const ROLE_SUPER_ADMIN = 4;
 
 // Add role check method
 public function isUser()
@@ -145,6 +146,7 @@ public function isUser()
             [['token_created_at'], 'safe'], // Allow SQL expression
             [['modules'], 'string'],
             [['password_hash', 'password_reset_token', 'auth_key'], 'string', 'max' => 255],
+            ['role', 'string'], // Since we're using string values for roles
         ];
     }
 

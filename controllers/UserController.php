@@ -11,6 +11,8 @@ use app\models\Company;
 use app\models\Ticket;
 use app\models\ContractRenewal;
 use yii\rbac\Role;
+use yii\web\ForbiddenHttpException;
+use yii\web\Response;
 
 class UserController extends Controller
 {
@@ -22,7 +24,6 @@ class UserController extends Controller
                 'rules' => [
                     [
                         'allow' => true,
-                        'roles' => ['@','admin'],  // Authenticated users only
                     ],
                 ],
             ],
@@ -35,15 +36,17 @@ class UserController extends Controller
             return false;
         }
 
-        // Check user status only if logged in
-        if (!Yii::$app->user->isGuest) {
-            $user = Yii::$app->user->identity;
-            if ($user->status == 0) {
-                Yii::$app->user->logout();
-                Yii::$app->session->setFlash('error', 'Your account has been deactivated. Please contact administrator.');
-                Yii::$app->response->redirect(['/site/login'])->send();
-                return false;
-            }
+        // Check if user is logged in
+        if (Yii::$app->user->isGuest) {
+            return $this->redirect(['/site/login']);
+        }
+
+        // Check user status
+        $user = Yii::$app->user->identity;
+        if ($user->status == 0) {
+            Yii::$app->user->logout();
+            Yii::$app->session->setFlash('error', 'Your account has been deactivated.');
+            return $this->redirect(['/site/login']);
         }
 
         return true;
@@ -53,145 +56,83 @@ class UserController extends Controller
     {
         $user = User::findOne($id);
         if (!$user) {
-            throw new NotFoundHttpException('The requested user does not exist.');
+            throw new NotFoundHttpException('User not found.');
         }
 
-        // Check if user is super admin (role 4)
-        if ($user->role === '4' || $user->role === 4) {
+        $isSuperAdmin = (int)$user->role === User::ROLE_SUPER_ADMIN;
+
+        if ($isSuperAdmin) {
+            // Super admin data
             $companyDetails = [
                 'id' => $user->id,
-                'company_name' => 'Super Admin',
+                'company_name' => $user->company_name,
                 'company_email' => $user->company_email,
                 'role' => $user->role,
-                'start_date' => null,
-                'end_date' => null,
                 'status' => $user->status,
                 'created_at' => $user->created_at,
                 'updated_at' => $user->updated_at,
-            ];
-
-            return $this->render('profile', [
-                'user' => $user,
-                'isCEO' => true,
-                'companyDetails' => $companyDetails,
-                'tickets' => Ticket::find()->orderBy(['last_update_at' => SORT_DESC])->all(),
+                'start_date' => null,  // Add these with null values
+                'end_date' => null,    // Add these with null values
+                // Add ticket statistics
                 'ticketStats' => [
                     'total' => Ticket::find()->count(),
-                    'pending' => Ticket::find()->where(['CAST(status as NVARCHAR(50))' => 'pending'])->count(),
-                    'approved' => Ticket::find()->where(['CAST(status as NVARCHAR(50))' => 'approved'])->count(),
-                    'closed' => Ticket::find()->where(['CAST(status as NVARCHAR(50))' => 'closed'])->count(),
-                    'breached_sla' => (new \yii\db\Query())
-                        ->from('ticket')
-                        ->where('CAST(sla_status as NVARCHAR(50)) = :status', [':status' => 'breached'])
-                        ->count(),
-                    'high_severity' => Ticket::find()
-                        ->where(['>=', 'CAST(severity_level as INT)', 3])
-                        ->count(),
-                ],
-                'companyStats' => Yii::$app->db->createCommand("
-                    SELECT company_name, COUNT(*) as ticket_count 
-                    FROM ticket 
-                    WHERE company_name IS NOT NULL
-                    GROUP BY company_name
-                ")->queryAll(),
-                'developerStats' => Yii::$app->db->createCommand("
-                    SELECT 
-                        u.id,
-                        COUNT(t.id) as total_tickets,
-                        SUM(CASE WHEN CAST(t.sla_status as NVARCHAR(50)) = 'breached' THEN 1 ELSE 0 END) as breached_tickets
-                    FROM users u
-                    LEFT JOIN ticket t ON t.developer_id = u.id
-                    WHERE CAST(u.role as NVARCHAR(50)) = '3'
-                    GROUP BY u.id
-                    HAVING COUNT(t.id) > 0
-                ")->queryAll(),
-            ]);
-        }
-
-        // For non-super admin users, proceed with company lookup
-        $company = Company::findOne(['company_name' => $user->company_name]);
-        if (!$company) {
-            throw new NotFoundHttpException('Company not found.');
-        }
-
-        $companyDetails = [
-            'id' => $company->id,
-            'company_name' => $company->company_name,
-            'company_email' => $company->company_email,
-            'role' => $company->role,
-            'start_date' => $company->start_date,
-            'end_date' => $company->end_date,
-            'status' => $company->status,
-            'created_at' => $company->created_at,
-            'updated_at' => $company->updated_at,
-        ];
-
-        // Initialize variables
-        $tickets = [];
-        $ticketStats = null;
-        $companyStats = null;
-        $developerStats = null;
-
-        if ($user->role === 4) {
-            // Fetch all tickets with company details
-            $tickets = Ticket::find()
-                ->alias('t')
-                ->select(['t.*', 'c.company_name', 'c.company_email'])
-                ->leftJoin('company c', 't.created_by = c.id')
-                ->orderBy(['t.last_update_at' => SORT_DESC])
-                ->all();
-
-            // Calculate ticket statistics
-            $ticketStats = [
-                'total' => Ticket::find()->count(),
-                'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
-                'approved' => Ticket::find()->where(['status' => 'approved'])->count(),
-                'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
-                'breached_sla' => Ticket::find()->where(['sla_status' => 'breached'])->count(),
-                'high_severity' => Ticket::find()->where(['>=', 'severity_level', 3])->count(),
+                    'open' => Ticket::find()->where(['status' => 'open'])->count(),
+                    'in_progress' => Ticket::find()->where(['status' => 'in_progress'])->count(),
+                    'resolved' => Ticket::find()->where(['status' => 'resolved'])->count(),
+                    'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
+                ]
             ];
 
-            // Get ticket distribution by company
-            $companyStats = Ticket::find()
-                ->alias('t')
-                ->select(['c.company_name', 'COUNT(*) as ticket_count'])
-                ->leftJoin('company c', 't.company_id = c.id')
-                ->groupBy('c.company_name')
+            // Get top ticket raisers
+            $topRaisers = Ticket::find()
+                ->select(['created_by', 'COUNT(*) as ticket_count'])
+                ->groupBy(['created_by'])
+                ->orderBy(['ticket_count' => SORT_DESC])
+                ->limit(5)
                 ->asArray()
                 ->all();
 
-            // Get developer statistics (role = 3)
-            $developerStats = (new \yii\db\Query())
-                ->select([
-                    'u.id',
-                    'COUNT(t.id) as total_tickets',
-                    'SUM(CASE WHEN t.sla_status = "breached" THEN 1 ELSE 0 END) as breached_tickets'
-                ])
-                ->from(['u' => 'user'])
-                ->leftJoin(['t' => 'ticket'], 't.developer_id = u.id')
-                ->where(['u.role' => 3])
-                ->groupBy('u.id')
-                ->having(['>', 'total_tickets', 0])
+            // Get top developers
+            $topDevelopers = Ticket::find()
+                ->select(['assigned_to', 'COUNT(*) as assigned_count'])
+                ->where(['not', ['assigned_to' => null]])
+                ->groupBy(['assigned_to'])
+                ->orderBy(['assigned_count' => SORT_DESC])
+                ->limit(5)
+                ->asArray()
                 ->all();
-        } else {
-            // Fetch tickets for the user's company only
-            $tickets = Ticket::find()
-                ->where(['created_by' => $company->id])
-                ->orderBy(['created_at' => SORT_DESC])
-                ->all();
+
+            return $this->render('profile', [
+                'user' => $user,
+                'isSuperAdmin' => true,
+                'companyDetails' => $companyDetails,
+                'topRaisers' => $topRaisers,
+                'topDevelopers' => $topDevelopers,
+                'allUsers' => User::find()
+                    ->where(['!=', 'id', $id])
+                    ->orderBy(['created_at' => SORT_DESC])
+                    ->asArray()
+                    ->all()
+            ]);
         }
+
+        // For non-super admin users
+        $companyDetails = [
+            'id' => $user->id,
+            'company_name' => $user->company_name,
+            'company_email' => $user->company_email,
+            'role' => $user->role,
+            'status' => $user->status,
+            'created_at' => $user->created_at,
+            'updated_at' => $user->updated_at,
+            'start_date' => null,  // Add these with null values
+            'end_date' => null     // Add these with null values
+        ];
 
         return $this->render('profile', [
             'user' => $user,
-            'company' => $company,
-            'companyDetails' => $companyDetails,
-            'tickets' => $tickets,
-            'renewals' => $renewals ?? [],
-            'ticketStats' => $ticketStats,
-            'companyStats' => $companyStats,
-            'developerStats' => $developerStats,
-            'isCEO' => $user->role === 4,
-            'model' => $model ?? null,
+            'isSuperAdmin' => false,
+            'companyDetails' => $companyDetails
         ]);
     }
 
@@ -213,51 +154,29 @@ class UserController extends Controller
 
     public function actionToggleStatus()
     {
-        \Yii::$app->response->format = \yii\web\Response::FORMAT_JSON;
+        if (Yii::$app->user->identity->role !== User::ROLE_SUPER_ADMIN) {
+            throw new ForbiddenHttpException('Access denied.');
+        }
+
+        Yii::$app->response->format = Response::FORMAT_JSON;
         
-        try {
-            $id = \Yii::$app->request->post('id');
-            
-            if (!$id) {
-                return [
-                    'success' => false,
-                    'message' => 'User ID is required'
-                ];
-            }
+        $id = Yii::$app->request->post('id');
+        $user = User::findOne($id);
+        
+        if (!$user) {
+            return ['success' => false, 'message' => 'User not found'];
+        }
 
-            $user = User::findOne($id);
-            if (!$user) {
-                return [
-                    'success' => false,
-                    'message' => 'User not found'
-                ];
-            }
-
-            // Toggle status between active (10) and inactive (0)
-            $user->status = ($user->status == 10) ? 0 : 10;
-
-            if ($user->save(false)) {
-                $statusText = $user->status == 10 ? 'activated' : 'deactivated';
-                return [
-                    'success' => true,
-                    'message' => "User successfully {$statusText}",
-                    'newStatus' => $user->status,
-                    'userId' => $user->id
-                ];
-            }
-
+        $user->status = !$user->status;
+        
+        if ($user->save()) {
             return [
-                'success' => false,
-                'message' => 'Failed to update user status'
-            ];
-
-        } catch (\Exception $e) {
-            \Yii::error('Error toggling user status: ' . $e->getMessage());
-            return [
-                'success' => false,
-                'message' => \YII_DEBUG ? $e->getMessage() : 'An error occurred while updating user status'
+                'success' => true,
+                'message' => 'Status updated successfully'
             ];
         }
+
+        return ['success' => false, 'message' => 'Failed to update status'];
     }
 
     public function actionDelete()

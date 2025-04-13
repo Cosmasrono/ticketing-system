@@ -37,7 +37,7 @@ window.showAlert = function(title, message, type = 'success') {
         title: title,
         text: message,
         icon: type, // 'success', 'error', 'warning', 'info', 'question'
-        timer: 3000,
+        timer: 4000,
         timerProgressBar: true,
         showConfirmButton: false,
         position: 'top-end',

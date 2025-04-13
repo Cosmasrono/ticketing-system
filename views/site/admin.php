@@ -46,15 +46,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
 
 <div class="" >
     <h1><?= Html::encode($this->title) ?></h1>
-    <?php if (Yii::$app->session->hasFlash('success')): ?>
-        <div class="alert alert-success">
-            <?= Yii::$app->session->getFlash('success') ?>
-        </div>
-    <?php elseif (Yii::$app->session->hasFlash('error')): ?>
-        <div class="alert alert-danger">
-            <?= Yii::$app->session->getFlash('error') ?>
-        </div>
-    <?php endif; ?>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <!-- Action Buttons Section -->
     <div class="action-buttons-container mb-4">
@@ -642,7 +634,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                             showAlert('Success!', 'Ticket has been assigned successfully');
                             setTimeout(() => {
                                 location.reload(); // Reload to update all statuses
-                            }, 2000);
+                            }, 3000);
                         } else {
                             // Re-enable the button if assignment failed
                             button.prop('disabled', false);
@@ -697,7 +689,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                         showAlert('Success!', response.message);
                         setTimeout(() => {
                             window.location.reload();
-                        }, 2000);
+                        }, 3000);
                     } else {
                         showAlert('Error!', response.message || 'Failed to cancel ticket', 'error');
                     }
@@ -756,7 +748,7 @@ if ($ticketName = Yii::$app->request->get('ticket_name')) {
                         showAlert('Success!', 'Ticket closed successfully.');
                         setTimeout(() => {
                             location.reload(); // Reload to update the ticket list
-                        }, 2000);
+                        }, 3000);
                     } else {
                         alert('Failed to close ticket: ' + response.message);
                     }

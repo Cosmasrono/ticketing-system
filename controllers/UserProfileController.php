@@ -32,130 +32,95 @@ class UserProfileController extends Controller
     {
         // Get current user's role
         $currentUserRole = Yii::$app->user->identity->role;
-        $isCEO = $currentUserRole === 4;
+        $isSuperAdmin = $currentUserRole === 4; // Role 4 is superadmin
 
+        // Get basic user and company info
         $user = User::findOne($id);
-        if ($user === null) {
-            throw new NotFoundHttpException('The requested user does not exist.');
+        if (!$user) {
+            throw new NotFoundHttpException('User not found.');
         }
-    
-        // Get the associated company data
+
         $company = Company::findOne(['company_name' => $user->company_name]);
-    
-        if ($company === null) {
+        if (!$company) {
             throw new NotFoundHttpException('Company not found.');
         }
 
-        // For CEO (role 4), fetch all tickets with detailed information
-        if ($isCEO) {
-            $tickets = Ticket::find()
-                ->select([
-                    'ticket.*',
-                    'developer.username as developer_name',
-                    'creator.username as created_by_name',
-                    'company.company_name',
-                    'company.company_email'
-                ])
-                ->alias('ticket')
-                ->leftJoin('user developer', 'ticket.developer_id = developer.id')
-                ->leftJoin('user creator', 'ticket.created_by = creator.id')
-                ->leftJoin('company', 'ticket.company_id = company.id')
-                ->orderBy(['last_update_at' => SORT_DESC])
+        // Initialize variables
+        $companyStats = [];
+        $ticketStats = [];
+        $userTickets = [];
+        $developers = [];
+
+        // If user is superadmin, fetch additional data
+        if ($isSuperAdmin) {
+            // Get company statistics
+            $companyStats = [
+                'total_companies' => Company::find()->count(),
+                'active_contracts' => Company::find()->where(['status' => 1])->count(),
+                'total_users' => User::find()->count(),
+            ];
+
+            // Get users who created tickets (ticket raisers)
+            $userTickets = User::find()
+                ->select(['user.username', 'COUNT(ticket.id) as ticket_count'])
+                ->leftJoin('ticket', 'user.id = ticket.created_by')
+                ->groupBy(['user.id', 'user.username'])
+                ->having(['>', 'ticket_count', 0])
+                ->orderBy(['ticket_count' => SORT_DESC])
+                ->limit(10)
+                ->asArray()
                 ->all();
 
-            // Calculate detailed statistics for CEO
+            // Get developers (users assigned to tickets)
+            $developers = User::find()
+                ->select(['user.username', 'COUNT(ticket.id) as assigned_count'])
+                ->leftJoin('ticket', 'user.id = ticket.developer_id')
+                ->where(['not', ['ticket.developer_id' => null]])
+                ->groupBy(['user.id', 'user.username'])
+                ->having(['>', 'assigned_count', 0])
+                ->orderBy(['assigned_count' => SORT_DESC])
+                ->limit(10)
+                ->asArray()
+                ->all();
+
+            // Get ticket statistics
             $ticketStats = [
                 'total' => Ticket::find()->count(),
                 'pending' => Ticket::find()->where(['status' => 'pending'])->count(),
-                'approved' => Ticket::find()->where(['status' => 'approved'])->count(),
-                'closed' => Ticket::find()->where(['status' => 'closed'])->count(),
-                'breached_sla' => Ticket::find()->where(['sla_status' => 'breached'])->count(),
                 'high_severity' => Ticket::find()->where(['>=', 'severity_level', 3])->count(),
-                'avg_resolution_time' => Ticket::find()
-                    ->where(['IS NOT', 'time_taken', null])
-                    ->average('time_taken'),
+                'breached_sla' => Ticket::find()->where(['sla_status' => 'breached'])->count(),
+                'most_common_issues' => Ticket::find()
+                    ->select(['issue', 'COUNT(*) as count'])
+                    ->groupBy('issue')
+                    ->orderBy(['count' => SORT_DESC])
+                    ->limit(5)
+                    ->asArray()
+                    ->all(),
             ];
-
-            // Get company-wise ticket distribution
-            $companyStats = Ticket::find()
-                ->select(['company.company_name', 'COUNT(*) as ticket_count'])
-                ->leftJoin('company', 'ticket.company_id = company.id')
-                ->groupBy(['company.company_name'])
-                ->asArray()
-                ->all();
-
-            // Get module-wise distribution
-            $moduleStats = Ticket::find()
-                ->select(['module', 'COUNT(*) as count'])
-                ->groupBy(['module'])
-                ->asArray()
-                ->all();
-
-            // Get severity-wise distribution
-            $severityStats = Ticket::find()
-                ->select(['severity_level', 'COUNT(*) as count'])
-                ->groupBy(['severity_level'])
-                ->asArray()
-                ->all();
-
-            // Get developer performance stats
-            $developerStats = Ticket::find()
-                ->select([
-                    'developer.username as developer_name',
-                    'COUNT(*) as total_tickets',
-                    'AVG(CASE WHEN time_taken IS NOT NULL THEN time_taken END) as avg_resolution_time',
-                    'SUM(CASE WHEN sla_status = "breached" THEN 1 ELSE 0 END) as breached_tickets'
-                ])
-                ->leftJoin('user developer', 'ticket.developer_id = developer.id')
-                ->groupBy(['developer.username'])
-                ->having(['>', 'total_tickets', 0])
-                ->asArray()
-                ->all();
-
-        } else {
-            // Regular ticket query for non-CEO users
-            $tickets = Ticket::find()
-                ->where(['company_id' => $company->id])
-                ->orderBy(['created_at' => SORT_DESC])
-                ->all();
-            
-            $ticketStats = null;
-            $companyStats = null;
-            $moduleStats = null;
-            $severityStats = null;
-            $developerStats = null;
         }
 
-        // Fetch renewal statistics for the company
-        $renewals = ContractRenewal::find()->where(['company_id' => $company->id])->all();
-        $renewalStats = [
-            'total' => ContractRenewal::find()->where(['company_id' => $company->id])->count(),
-            'pending' => ContractRenewal::find()->where(['company_id' => $company->id, 'renewal_status' => 'pending'])->count(),
-            'approved' => ContractRenewal::find()->where(['company_id' => $company->id, 'renewal_status' => 'approved'])->count(),
+        // Get company details for the view
+        $companyDetails = [
+            'id' => $company->id,
+            'company_name' => $company->company_name,
+            'company_email' => $company->company_email,
+            'start_date' => $company->start_date,
+            'end_date' => $company->end_date,
+            'status' => $company->status,
+            'created_at' => $company->created_at,
+            'updated_at' => $company->updated_at,
+            'role' => $currentUserRole,
         ];
 
         return $this->render('profile', [
             'user' => $user,
             'company' => $company,
-            'tickets' => $tickets,
-            'renewals' => $renewals,
-            'ticketStats' => $ticketStats,
+            'companyDetails' => $companyDetails,
             'companyStats' => $companyStats,
-            'moduleStats' => $moduleStats,
-            'severityStats' => $severityStats,
-            'developerStats' => $developerStats,
-            'isCEO' => $isCEO,
-            'renewalStats' => $renewalStats,
-            'companyDetails' => [
-                'id' => $company->id,
-                'company_name' => $company->company_name,
-                'company_email' => $company->company_email,
-                'start_date' => $company->start_date,
-                'end_date' => $company->end_date,
-                'status' => $company->status,
-                'created_at' => $company->created_at,
-                'updated_at' => $company->updated_at,
-            ],
+            'ticketStats' => $ticketStats,
+            'userTickets' => $userTickets,
+            'developers' => $developers,
+            'isSuperAdmin' => $isSuperAdmin,
         ]);
     }
 }

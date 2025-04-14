@@ -1,0 +1,107 @@
+# phpstorm project files
+.idea
+
+# netbeans project files
+nbproject
+
+# zend studio for eclipse project files
+.buildpath
+.project
+.settings
+
+# windows thumbnail cache
+Thumbs.db
+
+# composer vendor dir
+/vendor
+
+# composer itself is not needed
+composer.phar
+
+# Mac DS_Store Files
+.DS_Store
+
+# phpunit itself is not needed
+phpunit.phar
+# local phpunit config
+/phpunit.xml
+
+tests/_output/*
+tests/_support/_generated
+
+#vagrant folder
+/.vagrant
+# Composer dependencies
+/vendor/
+/composer.lock
+
+# Yii2 runtime and web assets
+/runtime/
+/web/assets/
+/web/uploads/
+
+# User-specific files
+/.env
+/.env.local
+/.env.*.local
+/.idea
+/.vscode
+*.swp
+*.swo
+
+# Log files
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE and editor specific files
+/.project
+/.buildpath
+/.settings
+/.metadata
+/.recommenders
+/.classpath
+/.factorypath
+/.externalToolBuilders
+/.cproject
+/.csettings
+/.launches
+/.pydevproject
+/.mypy_cache
+/.pytest_cache
+/.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.tmproj
+*.tmproject
+*.tm_properties
+*.code-workspace
+
+# PHPUnit
+.phpunit.result.cache
+
+# Node.js dependencies
+/node_modules/
+/npm-debug.log
+/yarn-error.log
+
+# Build directories
+/build/
+/dist/
+
+# Backup files
+*.bak
+*.tmp
+*.old
+*.orig
+*.save
+
+# Other
+*.sql
+*.sqlite
+*.sqlite3
+ 
+config/db.php

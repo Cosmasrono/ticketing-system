@@ -27,14 +27,7 @@ class m240115_234890_create_contract_renewals_table extends Migration
             'company_id'
         );
 
-        $this->addForeignKey(
-            // 'fk-contract_renewals-company_id',
-            // 'contract_renewals',
-            // 'company_id',
-            // 'company',
-            // 'id',
-            // 'CASCADE'
-        );
+        // Removed the empty addForeignKey call
 
         $this->addForeignKey(
             'fk-contract_renewals-requested_by',
@@ -51,4 +44,4 @@ class m240115_234890_create_contract_renewals_table extends Migration
     {
         $this->dropTable('contract_renewals');
     }
-} 
+}

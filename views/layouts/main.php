@@ -130,7 +130,7 @@ JqueryAsset::register($this);
         <header id="guest-header" class="guest-header d-flex align-items-center fixed-top p-10">
             <div class="container-fluid d-flex">
                 <a href="<?= Yii::$app->homeUrl ?>" class="logo d-flex align-items-center">
-                    <img src="https://www.iansoftltd.com/assets/img/logo.jpg" alt="Iansoft Logo">
+                    <img src="https://media.licdn.com/dms/image/v2/C4E0BAQHniFlkYaiprw/company-logo_200_200/company-logo_200_200/0/1637143089198/iansoft_technologies_ltd_logo?e=2147483647&v=beta&t=LQ6UHF2DvS7YzEwIvMtLDPCn1EXG9W7hIyhyW-xlcN0" alt="Iansoft Logo">
                 </a>
             </div>
             <div class="container-fluid container-xl d-flex align-items-center justify-content-end">

@@ -84,9 +84,11 @@ class Ticket extends ActiveRecord
             // Core required fields
             [['user_id', 'module', 'issue', 'description', 'severity'], 'required'],
             
+            
             // String fields with max length
             [['module', 'issue', 'company_name', 'company_email', 'status', 'renewal_status'], 'string', 'max' => 255],
-            
+            [['title'], 'string', 'max' => 255],
+            [['title'], 'safe'],
             // Integer fields
             [['severity', 'severity_level', 'created_by', 'assigned_to', 'approved_by'], 'integer'],
             
@@ -229,6 +231,11 @@ public function beforeSave($insert)
 {
     if (!parent::beforeSave($insert)) {
         return false;
+    }
+
+    // ✅ AUTO-SET TITLE FROM ISSUE IF TITLE IS EMPTY
+    if (empty($this->title) && !empty($this->issue)) {
+        $this->title = $this->issue;
     }
 
     // Debug screenshot value before save

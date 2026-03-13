@@ -2,15 +2,10 @@
 
 use yii\db\Migration;
 
-class m240402_567098_create_ticket_table extends Migration
+class m240211_084510_create_ticket_table extends Migration
 {
     public function up()
     {
-        // Skip if table already exists (duplicate migration)
-        if ($this->db->schema->getTableSchema('ticket') !== null) {
-            return;
-        }
-        
         $this->createTable('ticket', [
             'id' => $this->primaryKey(),
             'company_id' => $this->integer(),

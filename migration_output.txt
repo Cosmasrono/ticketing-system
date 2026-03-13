@@ -1,0 +1,300 @@
+Yii Migration Tool (based on Yii v2.0.52)
+
+Foreign key fk_auth_assignment_item_name dropped.
+Foreign key fk_auth_item_rule_name dropped.
+Foreign key fk_auth_item_child_parent dropped.
+Foreign key fk_auth_item_child_child dropped.
+Foreign key fk-contract_renewal-contract_id dropped.
+Foreign key fk-contract_renewal-requested_by dropped.
+Foreign key fk-contract_renewal-company_id dropped.
+Foreign key fk-contract_renewals-requested_by dropped.
+Foreign key fk-contracts-client_id dropped.
+Foreign key fk-subscription_renewal-requested_by dropped.
+Foreign key fk-subscription_renewal-company_id dropped.
+Foreign key fk-ticket-company_id dropped.
+Foreign key fk-ticket_message-ticket_id dropped.
+Foreign key fk-ticket_message-sender_id dropped.
+Foreign key fk-ticket_message-recipient_id dropped.
+Table auth_assignment dropped.
+Table auth_item dropped.
+Table auth_item_child dropped.
+Table auth_rule dropped.
+Table client dropped.
+Table company dropped.
+Table contract_renewal dropped.
+Table contract_renewals dropped.
+Table contracts dropped.
+Table migration dropped.
+Table permissions dropped.
+Table roles dropped.
+Table subscription_renewal dropped.
+Table ticket dropped.
+Table ticket_message dropped.
+Table users dropped.
+Creating migration history table "migration"...Done.
+Total 42 new migrations to be applied:
+	m240100_074852_create_users_table
+	m240101_135900_create_rbac_tables
+	m240115_234890_create_contract_renewals_table
+	m240202_008234_create_company_table
+	m240203_070000_create_users_table
+	m240203_080000_create_subscription_renewal_table
+	m240210_084500_add_renewal_duration_to_contract_renewal
+	m240211_084510_create_ticket_table
+	m240318_000000_add_screenshot_url_to_ticket
+	m240318_004500_add_notes_to_ticket
+	m240326_000001_create_ticket_message_table
+	m240326_000006_modify_users_email_constraint
+	m240402_567098_create_ticket_table
+	m240402_609234_update_user_status
+	m240402_656879_update_ticket_status
+	m240405_000000_update_ticket_columns
+	m241020_093242_create_client_table
+	m241021_063717_drop_rbac_tables
+	m241021_063937_create_roles_table
+	m241021_063941_create_permissions_table
+	m241021_063950_create_auth_assignment_table
+	m250111_075445_insert_client
+	m250124_075518_create_contracts_table
+	m250124_080000_insert_super_admin
+	m250202_172635_add_module_column_to_client_table
+	m250310_133801_create_ticket_table
+	m250310_135323_create_company_table
+	m250310_135841_add_company_id_to_ticket
+	m250310_140513_create_contract_renewal_table
+	m250310_140813_add_renewal_duration_to_contract_renewal
+	m250402_567384_create_contracts_renewal_table
+	m250403_144200_add_requested_by_to_contract_renewal
+	m250403_144431_add_renewal_status_to_contract_renewal
+	m250403_144641_add_renewal_duration_to_contract_renewal
+	m250403_144821_add_notes_to_contract_renewal
+	m250403_145319_add_new_end_date_to_contract_renewal
+	m250403_567385_add_company_id_to_contract_renewal
+	m250404_115012_add_contract_id_to_contracts_table
+	m250404_600519_add_company_id_to_contracts
+	m250453_458946_add_current_end_date_to_contract_renewal
+	m251114_094802_alter_ticket_renewal_status_to_string
+	m251243_700800_add_extension_period_to_contract_renewal
+
+*** applying m240100_074852_create_users_table
+    > create table {{%users}} ... done (time: 0.007s)
+    > create index idx-users-company_id on {{%users}} (company_id) ... done (time: 0.001s)
+    > create unique index idx-users-company_email on {{%users}} (company_email) ... done (time: 0.001s)
+*** applied m240100_074852_create_users_table (time: 0.108s)
+
+*** applying m240101_135900_create_rbac_tables
+    > drop table auth_assignment ...    > drop table auth_item_child ...    > drop table auth_item ...    > drop table auth_rule ...    > create table auth_rule ... done (time: 0.002s)
+    > create table auth_item ... done (time: 0.002s)
+    > add foreign key fk_auth_item_rule_name: auth_item (rule_name) references auth_rule (name) ... done (time: 0.002s)
+    > create table auth_item_child ... done (time: 0.002s)
+    > add foreign key fk_auth_item_child_parent: auth_item_child (parent) references auth_item (name) ... done (time: 0.003s)
+    > add foreign key fk_auth_item_child_child: auth_item_child (child) references auth_item (name) ... done (time: 0.002s)
+    > create table auth_assignment ... done (time: 0.002s)
+    > add foreign key fk_auth_assignment_item_name: auth_assignment (item_name) references auth_item (name) ... done (time: 0.003s)
+    > insert into auth_item ... done (time: 0.066s)
+*** applied m240101_135900_create_rbac_tables (time: 0.110s)
+
+*** applying m240115_234890_create_contract_renewals_table
+    > create table contract_renewals ... done (time: 0.004s)
+    > create index idx-contract_renewals-company_id on contract_renewals (company_id) ... done (time: 0.002s)
+    > add foreign key fk-contract_renewals-requested_by: contract_renewals (requested_by) references users (id) ... done (time: 0.003s)
+*** applied m240115_234890_create_contract_renewals_table (time: 0.084s)
+
+*** applying m240202_008234_create_company_table
+    > create table company ... done (time: 0.004s)
+    > create index idx-company-email on company (company_email) ... done (time: 0.001s)
+    > create index idx-company-status on company (status) ... done (time: 0.002s)
+*** applied m240202_008234_create_company_table (time: 0.023s)
+
+*** applying m240203_070000_create_users_table
+*** applied m240203_070000_create_users_table (time: 0.027s)
+
+*** applying m240203_080000_create_subscription_renewal_table
+    > create table subscription_renewal ... done (time: 0.157s)
+    > create index idx-subscription_renewal-company_id on subscription_renewal (company_id) ... done (time: 0.002s)
+    > create index idx-subscription_renewal-requested_by on subscription_renewal (requested_by) ... done (time: 0.001s)
+    > add foreign key fk-subscription_renewal-company_id: subscription_renewal (company_id) references company (id) ... done (time: 0.003s)
+    > add foreign key fk-subscription_renewal-requested_by: subscription_renewal (requested_by) references users (id) ... done (time: 0.002s)
+*** applied m240203_080000_create_subscription_renewal_table (time: 0.181s)
+
+*** applying m240210_084500_add_renewal_duration_to_contract_renewal
+    > add column renewal_duration integer NOT NULL DEFAULT 0 to table contract_renewals ... done (time: 0.025s)
+    > create index idx-contract_renewals-renewal_duration on contract_renewals (renewal_duration) ... done (time: 0.002s)
+*** applied m240210_084500_add_renewal_duration_to_contract_renewal (time: 0.062s)
+
+*** applying m240211_084510_create_ticket_table
+    > create table ticket ... done (time: 0.005s)
+    > create index idx-ticket-company_id on ticket (company_id) ... done (time: 0.002s)
+    > create index idx-ticket-created_by on ticket (created_by) ... done (time: 0.002s)
+    > create index idx-ticket-assigned_to on ticket (assigned_to) ... done (time: 0.002s)
+    > create index idx-ticket-status on ticket (status) ... done (time: 0.002s)
+    > create index idx-ticket-user_id on ticket (user_id) ... done (time: 0.002s)
+*** applied m240211_084510_create_ticket_table (time: 0.031s)
+
+*** applying m240318_000000_add_screenshot_url_to_ticket
+    > add column cloudinary_public_id string to table ticket ... done (time: 0.004s)
+*** applied m240318_000000_add_screenshot_url_to_ticket (time: 0.080s)
+
+*** applying m240318_004500_add_notes_to_ticket
+    > add column notes text to table ticket ... done (time: 0.002s)
+*** applied m240318_004500_add_notes_to_ticket (time: 0.016s)
+
+*** applying m240326_000001_create_ticket_message_table
+    > create table {{%ticket_message}} ... done (time: 0.004s)
+    > add foreign key fk-ticket_message-ticket_id: {{%ticket_message}} (ticket_id) references {{%ticket}} (id) ... done (time: 0.002s)
+    > add foreign key fk-ticket_message-sender_id: {{%ticket_message}} (sender_id) references {{%users}} (id) ... done (time: 0.002s)
+    > add foreign key fk-ticket_message-recipient_id: {{%ticket_message}} (recipient_id) references {{%users}} (id) ... done (time: 0.002s)
+    > create index idx-ticket_message-ticket_id on {{%ticket_message}} (ticket_id) ... done (time: 0.002s)
+    > create index idx-ticket_message-admin_viewed on {{%ticket_message}} (admin_viewed) ... done (time: 0.002s)
+*** applied m240326_000001_create_ticket_message_table (time: 0.033s)
+
+*** applying m240326_000006_modify_users_email_constraint
+    > drop index idx-users-company_email on users ... done (time: 0.003s)
+    > create unique index idx-users-company_email-unique on users (company_email) ... done (time: 0.002s)
+*** applied m240326_000006_modify_users_email_constraint (time: 0.034s)
+
+*** applying m240402_567098_create_ticket_table
+*** applied m240402_567098_create_ticket_table (time: 0.031s)
+
+*** applying m240402_609234_update_user_status
+    > execute SQL: UPDATE users SET status = 1 WHERE status = 10 ... done (time: 0.003s)
+    > execute SQL: UPDATE users SET status = 0 WHERE status != 1 ... done (time: 0.004s)
+*** applied m240402_609234_update_user_status (time: 0.022s)
+
+*** applying m240402_656879_update_ticket_status
+    > drop index idx-ticket-status on ticket ... done (time: 0.003s)
+    > execute SQL: DECLARE @ConstraintName nvarchar(200)
+        SELECT @ConstraintName = Name FROM SYS.DEFAULT_CONSTRAINTS
+        WHERE PARENT_OBJECT_ID = OBJECT_ID('ticket')
+        AND PARENT_COLUMN_ID = (SELECT column_id FROM sys.columns
+                               WHERE NAME = N'status'
+                               AND object_id = OBJECT_ID(N'ticket'))
+        IF @ConstraintName IS NOT NULL
+            EXECUTE('ALTER TABLE ticket DROP CONSTRAINT ' + @ConstraintName) ... done (time: 0.025s)
+    > alter column status in table ticket to string(20) ... done (time: 0.090s)
+    > execute SQL: ALTER TABLE ticket ADD CONSTRAINT DF_ticket_status DEFAULT 'pending' FOR status ... done (time: 0.002s)
+    > create index idx-ticket-status on ticket (status) ... done (time: 0.002s)
+*** applied m240402_656879_update_ticket_status (time: 0.138s)
+
+*** applying m240405_000000_update_ticket_columns
+    > alter column screenshot_url in table ticket to text ... done (time: 0.070s)
+    > alter column voice_note_url in table ticket to text ... done (time: 0.071s)
+*** applied m240405_000000_update_ticket_columns (time: 0.201s)
+
+*** applying m241020_093242_create_client_table
+    > create table {{%client}} ... done (time: 0.004s)
+    > create index idx-client-company_email on {{%client}} (company_email) ... done (time: 0.002s)
+*** applied m241020_093242_create_client_table (time: 0.021s)
+
+*** applying m241021_063717_drop_rbac_tables
+*** applied m241021_063717_drop_rbac_tables (time: 0.015s)
+
+*** applying m241021_063937_create_roles_table
+    > create table {{%roles}} ... done (time: 0.004s)
+*** applied m241021_063937_create_roles_table (time: 0.020s)
+
+*** applying m241021_063941_create_permissions_table
+    > create table {{%permissions}} ... done (time: 0.005s)
+*** applied m241021_063941_create_permissions_table (time: 0.022s)
+
+*** applying m241021_063950_create_auth_assignment_table
+*** applied m241021_063950_create_auth_assignment_table (time: 0.085s)
+
+*** applying m250111_075445_insert_client
+    > add column name string NOT NULL to table client ... done (time: 0.002s)
+    > add column company_name string NOT NULL to table client ... done (time: 0.001s)
+    > insert into client ... done (time: 0.095s)
+*** applied m250111_075445_insert_client (time: 0.250s)
+
+*** applying m250124_075518_create_contracts_table
+    > create table contracts ... done (time: 0.004s)
+    > add foreign key fk-contracts-client_id: contracts (client_id) references client (id) ... done (time: 0.003s)
+*** applied m250124_075518_create_contracts_table (time: 0.077s)
+
+*** applying m250124_080000_insert_super_admin
+    > insert into company ... done (time: 0.015s)
+    > insert into users ... done (time: 0.080s)
+*** applied m250124_080000_insert_super_admin (time: 1.215s)
+
+*** applying m250202_172635_add_module_column_to_client_table
+    > add column module string to table client ... done (time: 0.002s)
+*** applied m250202_172635_add_module_column_to_client_table (time: 0.032s)
+
+*** applying m250310_133801_create_ticket_table
+*** applied m250310_133801_create_ticket_table (time: 0.081s)
+
+*** applying m250310_135323_create_company_table
+*** applied m250310_135323_create_company_table (time: 0.033s)
+
+*** applying m250310_135841_add_company_id_to_ticket
+    > add foreign key fk-ticket-company_id: ticket (company_id) references company (id) ... done (time: 0.003s)
+*** applied m250310_135841_add_company_id_to_ticket (time: 0.055s)
+
+*** applying m250310_140513_create_contract_renewal_table
+    > create table contract_renewal ... done (time: 0.005s)
+    > execute SQL: ALTER TABLE contract_renewal ADD CONSTRAINT CK_contract_renewal_status CHECK (renewal_status IN ('pending', 'approved', 'rejected')) ... done (time: 0.003s)
+    > create index idx-contract_renewal-company_id on contract_renewal (company_id) ... done (time: 0.002s)
+    > create index idx-contract_renewal-requested_by on contract_renewal (requested_by) ... done (time: 0.001s)
+    > create index idx-contract_renewal-contract_id on contract_renewal (contract_id) ... done (time: 0.002s)
+    > add foreign key fk-contract_renewal-company_id: contract_renewal (company_id) references company (id) ... done (time: 0.002s)
+    > add foreign key fk-contract_renewal-requested_by: contract_renewal (requested_by) references users (id) ... done (time: 0.002s)
+    > add foreign key fk-contract_renewal-contract_id: contract_renewal (contract_id) references contracts (id) ... done (time: 0.002s)
+*** applied m250310_140513_create_contract_renewal_table (time: 0.095s)
+
+*** applying m250310_140813_add_renewal_duration_to_contract_renewal
+    > add column renewal_duration integer NOT NULL to table contract_renewal ... done (time: 0.020s)
+*** applied m250310_140813_add_renewal_duration_to_contract_renewal (time: 0.035s)
+
+*** applying m250402_567384_create_contracts_renewal_table
+*** applied m250402_567384_create_contracts_renewal_table (time: 0.028s)
+
+*** applying m250403_144200_add_requested_by_to_contract_renewal
+Column 'requested_by' already exists in table 'contract_renewal'. Skipping column creation...
+    > add foreign key fk-contract_renewal-requested_by: contract_renewal (requested_by) references users (id) ...Foreign key 'fk-contract_renewal-requested_by' may already exist. Skipping...
+*** applied m250403_144200_add_requested_by_to_contract_renewal (time: 0.034s)
+
+*** applying m250403_144431_add_renewal_status_to_contract_renewal
+Column 'renewal_status' already exists in table 'contract_renewal'. Skipping...
+*** applied m250403_144431_add_renewal_status_to_contract_renewal (time: 0.034s)
+
+*** applying m250403_144641_add_renewal_duration_to_contract_renewal
+Column 'renewal_duration' already exists in table 'contract_renewal'. Skipping...
+*** applied m250403_144641_add_renewal_duration_to_contract_renewal (time: 0.036s)
+
+*** applying m250403_144821_add_notes_to_contract_renewal
+Column 'notes' already exists in table 'contract_renewal'. Skipping...
+*** applied m250403_144821_add_notes_to_contract_renewal (time: 0.034s)
+
+*** applying m250403_145319_add_new_end_date_to_contract_renewal
+Column 'new_end_date' already exists. Skipping...
+*** applied m250403_145319_add_new_end_date_to_contract_renewal (time: 0.040s)
+
+*** applying m250403_567385_add_company_id_to_contract_renewal
+Column 'company_id' already exists. Skipping...
+    > add foreign key fk-contract_renewal-company_id: contract_renewal (company_id) references company (id) ...Foreign key may already exist. Skipping...
+*** applied m250403_567385_add_company_id_to_contract_renewal (time: 0.039s)
+
+*** applying m250404_115012_add_contract_id_to_contracts_table
+    > add column contract_id integer NOT NULL DEFAULT 0 to table contracts ... done (time: 0.002s)
+*** applied m250404_115012_add_contract_id_to_contracts_table (time: 0.031s)
+
+*** applying m250404_600519_add_company_id_to_contracts
+    > add foreign key fk-contracts-company_id: contracts (company_id) references company (id) ...Foreign key may already exist. Skipping...
+*** applied m250404_600519_add_company_id_to_contracts (time: 0.032s)
+
+*** applying m250453_458946_add_current_end_date_to_contract_renewal
+Column 'current_end_date' already exists. Skipping...
+*** applied m250453_458946_add_current_end_date_to_contract_renewal (time: 0.026s)
+
+*** applying m251114_094802_alter_ticket_renewal_status_to_string
+    > alter column renewal_status in table ticket to string(50) DEFAULT 'pending' ... done (time: 0.101s)
+*** applied m251114_094802_alter_ticket_renewal_status_to_string (time: 0.122s)
+
+*** applying m251243_700800_add_extension_period_to_contract_renewal
+Column 'extension_period' already exists. Skipping...
+*** applied m251243_700800_add_extension_period_to_contract_renewal (time: 0.035s)
+
+
+42 migrations were applied.
+
+Migrated up successfully.

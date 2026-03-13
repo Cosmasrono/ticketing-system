@@ -12,21 +12,33 @@ class m240210_084500_add_renewal_duration_to_contract_renewal extends Migration
      */
     public function safeUp()
     {
-        // Check if column exists first
-        $table = 'contract_renewal';
+        // Check if table exists first
+        $table = 'contract_renewals';
         $column = 'renewal_duration';
         
-        // Only add the column if it doesn't exist
-        if (!$this->db->getTableSchema($table)->getColumn($column)) {
-            $this->addColumn($table, $column, $this->integer()->notNull()->after('company_id')->comment('Duration in months'));
+        $tableSchema = $this->db->getTableSchema($table);
+        
+        // Skip if table doesn't exist
+        if ($tableSchema === null) {
+            echo "Table '$table' does not exist. Skipping migration.\n";
+            return true;
         }
         
-        // Create an index for better performance
-        $this->createIndex(
-            'idx-contract_renewal-renewal_duration',
-            'contract_renewals',
-            'renewal_duration'
-        );
+        // Only add the column if it doesn't exist
+        if ($tableSchema->getColumn($column) === null) {
+            $this->addColumn($table, $column, $this->integer()->notNull()->defaultValue(0)->comment('Duration in months'));
+        }
+        
+        // Try to create index (ignore if it already exists)
+        try {
+            $this->createIndex(
+                'idx-contract_renewals-renewal_duration',
+                $table,
+                'renewal_duration'
+            );
+        } catch (\Exception $e) {
+            echo "Index may already exist, skipping...\n";
+        }
     }
 
     /**
@@ -34,10 +46,16 @@ class m240210_084500_add_renewal_duration_to_contract_renewal extends Migration
      */
     public function safeDown()
     {
+        $table = 'contract_renewals';
+        
         // Drop the index first
-        $this->dropIndex('idx-contract_renewal-renewal_duration', 'contract_renewals');
+        try {
+            $this->dropIndex('idx-contract_renewals-renewal_duration', $table);
+        } catch (\Exception $e) {
+            // Index may not exist
+        }
         
         // Then drop the column
-        $this->dropColumn('contract_renewals', 'renewal_duration');
+        $this->dropColumn($table, 'renewal_duration');
     }
-} 
+}

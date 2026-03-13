@@ -44,25 +44,26 @@ $config = [
         ],
         'user' => [
             'identityClass' => 'app\models\User',
+            'enableAutoLogin' => false, // ✅ Disable auto-login for strict timeout
+            'authTimeout' => 1800, // ✅ 30 minutes auth timeout
+            'identityCookie' => ['name' => '_identity', 'httpOnly' => true],
+            'loginUrl' => ['site/login'],
         ],
         'errorHandler' => [
             'errorAction' => 'site/error',
         ],
         'mailer' => [
-            'class' => 'yii\swiftmailer\Mailer',
-            'viewPath' => '@app/mail',
-            'useFileTransport' => false, // Set to false to send real emails
-            'transport' => [
-                // 'scheme' => 'smtp',
-                'class' => 'Swift_SmtpTransport',
-                'host' => 'smtp.gmail.com', // Brevo's SMTP relay
-                'username' => 'abby.wairi@gmail.com', // Always use 'apikey' as the username
-                'password' => 'mgjnsigzwttosnys', // Fetch API key from environment variables
-                'port' => 587, // Use 465 for SSL, 25 as an alternative
-                'encryption' => 'tls', // Use 'ssl' if using port 465
-            ],
-        
-        ],
+    'class' => \yii\symfonymailer\Mailer::class,
+    'viewPath' => '@app/mail',
+    'useFileTransport' => false,
+    'transport' => [
+        'scheme' => 'smtp',
+        'host' => 'smtp.gmail.com',
+        'username' => 'ccosmas001@gmail.com',
+        'password' => 'cxnjnvjtusdeepks',
+        'port' => 587,
+    ],
+],
         'log' => [
             'traceLevel' => YII_DEBUG ? 3 : 0,
             'targets' => [
@@ -101,6 +102,7 @@ $config = [
                 'set-initial-password' => 'site/set-initial-password',
                 'site/change-initial-password' => 'site/change-initial-password',
                 'site/reset-password' => 'site/reset-password',
+                'site/request-password-reset' => 'site/request-password-reset',
                 'site/create-user-for-company' => 'site/create-user-for-company',
                 'developer/view/<id:\d+>' => 'developer/view',
                 'ticket/search' => 'ticket/search',
@@ -114,8 +116,11 @@ $config = [
         ],
         'session' => [
             'class' => 'yii\web\Session',
-            'cookieParams' => ['httponly' => true],
-            'timeout' => 2400, // 40 minutes in seconds
+            'timeout' => 1800, // ✅ 30 minutes session timeout (changed from 2400)
+            'cookieParams' => [
+                'httpOnly' => true,
+                'lifetime' => 1800, // ✅ 30 minutes cookie lifetime
+            ],
             'savePath' => dirname(__DIR__) . '/runtime/sessions'
         ],
         'authManager' => [
@@ -180,6 +185,40 @@ $config = [
     ],
     'defaultRoute' => 'site/index',
     'timeZone' => 'UTC',
+    
+    // ✅ ADD THIS: Global session timeout handler
+    'on beforeRequest' => function ($event) {
+        // Only check for logged-in users
+        if (!Yii::$app->user->isGuest) {
+            $session = Yii::$app->session;
+            $user = Yii::$app->user->identity;
+            
+            // Check if user account is deactivated
+            if ($user && $user->status == 0) {
+                Yii::$app->user->logout();
+                Yii::$app->session->setFlash('error', 'Your account has been deactivated. Please contact administrator.');
+                Yii::$app->response->redirect(['site/login'])->send();
+                Yii::$app->end();
+            }
+            
+            // Session timeout check (30 minutes = 1800 seconds)
+            $timeout = 1800; // 30 minutes
+            $lastActivityTime = $session->get('lastActivityTime');
+            
+            // If lastActivityTime exists and session has expired
+            if ($lastActivityTime !== null && (time() - $lastActivityTime) > $timeout) {
+                // Session expired, log out the user
+                Yii::$app->user->logout();
+                $session->destroy();
+                $session->setFlash('warning', 'Your session has expired due to inactivity. Please login again.');
+                Yii::$app->response->redirect(['site/login'])->send();
+                Yii::$app->end();
+            }
+            
+            // Update last activity time on every request
+            $session->set('lastActivityTime', time());
+        }
+    },
 ];
 
 // Temporarily enable debug module
@@ -191,7 +230,5 @@ if (YII_ENV_DEV) {
         //'allowedIPs' => ['127.0.0.1', '::1', 'your.ip.address.here'],
     ];
 }
-
-
 
 return $config;

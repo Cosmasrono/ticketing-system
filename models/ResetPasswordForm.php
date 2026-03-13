@@ -29,12 +29,11 @@ class ResetPasswordForm extends Model
         
         Yii::debug("Looking for user with token in ResetPasswordForm: " . $token);
         
-        // Find user with exact token match
-        $this->_user = User::findOne([
-            'password_reset_token' => $token,
-            'status' => User::STATUS_UNVERIFIED
-        ]);
-        
+     // Find user with exact token match
+$this->_user = User::findOne([
+    'password_reset_token' => $token,
+    'status' => User::STATUS_ACTIVE  // Changed from STATUS_UNVERIFIED
+]);
         if (!$this->_user) {
             Yii::error("No user found with token in ResetPasswordForm: $token");
             throw new InvalidArgumentException('Wrong password reset token.');

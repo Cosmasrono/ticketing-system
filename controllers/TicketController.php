@@ -43,12 +43,6 @@ use GuzzleHttp\Client;
 // use Cloudinary;
 // use Cloudinary\Configuration\Configuration;
 use app\models\TicketMessage;
- 
- 
- 
- 
- 
- 
 
 class TicketController extends Controller
 {
@@ -1675,195 +1669,193 @@ public function actionClose()
     }
 
     public function actionCreate()
-{
-    $model = new Ticket();
-
-    // Get user's modules from database
-    $userInfo = Yii::$app->db->createCommand('
-        SELECT company_email, modules 
-        FROM users 
-        WHERE id = :user_id
-    ')
-    ->bindValue(':user_id', Yii::$app->user->id)
-    ->queryOne();
-
-    // Prepare modules list
-    $companyModules = [];
-    if (!empty($userInfo['modules'])) {
-        $modules = explode(',', $userInfo['modules']);
-        foreach ($modules as $module) {
-            $module = trim($module);
-            if (!empty($module)) {
-                $companyModules[$module] = $module;
-            }
-        }
-    }
-
-    // Get module issues
-    $moduleIssues = $this->getModuleIssues();
-
-    if (Yii::$app->request->isPost) {
-        try {
-            // Debug incoming data
-            Yii::debug('POST data received: ' . print_r($_POST, true));
-            
-            $base64Screenshot = Yii::$app->request->post('screenshot-base64');
-            if (empty($base64Screenshot)) {
-                throw new \Exception('Screenshot data is missing.');
-            }
-
-            // Debug the incoming data
-            Yii::debug('Base64 screenshot length: ' . strlen($base64Screenshot));
-
-            // Create a new Cloudinary instance instead of using static configuration
-            $cloudinary = new Cloudinary([
-                'cloud' => [
-                    'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
-                    'api_key' => Yii::$app->params['cloudinary']['api_key'],
-                    'api_secret' => Yii::$app->params['cloudinary']['api_secret']
-                ],
-                'url' => [
-                    'secure' => true
-                ]
-            ]);
-            
-            try {
-                // Extract the actual base64 content without the prefix
-                if (strpos($base64Screenshot, 'data:image') !== false) {
-                    // Extract mime type
-                    $mime = substr($base64Screenshot, 5, strpos($base64Screenshot, ';') - 5);
-                    
-                    // Extract base64 content
-                    $base64Content = substr($base64Screenshot, strpos($base64Screenshot, ',') + 1);
-                    
-                    // Decode base64 content
-                    $decodedImage = base64_decode($base64Content);
-                    
-                    if ($decodedImage === false) {
-                        throw new \Exception('Invalid base64 encoding');
-                    }
-
-                    // Set up temporary directory
-                    $tempDir = Yii::getAlias('@runtime/temp');
-                    if (!file_exists($tempDir)) {
-                        mkdir($tempDir, 0777, true);
-                    }
-
-                    // Create temporary file with appropriate extension
-                    $extension = explode('/', $mime)[1] ?? 'png';
-                    $tempFile = tempnam($tempDir, 'cloudinary_');
-                    $tempFileWithExt = $tempFile . '.' . $extension;
-                    rename($tempFile, $tempFileWithExt);
-
-                    // Write decoded content to file
-                    if (file_put_contents($tempFileWithExt, $decodedImage) === false) {
-                        throw new \Exception('Failed to write temporary file');
-                    }
-
-                    // Upload to Cloudinary
-                    $uploadResult = $cloudinary->uploadApi()->upload($tempFileWithExt, [
-                        'resource_type' => 'image'
-                    ]);
-
-                    // Store the Cloudinary URL
-                    $model->screenshot_url = $uploadResult['secure_url'];
-                } else {
-                    throw new \Exception('Invalid image format: Base64 image data not found');
-                }
-            } catch (\Exception $cloudinaryError) {
-                // Add more detailed error logging
-                Yii::error('Cloudinary upload error: ' . $cloudinaryError->getMessage());
-                Yii::error('Base64 data preview: ' . substr($base64Screenshot, 0, 100) . '...');
-                
-                // Store the original base64 data as fallback
-                $model->screenshot = $base64Screenshot;
-                
-                throw new \Exception('Cloudinary configuration error: ' . $cloudinaryError->getMessage());
-            }
-            
-            // Replace these direct POST assignments with proper format
-            $model->attributes = [
-                'module' => Yii::$app->request->post('Ticket')['module'],
-                'issue' => Yii::$app->request->post('Ticket')['issue'],
-                'description' => Yii::$app->request->post('Ticket')['description'],
-                'severity' => Yii::$app->request->post('Ticket')['severity'],
-                'user_id' => Yii::$app->user->id,
-                'created_by' => Yii::$app->user->id,
-                'status' => 'pending',
-                'company_name' => Yii::$app->user->identity->company_name ?? '(not set)',
-                'company_email' => $userInfo['company_email'] ?? null,
-                'severity_level' => Yii::$app->request->post('Ticket')['severity'] ?? 3,
-                'sla_status' => 'pending'
-            ];
-
-            // Debug the values before save
-            Yii::debug('Model attributes before save: ' . print_r($model->attributes, true));
-
-            if ($model->getIsNewRecord()) {
-                $model->created_at = new \yii\db\Expression('DATEDIFF(SECOND, \'1970-01-01\', GETDATE())');
-                $model->last_update_at = new \yii\db\Expression('DATEDIFF(SECOND, \'1970-01-01\', GETDATE())');
-                $model->resolution_deadline = new \yii\db\Expression('DATEDIFF(SECOND, \'1970-01-01\', DATEADD(MINUTE, 2880, GETDATE()))');
-                $model->next_update_due = new \yii\db\Expression('DATEDIFF(SECOND, \'1970-01-01\', DATEADD(MINUTE, 480, GETDATE()))');
-            }
+    {
+        $model = new Ticket();
     
-            // Try to save with detailed error logging
-            if (!$model->save()) {
-                Yii::error('Model validation errors: ' . print_r($model->errors, true));
-                throw new \Exception('Validation failed: ' . json_encode($model->errors));
+        // Get user's modules from database
+        $userInfo = Yii::$app->db->createCommand('
+            SELECT company_email, modules 
+            FROM users 
+            WHERE id = :user_id
+        ')
+        ->bindValue(':user_id', Yii::$app->user->id)
+        ->queryOne();
+    
+        // Prepare modules list
+        $companyModules = [];
+        if (!empty($userInfo['modules'])) {
+            $modules = explode(',', $userInfo['modules']);
+            foreach ($modules as $module) {
+                $module = trim($module);
+                if (!empty($module)) {
+                    $companyModules[$module] = $module;
+                }
             }
-
-            // Verify data was saved
-            $savedTicket = Ticket::findOne($model->id);
-            if (!$savedTicket) {
-                throw new \Exception('Could not find saved ticket');
-            }
-
-            // Check if we have either a Cloudinary URL or a local screenshot
-            if (empty($savedTicket->screenshot_url) && empty($savedTicket->screenshot)) {
-                // Log the actual database values
-                $dbValues = Yii::$app->db->createCommand('
-                    SELECT screenshot, screenshot_url FROM ticket WHERE id = :id
-                ', [':id' => $savedTicket->id])->queryOne();
-                
-                Yii::error('Screenshot data missing from database. DB values: ' . print_r($dbValues, true));
-                throw new \Exception('No screenshot data was saved to database');
-            }
-
-            // Initialize transaction before trying to commit it
-            if (isset($transaction)) {
-                $transaction->commit();
-            }
-
-            // Success message indicates where the image was stored
-            $successMessage = 'Ticket created successfully';
-            if (!empty($savedTicket->screenshot_url)) {
-                $successMessage .= ' with screenshot uploaded to Cloudinary';
-            } else {
-                $successMessage .= ' with screenshot stored in database';
-            }
-            
-            Yii::$app->session->setFlash('success', $successMessage);
-            return $this->redirect(['view', 'id' => $model->id]);
-
-        } catch (\Exception $e) {
-            // Rollback transaction on error
-            if (isset($transaction)) {
-                $transaction->rollBack();
-            }
-            
-            Yii::error('Screenshot processing error: ' . $e->getMessage());
-            Yii::error('Error trace: ' . $e->getTraceAsString());
-            throw $e;
         }
+    
+        // Get module issues
+        $moduleIssues = $this->getModuleIssues();
+    
+        if (Yii::$app->request->isPost) {
+            try {
+                // Debug incoming data
+                Yii::debug('POST data received: ' . print_r($_POST, true));
+                
+                $base64Screenshot = Yii::$app->request->post('screenshot-base64');
+                if (empty($base64Screenshot)) {
+                    throw new \Exception('Screenshot data is missing.');
+                }
+    
+                // Debug the incoming data
+                Yii::debug('Base64 screenshot length: ' . strlen($base64Screenshot));
+    
+                // Create a new Cloudinary instance
+                $cloudinary = new Cloudinary([
+                    'cloud' => [
+                        'cloud_name' => Yii::$app->params['cloudinary']['cloud_name'],
+                        'api_key' => Yii::$app->params['cloudinary']['api_key'],
+                        'api_secret' => Yii::$app->params['cloudinary']['api_secret']
+                    ],
+                    'url' => [
+                        'secure' => true
+                    ]
+                ]);
+                
+                try {
+                    // Extract the actual base64 content without the prefix
+                    if (strpos($base64Screenshot, 'data:image') !== false) {
+                        // Extract mime type
+                        $mime = substr($base64Screenshot, 5, strpos($base64Screenshot, ';') - 5);
+                        
+                        // Extract base64 content
+                        $base64Content = substr($base64Screenshot, strpos($base64Screenshot, ',') + 1);
+                        
+                        // Decode base64 content
+                        $decodedImage = base64_decode($base64Content);
+                        
+                        if ($decodedImage === false) {
+                            throw new \Exception('Invalid base64 encoding');
+                        }
+    
+                        // Set up temporary directory
+                        $tempDir = Yii::getAlias('@runtime/temp');
+                        if (!file_exists($tempDir)) {
+                            mkdir($tempDir, 0777, true);
+                        }
+    
+                        // Create temporary file with appropriate extension
+                        $extension = explode('/', $mime)[1] ?? 'png';
+                        $tempFile = tempnam($tempDir, 'cloudinary_');
+                        $tempFileWithExt = $tempFile . '.' . $extension;
+                        rename($tempFile, $tempFileWithExt);
+    
+                        // Write decoded content to file
+                        if (file_put_contents($tempFileWithExt, $decodedImage) === false) {
+                            throw new \Exception('Failed to write temporary file');
+                        }
+    
+                        // Upload to Cloudinary
+                        $uploadResult = $cloudinary->uploadApi()->upload($tempFileWithExt, [
+                            'resource_type' => 'image'
+                        ]);
+    
+                        // Store the Cloudinary URL
+                        $model->screenshot_url = $uploadResult['secure_url'];
+                        
+                        // Clean up temp file
+                        @unlink($tempFileWithExt);
+                    } else {
+                        throw new \Exception('Invalid image format: Base64 image data not found');
+                    }
+                } catch (\Exception $cloudinaryError) {
+                    // Add more detailed error logging
+                    Yii::error('Cloudinary upload error: ' . $cloudinaryError->getMessage());
+                    Yii::error('Base64 data preview: ' . substr($base64Screenshot, 0, 100) . '...');
+                    
+                    // Store the original base64 data as fallback
+                    $model->screenshot = $base64Screenshot;
+                    
+                    throw new \Exception('Cloudinary configuration error: ' . $cloudinaryError->getMessage());
+                }
+                
+                // Set all ticket attributes
+                $model->attributes = [
+                    'title' => Yii::$app->request->post('Ticket')['issue'],  // ✅ Use issue as title
+                    'module' => Yii::$app->request->post('Ticket')['module'],
+                    'issue' => Yii::$app->request->post('Ticket')['issue'],
+                    'description' => Yii::$app->request->post('Ticket')['description'],
+                    'severity' => Yii::$app->request->post('Ticket')['severity'],
+                    'user_id' => Yii::$app->user->id,
+                    'created_by' => Yii::$app->user->id,
+                    'status' => 'pending',
+                    'company_name' => Yii::$app->user->identity->company_name ?? '(not set)',
+                    'company_email' => $userInfo['company_email'] ?? null,
+                    'severity_level' => Yii::$app->request->post('Ticket')['severity'] ?? 3,
+                    'sla_status' => 'pending'  // ✅ CHANGED: Use string instead of integer
+
+                ];
+    
+                // Set timestamps as Unix timestamps (integers)
+                if ($model->getIsNewRecord()) {
+                    $currentTime = time();
+                    $model->created_at = $currentTime;
+                    $model->last_update_at = $currentTime;
+                    $model->resolution_deadline = $currentTime + (2880 * 60);  // 2880 minutes (48 hours)
+                    $model->next_update_due = $currentTime + (480 * 60);  // 480 minutes (8 hours)
+                }
+    
+                // Debug the values before save
+                Yii::debug('Model attributes before save: ' . print_r($model->attributes, true));
+        
+                // Try to save with detailed error logging
+                if (!$model->save()) {
+                    Yii::error('Model validation errors: ' . print_r($model->errors, true));
+                    throw new \Exception('Validation failed: ' . json_encode($model->errors));
+                }
+    
+                // Verify data was saved
+                $savedTicket = Ticket::findOne($model->id);
+                if (!$savedTicket) {
+                    throw new \Exception('Could not find saved ticket');
+                }
+    
+                // Check if we have either a Cloudinary URL or a local screenshot
+                if (empty($savedTicket->screenshot_url) && empty($savedTicket->screenshot)) {
+                    // Log the actual database values
+                    $dbValues = Yii::$app->db->createCommand('
+                        SELECT screenshot, screenshot_url FROM ticket WHERE id = :id
+                    ', [':id' => $savedTicket->id])->queryOne();
+                    
+                    Yii::error('Screenshot data missing from database. DB values: ' . print_r($dbValues, true));
+                    throw new \Exception('No screenshot data was saved to database');
+                }
+    
+                // Success message indicates where the image was stored
+                $successMessage = 'Ticket created successfully';
+                if (!empty($savedTicket->screenshot_url)) {
+                    $successMessage .= ' with screenshot uploaded to Cloudinary';
+                } else {
+                    $successMessage .= ' with screenshot stored in database';
+                }
+                
+                Yii::$app->session->setFlash('success', $successMessage);
+                return $this->redirect(['view', 'id' => $model->id]);
+    
+            } catch (\Exception $e) {
+                Yii::error('Screenshot processing error: ' . $e->getMessage());
+                Yii::error('Error trace: ' . $e->getTraceAsString());
+                
+                Yii::$app->session->setFlash('error', 'Failed to create ticket: ' . $e->getMessage());
+                // Don't throw, just fall through to render the form again
+            }
+        }
+    
+        return $this->render('create', [
+            'model' => $model,
+            'companyModules' => $companyModules,
+            'moduleIssues' => $moduleIssues
+        ]);
     }
-
-    return $this->render('create', [
-        'model' => $model,
-        'companyModules' => $companyModules,
-        'moduleIssues' => $moduleIssues
-    ]);
-}
-
 
 
 

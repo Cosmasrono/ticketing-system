@@ -6,6 +6,11 @@ class m240203_070000_create_users_table extends Migration
 {
     public function safeUp()
     {
+        // Skip if table already exists (duplicate migration)
+        if ($this->db->schema->getTableSchema('{{%users}}') !== null) {
+            return;
+        }
+        
         $this->createTable('users', [
             'id' => $this->primaryKey(),
             'company_id' => $this->integer(),

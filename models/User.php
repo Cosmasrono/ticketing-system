@@ -104,8 +104,8 @@ public function isUser()
         return [
             'timestamp' => [
                 'class' => TimestampBehavior::className(),
-                'createdAtAttribute' => 'created_at_unix',
-                'updatedAtAttribute' => 'updated_at_unix',
+                'createdAtAttribute' => 'created_at',  // ✅ CORRECT
+                'updatedAtAttribute' => 'updated_at',  // ✅ CORRECT
                 'value' => time(),
             ],
         ];
@@ -167,8 +167,9 @@ public function isUser()
             'role' => 'Role',
             'status' => 'Status',
             'company_id' => 'Company ID',
-            'created_at_unix'=>'created_at_unix',
-            'updated_at_unix'=>'updated_at_unix',
+            'created_at',  // Changed from created_at_unix
+            'updated_at',  // Changed from updated_at_unix
+            'token_created_at',  // Changed from token_created_at_unix
             'is_verified' => 'Is Verified',
             'first_login' => 'First Login',
             'verification_token' => 'Verification Token',
@@ -196,16 +197,15 @@ public function isUser()
              return false;
          }
      
-         // Convert Unix timestamp to SQL Server datetime format
-         if ($this->token_created_at) {
-             $this->token_created_at = new \yii\db\Expression('DATEADD(second, ' . $this->token_created_at . ', \'1970-01-01\')');
-         }
-
-         // Set the Unix timestamp fields
+         // Remove this conversion - token_created_at should stay as Unix timestamp (int)
+         // if ($this->token_created_at) {
+         //     $this->token_created_at = new \yii\db\Expression('DATEADD(second, ' . $this->token_created_at . ', \'1970-01-01\')');
+         // }
+     
          $timestamp = time();
          if ($insert) {
-             $this->created_at_unix = $timestamp;
-             $this->updated_at_unix = $timestamp;
+             $this->created_at = $timestamp;
+             $this->updated_at = $timestamp;
              $this->is_verified = false;
              $this->first_login = true;
              $this->email_verified = false;
@@ -216,24 +216,21 @@ public function isUser()
                  $this->verification_token = null;
              }
          } else {
-             $this->updated_at_unix = $timestamp;
+             $this->updated_at = $timestamp;
          }
          
          return true;
      }
-
-     
     // Add this method to handle datetime conversion when retrieving data
     public function afterFind()
     {
         parent::afterFind();
         
-        // Convert Unix timestamp to datetime if needed
-        if ($this->created_at_unix) {
-            $this->created_at = date('Y-m-d H:i:s', $this->created_at_unix);
+        if ($this->created_at) {  // Changed from created_at_unix
+            // Keep the timestamp format
         }
-        if ($this->updated_at_unix) {
-            $this->updated_at = date('Y-m-d H:i:s', $this->updated_at_unix);
+        if ($this->updated_at) {  // Changed from updated_at_unix
+            // Keep the timestamp format
         }
     }
  
@@ -534,7 +531,13 @@ public function isUser()
         $randomStr = Yii::$app->security->generateRandomString(32);
         $timestamp = time();
         $this->password_reset_token = $randomStr . '_' . $timestamp;
-        Yii::debug("Generated new reset token: " . $this->password_reset_token);
+        
+        // Ensure the timestamp is saved so validation works
+        $this->token_created_at_unix = $timestamp;
+        // Also set token_created_at if it's the DB field
+        $this->token_created_at = $timestamp;
+        
+        Yii::debug("Generated new reset token: " . $this->password_reset_token . " with timestamp: " . $timestamp);
         return $this->password_reset_token;
     }
 

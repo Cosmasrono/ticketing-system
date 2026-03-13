@@ -2,47 +2,39 @@
 
 use yii\db\Migration;
 
-/**
- * Class m250404_115012_add_contract_id_to_contracts_table
- */
 class m250404_115012_add_contract_id_to_contracts_table extends Migration
 {
-    /**
-     * {@inheritdoc}
-     */
     public function safeUp()
     {
-        // Add the contract_id column to the contracts table
-        $this->addColumn('contracts', 'contract_id', $this->integer()->notNull()->after('id'));
-
-        // Replace 'actual_contracts_table' with the correct table name
-       
+        $table = 'contracts';
+        $column = 'contract_id';
+        
+        $tableSchema = $this->db->getTableSchema($table);
+        if ($tableSchema === null) {
+            echo "Table '$table' does not exist. Skipping migration.\n";
+            return true;
+        }
+        
+        if ($tableSchema->getColumn($column) === null) {
+            // Remove the after() - not supported in SQL Server
+            $this->addColumn($table, $column, $this->integer()->notNull()->defaultValue(0));
+        } else {
+            echo "Column '$column' already exists. Skipping...\n";
+        }
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function safeDown()
     {
-        // Remove the foreign key constraint if it was added
-        $this->dropForeignKey('fk-contracts-contract_id', 'contracts');
+        try {
+            $this->dropForeignKey('fk-contracts-contract_id', 'contracts');
+        } catch (\Exception $e) {
+            // Foreign key may not exist
+        }
 
-        // Drop the contract_id column
-        $this->dropColumn('contracts', 'contract_id');
+        if ($this->db->getTableSchema('contracts') !== null) {
+            if ($this->db->getTableSchema('contracts')->getColumn('contract_id') !== null) {
+                $this->dropColumn('contracts', 'contract_id');
+            }
+        }
     }
-
-    /*
-    // Use up()/down() to run migration code without a transaction.
-    public function up()
-    {
-
-    }
-
-    public function down()
-    {
-        echo "m250404_115012_add_contract_id_to_contracts_table cannot be reverted.\n";
-
-        return false;
-    }
-    */
 }

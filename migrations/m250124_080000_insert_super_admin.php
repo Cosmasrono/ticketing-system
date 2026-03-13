@@ -8,10 +8,8 @@ class m250124_080000_insert_super_admin extends Migration
     {
         // First check if the table exists
         if ($this->db->schema->getTableSchema('company') === null) {
-            // Create the company table first if it doesn't exist
-            $this->createTable('company', [
-                // ... company table columns ...
-            ]);
+            echo "Company table doesn't exist. Skipping migration.\n";
+            return true;
         }
 
         // First check if the user already exists
@@ -31,6 +29,8 @@ class m250124_080000_insert_super_admin extends Migration
 
         // First insert the company
         $this->insert('company', [
+            'name' => 'Iansoft Limited',   
+            'role' => 'Admin',   
             'company_name' => 'Iansoft Limited',
             'company_email' => 'ccosmas001@gmail.com',
             'company_type' => 'Admin',

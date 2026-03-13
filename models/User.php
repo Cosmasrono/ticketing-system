@@ -531,13 +531,7 @@ public function isUser()
         $randomStr = Yii::$app->security->generateRandomString(32);
         $timestamp = time();
         $this->password_reset_token = $randomStr . '_' . $timestamp;
-        
-        // Ensure the timestamp is saved so validation works
-        $this->token_created_at_unix = $timestamp;
-        // Also set token_created_at if it's the DB field
-        $this->token_created_at = $timestamp;
-        
-        Yii::debug("Generated new reset token: " . $this->password_reset_token . " with timestamp: " . $timestamp);
+        Yii::debug("Generated new reset token: " . $this->password_reset_token);
         return $this->password_reset_token;
     }
 

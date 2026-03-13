@@ -869,7 +869,29 @@ class SiteController extends Controller
  
 
 
- 
+    public function actionResetPassword($token)
+{
+    try {
+        $model = new ResetPasswordForm($token);
+        
+        if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+            if ($model->resetPassword()) {
+                Yii::$app->session->setFlash('success', 'New password saved.');
+                return $this->goHome();
+            } else {
+                Yii::$app->session->setFlash('error', 'Failed to reset password.');
+            }
+        }
+        
+        return $this->render('resetPassword', [
+            'model' => $model,
+        ]);
+        
+    } catch (InvalidArgumentException $e) {
+        Yii::$app->session->setFlash('error', $e->getMessage());
+        return $this->goHome(); // Redirect instead of trying to render
+    }
+}
     public function actionForgotPassword()
     {
         $model = new PasswordResetRequestForm(); // Assuming you have a model for this

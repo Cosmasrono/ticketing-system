@@ -55,9 +55,7 @@ class User extends ActiveRecord implements IdentityInterface
     const STATUS_DELETED = 9;
     const STATUS_UNVERIFIED = 20;
 
-    public $password_reset_token;
-
-    public $token_created_at; // Ensure this line exists if you need this property
+    // Removed public $password_reset_token and $token_created_at to allow ActiveRecord to track them.
 
     const ROLE_SUPER_ADMIN = 4;
 
@@ -430,7 +428,9 @@ public function isUser()
             'modules',
             'is_verified',
             'first_login',
-            'subscription_level'
+            'subscription_level',
+            'password_reset_token',
+            'token_created_at'
         ];
     }
 
@@ -531,14 +531,17 @@ public function isUser()
         $randomStr = Yii::$app->security->generateRandomString(32);
         $timestamp = time();
         $this->password_reset_token = $randomStr . '_' . $timestamp;
-        Yii::debug("Generated new reset token: " . $this->password_reset_token);
+        
+        // Ensure the timestamp is saved so validation works
+        $this->token_created_at_unix = $timestamp;
+        // Also set token_created_at if it's the DB field
+        $this->token_created_at = $timestamp;
+        
+        Yii::debug("Generated new reset token: " . $this->password_reset_token . " with timestamp: " . $timestamp);
         return $this->password_reset_token;
     }
 
-    // public function removePasswordResetToken()
-    // {
-    //     $this->password_reset_token = null;
-    // }
+    
 
     public function sendEmail()
     

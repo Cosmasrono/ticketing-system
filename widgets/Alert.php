@@ -52,7 +52,7 @@ class Alert extends \yii\bootstrap5\Widget
     /**
      * {@inheritdoc}
      */
-    public function init()
+    public function init(): void
     {
         parent::init();
         

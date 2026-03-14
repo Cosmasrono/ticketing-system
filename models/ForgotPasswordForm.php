@@ -90,7 +90,7 @@ class ForgotPasswordForm extends Model
 
             ->setTo($this->email)
 
-            ->setFrom([\Yii::$app->params['supportEmail'] => \Yii::$app->name])
+            ->setFrom([\Yii::$app->params['supportEmail'] => 'iansoft'])
 
             ->setSubject('Password reset request')
 

@@ -849,24 +849,34 @@ class SiteController extends Controller
 
 
  
-    public function actionRequestPasswordReset()
-    {
-        $model = new PasswordResetRequestForm();
+ 
 
-        if ($model->load(Yii::$app->request->post()) && $model->validate()) {
-            if ($model->sendEmail()) {
-                Yii::$app->session->setFlash('success', 'Check your email for further instructions.');
-                return $this->goHome();
+public function actionRequestPasswordReset()
+{
+    $model = new PasswordResetRequestForm();
+
+    if ($model->load(Yii::$app->request->post()) && $model->validate()) {
+        if ($model->sendEmail()) {
+            // Find the user to get their token
+            $user = User::findByCompanyEmail($model->company_email);
+            if ($user && $user->password_reset_token) {
+                Yii::$app->session->setFlash('success', 'Email recognized. A password reset link has been sent to your email.');
+                // CHANGED: Instead of redirect, refresh the page to stay here
+                return $this->refresh();
             }
-
-            Yii::$app->session->setFlash('error', 'Sorry, we are unable to reset password for the provided email address.');
+            
+            Yii::$app->session->setFlash('success', 'Check your email for further instructions.');
+            // CHANGED: Instead of redirect, refresh the page to stay here
+            return $this->refresh();
         }
 
-        return $this->render('requestPasswordResetToken', [
-            'model' => $model,
-        ]);
+        Yii::$app->session->setFlash('error', 'Sorry, we are unable to reset password for the provided email address.');
     }
- 
+
+    return $this->render('requestPasswordResetToken', [
+        'model' => $model,
+    ]);
+}
 
 
     public function actionResetPassword($token)
@@ -876,8 +886,11 @@ class SiteController extends Controller
         
         if ($model->load(Yii::$app->request->post()) && $model->validate()) {
             if ($model->resetPassword()) {
-                Yii::$app->session->setFlash('success', 'New password saved.');
-                return $this->goHome();
+                // ✅ FIX: Set flash before redirect
+                Yii::$app->session->setFlash('success', 'Password has been reset successfully. Please log in with your new password.');
+                
+                // ✅ FIX: Use redirect instead of goHome() to ensure flash persists
+                return $this->redirect(['site/login']);
             } else {
                 Yii::$app->session->setFlash('error', 'Failed to reset password.');
             }
@@ -889,7 +902,8 @@ class SiteController extends Controller
         
     } catch (InvalidArgumentException $e) {
         Yii::$app->session->setFlash('error', $e->getMessage());
-        return $this->goHome(); // Redirect instead of trying to render
+        // ✅ FIX: Use redirect instead of goHome()
+        return $this->redirect(['site/login']);
     }
 }
     public function actionForgotPassword()

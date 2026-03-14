@@ -92,73 +92,123 @@ class SiteController extends Controller
 
 
 
-    // First, let's modify the action to debug the data:
+    // // First, let's modify the action to debug the data:
+    // public function actionCreateUser()
+    // {
+    //     // Fetch companies with role
+    //     $companies = Yii::$app->db->createCommand('
+    //         SELECT 
+    //             c.id,
+    //             c.company_name,
+    //             c.company_email,
+    //             c.modules,
+    //             c.role  -- Make sure this column exists in your company table
+    //         FROM company c
+    //         WHERE c.status = 1
+    //         ORDER BY c.company_name ASC
+    //     ')->queryAll();
+
+    //     // Debug log the raw data
+    //     foreach ($companies as $company) {
+    //         Yii::debug([
+    //             'company_name' => $company['company_name'],
+    //             'role_raw' => $company['role'],
+    //             'role_type' => gettype($company['role']),
+    //             'role_empty' => empty($company['role'])
+    //         ], 'role_debugging');
+    //     }
+
+    //     return $this->render('create-user', [
+    //         'companies' => $companies,
+    //     ]);
+    // }
+
+
     public function actionCreateUser()
-    {
-        // Fetch companies with role
-        $companies = Yii::$app->db->createCommand('
-            SELECT 
-                c.id,
-                c.company_name,
-                c.company_email,
-                c.modules,
-                c.role  -- Make sure this column exists in your company table
-            FROM company c
-            WHERE c.status = 1
-            ORDER BY c.company_name ASC
-        ')->queryAll();
+{
+    $companies = Yii::$app->db->createCommand('
+        SELECT 
+            c.id,
+            c.company_name,
+            c.company_email,
+            c.modules,
+            c.role
+        FROM company c
+        WHERE c.status = 1
+        ORDER BY c.company_name ASC
+    ')->queryAll();
 
-        // Debug log the raw data
-        foreach ($companies as $company) {
-            Yii::debug([
-                'company_name' => $company['company_name'],
-                'role_raw' => $company['role'],
-                'role_type' => gettype($company['role']),
-                'role_empty' => empty($company['role'])
-            ], 'role_debugging');
+    // Map text roles to numeric values the view expects
+    $roleMap = [
+        'user'       => 2,
+        'admin'      => 1,
+        'developer'  => 3,
+        'superadmin' => 4,
+        'super_admin'=> 4,
+    ];
+
+    foreach ($companies as &$company) {
+        $textRole = strtolower(trim($company['role'] ?? ''));
+        if (isset($roleMap[$textRole])) {
+            $company['role'] = $roleMap[$textRole];
         }
-
-        return $this->render('create-user', [
-            'companies' => $companies,
-        ]);
+        // if already numeric, leave it as-is
     }
+    unset($company);
 
-    public function actionCreateCompany()
-    {
-        $model = new Company();
-        $model->role = 'user';
+    return $this->render('create-user', [
+        'companies' => $companies,
+    ]);
+}
 
-        // Get the currently logged-in user
-        $user = Yii::$app->user->identity;
 
-        if ($model->load(Yii::$app->request->post())) {
+
+public function actionCreateCompany()
+{
+    $model = new Company();
+    $model->role = 'user';
+
+    $user = Yii::$app->user->identity;
+
+    $clientCompanies = (new \yii\db\Query())
+        ->select(['c.company_name', 'c.company_email', 'c.module', 'cl.name'])
+        ->from(['c' => 'client'])
+        ->leftJoin(['cl' => 'client'], 'c.company_name = cl.company_name')
+        ->all();
+
+    if ($model->load(Yii::$app->request->post())) {
+        try {
+            $post = Yii::$app->request->post('Company');
+
+            // Check for duplicate client email FIRST
+            $emailExists = (new \yii\db\Query())
+                ->from('client')
+                ->where(['company_email' => $post['company_email']])
+                ->exists();
+
+            if ($emailExists) {
+                Yii::$app->session->setFlash('error', 
+                    'A client with this email already exists. Please use a different email.');
+                return $this->render('create-company', [
+                    'model' => $model,
+                    'clientCompanies' => $clientCompanies,
+                    'user' => $user,
+                ]);
+            }
+
+            $transaction = Yii::$app->db->beginTransaction();
+
             try {
-                $post = Yii::$app->request->post('Company');
-
-                // Check if company name already exists
+                // Only create the company record if it doesn't already exist
                 $existingCompany = Company::findOne(['company_name' => $post['company_name']]);
-                if ($existingCompany) {
-                    Yii::$app->session->setFlash('error', 'This company name is already taken. Please choose a different name.');
-                    return $this->render('create-company', [
-                        'model' => $model,
-                        'user' => $user, // Pass user variable
-                    ]);
-                }
 
-                // Start transaction
-                $transaction = Yii::$app->db->beginTransaction();
-
-                try {
-                    // Convert modules array to comma-separated string
-                    $modules = isset($post['modules']) ? implode(',', $post['modules']) : '';
-
-                    // Insert into company table
-                    $result = Yii::$app->db->createCommand()->insert('company', [
+                if (!$existingCompany) {
+                    Yii::$app->db->createCommand()->insert('company', [
                         'name' => $post['name'] ?? $post['company_name'],
                         'company_name' => $post['company_name'],
                         'company_email' => $post['company_email'],
-                        'company_type' => $post['company_type'] ?? 'default',  // Add this line with appropriate default
-                        'subscription_level' => $post['subscription_level'] ?? 'basic',  // Add this line with appropriate default
+                        'company_type' => $post['company_type'] ?? 'default',
+                        'subscription_level' => $post['subscription_level'] ?? 'basic',
                         'start_date' => date('Y-m-d', strtotime($post['start_date'])),
                         'end_date' => date('Y-m-d', strtotime($post['end_date'])),
                         'role' => 'user',
@@ -167,39 +217,40 @@ class SiteController extends Controller
                         'created_at' => new \yii\db\Expression('GETDATE()'),
                         'updated_at' => new \yii\db\Expression('GETDATE()')
                     ])->execute();
-
-                    $transaction->commit();
-                    Yii::$app->session->setFlash('success', 'Company created successfully.');
-                    return $this->redirect(['admin']);
-                } catch (\Exception $e) {
-                    $transaction->rollBack();
-                    Yii::error('Database Error: ' . $e->getMessage());
-                    Yii::$app->session->setFlash('error', 'Database Error: ' . $e->getMessage());
                 }
+
+                // Always insert the client record
+                Yii::$app->db->createCommand()->insert('client', [
+                    'name' => $post['name'],
+                    'company_name' => $post['company_name'],
+                    'company_email' => $post['company_email'],
+                    'module' => isset($post['modules']) ? implode(', ', $post['modules']) : '',
+                    'created_at' => time(),
+                    'updated_at' => time(),
+                ])->execute();
+
+                $transaction->commit();
+                Yii::$app->session->setFlash('success', 'Client added successfully.');
+                return $this->redirect(['admin']);
+
             } catch (\Exception $e) {
-                Yii::error('Error creating company: ' . $e->getMessage());
-                Yii::$app->session->setFlash('error', 'Error creating company: ' . $e->getMessage());
+                $transaction->rollBack();
+                Yii::error('Database Error: ' . $e->getMessage());
+                Yii::$app->session->setFlash('error', 'Database Error: ' . $e->getMessage());
             }
+
+        } catch (\Exception $e) {
+            Yii::error('Error creating company: ' . $e->getMessage());
+            Yii::$app->session->setFlash('error', 'Error creating company: ' . $e->getMessage());
         }
-
-        // Get all companies with their modules and associated client names
-        $clientCompanies = (new \yii\db\Query())
-            ->select([
-                'c.company_name',
-                'c.company_email',
-                'c.module',
-                'cl.name'
-            ])
-            ->from(['c' => 'client'])
-            ->leftJoin(['cl' => 'client'], 'c.company_name = cl.company_name')
-            ->all();
-
-        return $this->render('create-company', [
-            'model' => $model,
-            'clientCompanies' => $clientCompanies,
-            'user' => $user, // Pass user variable
-        ]);
     }
+
+    return $this->render('create-company', [
+        'model' => $model,
+        'clientCompanies' => $clientCompanies,
+        'user' => $user,
+    ]);
+}
 
 
     /**
@@ -1605,74 +1656,147 @@ public function actionRequestPasswordReset()
 
 
 
-    public function actionCreateDeveloper()
-    {
-        $model = new Company();
-        $model->role = 'developer';
+    // public function actionCreateDeveloper()
+    // {
+    //     $model = new Company();
+    //     $model->role = 'developer';
 
-        if ($model->load(Yii::$app->request->post())) {
-            try {
-                $post = Yii::$app->request->post('Company');
+    //     if ($model->load(Yii::$app->request->post())) {
+    //         try {
+    //             $post = Yii::$app->request->post('Company');
 
-                // Debug post data
-                Yii::debug('POST data received: ' . print_r($post, true));
+    //             // Debug post data
+    //             Yii::debug('POST data received: ' . print_r($post, true));
 
-                // Validate required fields
-                $requiredFields = ['name', 'company_name', 'company_email', 'start_date', 'end_date'];
-                $missingFields = [];
+    //             // Validate required fields
+    //             $requiredFields = ['name', 'company_name', 'company_email', 'start_date', 'end_date'];
+    //             $missingFields = [];
 
-                foreach ($requiredFields as $field) {
-                    if (empty($post[$field])) {
-                        $missingFields[] = ucfirst(str_replace('_', ' ', $field));
-                    }
+    //             foreach ($requiredFields as $field) {
+    //                 if (empty($post[$field])) {
+    //                     $missingFields[] = ucfirst(str_replace('_', ' ', $field));
+    //                 }
+    //             }
+
+    //             if (!empty($missingFields)) {
+    //                 throw new \Exception('The following fields are required: ' . implode(', ', $missingFields));
+    //             }
+
+    //             // Process the names
+    //             $developerName = strtolower(trim($post['name']));
+    //             $companyName = strtolower(trim($post['company_name']));
+
+    //             // First check if company_name already exists
+    //             $existingName = (new \yii\db\Query())
+    //                 ->from('company')
+    //                 ->where(['company_name' => $companyName])
+    //                 ->exists();
+
+    //             if ($existingName) {
+    //                 throw new \Exception('This company name is already taken. Please choose a different name.');
+    //             }
+
+    //             // Prepare SQL for insertion with nullable fields
+    //             $sql = "INSERT INTO company (
+    //             name,
+    //             company_name, 
+    //             company_email, 
+    //             start_date, 
+    //             end_date, 
+    //             role,
+    //             status,
+    //             company_type,
+    //             subscription_level,
+    //             created_at, 
+    //             updated_at
+    //         ) VALUES (
+    //             :name,
+    //             :company_name,
+    //             :email,
+    //             :start_date,
+    //             :end_date,
+    //             :role,
+    //             :status,
+    //             :company_type,
+    //             'basic',  -- Set a default value instead of NULL
+    //             GETDATE(),
+    //             GETDATE()
+    //         )";
+
+    //             $result = Yii::$app->db->createCommand($sql)
+    //                 ->bindValues([
+    //                     ':name' => $developerName,
+    //                     ':company_name' => $companyName,
+    //                     ':email' => $post['company_email'],
+    //                     ':start_date' => $post['start_date'],
+    //                     ':end_date' => $post['end_date'],
+    //                     ':role' => 'developer',
+    //                     ':status' => 1,
+    //                     ':company_type' => 'default'
+    //                 ])
+    //                 ->execute();
+
+    //             if ($result) {
+    //                 Yii::$app->session->setFlash('success', 'Developer created successfully.');
+    //                 return $this->redirect(['admin']);
+    //             }
+    //         } catch (\Exception $e) {
+    //             Yii::error('Error creating developer: ' . $e->getMessage());
+    //             Yii::error('Stack trace: ' . $e->getTraceAsString());
+    //             Yii::error('POST data: ' . print_r($post ?? [], true));
+    //             Yii::$app->session->setFlash('error', 'Error creating developer: ' . $e->getMessage());
+    //         }
+    //     }
+
+    //     return $this->render('create-developer', [
+    //         'model' => $model,
+    //     ]);
+    // }
+
+ 
+ public function actionCreateDeveloper()
+{
+    $model = new Company();
+    $model->role = 'developer';
+
+    if ($model->load(Yii::$app->request->post())) {
+        try {
+            $post = Yii::$app->request->post('Company');
+
+            // Validate required fields
+            $requiredFields = ['name', 'company_name', 'company_email', 'start_date', 'end_date'];
+            $missingFields = [];
+
+            foreach ($requiredFields as $field) {
+                if (empty($post[$field])) {
+                    $missingFields[] = ucfirst(str_replace('_', ' ', $field));
                 }
+            }
 
-                if (!empty($missingFields)) {
-                    throw new \Exception('The following fields are required: ' . implode(', ', $missingFields));
-                }
+            if (!empty($missingFields)) {
+                throw new \Exception('The following fields are required: ' . implode(', ', $missingFields));
+            }
 
-                // Process the names
-                $developerName = strtolower(trim($post['name']));
-                $companyName = strtolower(trim($post['company_name']));
+            $developerName = strtolower(trim($post['name']));
+            $companyName = strtolower(trim($post['company_name']));
 
-                // First check if company_name already exists
-                $existingName = (new \yii\db\Query())
-                    ->from('company')
-                    ->where(['company_name' => $companyName])
-                    ->exists();
+            // Check if company already exists
+            $existingCompany = (new \yii\db\Query())
+                ->from('company')
+                ->where(['company_name' => $companyName])
+                ->one();
 
-                if ($existingName) {
-                    throw new \Exception('This company name is already taken. Please choose a different name.');
-                }
-
-                // Prepare SQL for insertion with nullable fields
+            if (!$existingCompany) {
+                // Company doesn't exist, create it
                 $sql = "INSERT INTO company (
-                name,
-                company_name, 
-                company_email, 
-                start_date, 
-                end_date, 
-                role,
-                status,
-                company_type,
-                subscription_level,
-                created_at, 
-                updated_at
-            ) VALUES (
-                :name,
-                :company_name,
-                :email,
-                :start_date,
-                :end_date,
-                :role,
-                :status,
-                :company_type,
-                'basic',  -- Set a default value instead of NULL
-                GETDATE(),
-                GETDATE()
-            )";
+                    name, company_name, company_email, start_date, end_date,
+                    role, status, company_type, subscription_level, created_at, updated_at
+                ) VALUES (
+                    :name, :company_name, :email, :start_date, :end_date,
+                    :role, :status, :company_type, 'basic', GETDATE(), GETDATE()
+                )";
 
-                $result = Yii::$app->db->createCommand($sql)
+                Yii::$app->db->createCommand($sql)
                     ->bindValues([
                         ':name' => $developerName,
                         ':company_name' => $companyName,
@@ -1684,26 +1808,25 @@ public function actionRequestPasswordReset()
                         ':company_type' => 'default'
                     ])
                     ->execute();
-
-                if ($result) {
-                    Yii::$app->session->setFlash('success', 'Developer created successfully.');
-                    return $this->redirect(['admin']);
-                }
-            } catch (\Exception $e) {
-                Yii::error('Error creating developer: ' . $e->getMessage());
-                Yii::error('Stack trace: ' . $e->getTraceAsString());
-                Yii::error('POST data: ' . print_r($post ?? [], true));
-                Yii::$app->session->setFlash('error', 'Error creating developer: ' . $e->getMessage());
             }
-        }
+            // If company already exists, we just proceed — 
+            // the developer will be linked to the existing company
 
-        return $this->render('create-developer', [
-            'model' => $model,
-        ]);
+            Yii::$app->session->setFlash('success', 'Developer created successfully.');
+            return $this->redirect(['admin']);
+
+        } catch (\Exception $e) {
+            Yii::error('Error creating developer: ' . $e->getMessage());
+            Yii::error('Stack trace: ' . $e->getTraceAsString());
+            Yii::error('POST data: ' . print_r($post ?? [], true));
+            Yii::$app->session->setFlash('error', 'Error creating developer: ' . $e->getMessage());
+        }
     }
 
- 
- 
+    return $this->render('create-developer', [
+        'model' => $model,
+    ]);
+}
 
     public function actionRejectRenewal($id)
     {

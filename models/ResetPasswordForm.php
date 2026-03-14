@@ -1,5 +1,11 @@
 <?php
-// models/ResetPasswordForm.php
+/**
+ * Reset Password Form Model
+ * 
+ * Handles password reset for users with valid reset tokens.
+ * Allows users with any status to set their initial password.
+ */
+
 namespace app\models;
 
 use Yii;
@@ -8,73 +14,129 @@ use yii\base\Model;
 
 class ResetPasswordForm extends Model
 {
-    public $password;
-    public $confirmPassword;
-    // Removed current_password as it shouldn't be required during reset
-    
-    private $_user;
-    
     /**
-     * Creates a form model given a token.
+     * @var string New password
+     */
+    public $password;
+
+    /**
+     * @var string Password confirmation
+     */
+    public $confirmPassword;
+
+    /**
+     * @var User|null User instance
+     */
+    private $_user;
+
+    /**
+     * Constructor - validates and loads user by reset token
      *
-     * @param string $token password reset token
-     * @param array $config name-value pairs that will be used to initialize the object properties
-     * @throws InvalidArgumentException if token is empty or not valid
+     * @param string $token Password reset token
+     * @param array $config Configuration array
+     * @throws InvalidArgumentException If token is invalid
      */
     public function __construct($token, $config = [])
     {
+        // Validate token exists and is a string
         if (empty($token) || !is_string($token)) {
             throw new InvalidArgumentException('Password reset token cannot be blank.');
         }
-        
-        Yii::debug("Looking for user with token in ResetPasswordForm: " . $token);
-        
-     // Find user with exact token match
-$this->_user = User::findOne([
-    'password_reset_token' => $token,
-    'status' => User::STATUS_ACTIVE  // Changed from STATUS_UNVERIFIED
-]);
+
+        // Find user by reset token only
+        // Status check removed to allow newly created users (status=20) to set password
+        $this->_user = $this->findUserByToken($token);
+
         if (!$this->_user) {
-            Yii::error("No user found with token in ResetPasswordForm: $token");
+            Yii::error('No user found with token: ' . $token);
             throw new InvalidArgumentException('Wrong password reset token.');
         }
-        
-        Yii::debug("Found user: " . $this->_user->company_email);
-                
+
         parent::__construct($config);
     }
-    
+
     /**
-     * {@inheritdoc}
+     * Find user by password reset token
+     *
+     * @param string $token The reset token
+     * @return User|null The user model or null if not found
+     */
+    private function findUserByToken($token)
+    {
+        return User::findOne([
+            'password_reset_token' => $token,
+        ]);
+    }
+
+    /**
+     * Validation rules
+     *
+     * @return array Validation rules
      */
     public function rules()
     {
         return [
-            [['password', 'confirmPassword'], 'required'],
-            ['password', 'string', 'min' => 6],
-            ['confirmPassword', 'compare', 'compareAttribute' => 'password', 'message' => 'Passwords do not match.'],
-            // Removed validation for current_password
+            // Both password fields are required
+            [['password', 'confirmPassword'], 'required', 'message' => '{attribute} cannot be blank.'],
+
+            // Password minimum length
+            ['password', 'string', 'min' => 6, 'tooShort' => 'Password must be at least 6 characters.'],
+
+            // Password confirmation match
+            ['confirmPassword', 'compare', 
+                'compareAttribute' => 'password',
+                'operator' => '==',
+                'message' => 'Passwords do not match.',
+            ],
         ];
     }
-    
+
     /**
-     * Resets password.
+     * Attribute labels
      *
-     * @return bool if password was reset.
+     * @return array Attribute labels for display
+     */
+    public function attributeLabels()
+    {
+        return [
+            'password' => 'New Password',
+            'confirmPassword' => 'Confirm Password',
+        ];
+    }
+
+    /**
+     * Reset user password
+     *
+     * @return bool True if password was reset successfully, false otherwise
      */
     public function resetPassword()
     {
+        // Validate form data
         if (!$this->validate()) {
             return false;
         }
-        
+
+        // Get user instance
         $user = $this->_user;
+
+        // Update user data
         $user->setPassword($this->password);
         $user->removePasswordResetToken();
         $user->status = User::STATUS_ACTIVE;
-        $user->is_verified = 1;
-        $user->email_verified = 1;
-        
+        $user->is_verified = true;
+        $user->email_verified = true;
+
+        // Save without running validation again (we already validated)
         return $user->save(false);
+    }
+
+    /**
+     * Get the user instance
+     *
+     * @return User|null The user model
+     */
+    public function getUser()
+    {
+        return $this->_user;
     }
 }
